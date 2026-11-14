@@ -5,86 +5,18 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#080b12">
 <title>First Day</title>
+<link rel="stylesheet" href="common.css">
 <style>
-  :root { color-scheme: dark; }
-  * { box-sizing: border-box; }
-  html, body { height: 100%; }
-  body {
-    margin: 0;
-    min-height: 100dvh;
-    padding: 12px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 9px;
-    background: radial-gradient(120% 85% at 50% 0%, #1c2a2c 0%, #0a1012 58%, #06090a 100%);
-    color: #eafcff;
-    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-    -webkit-user-select: none;
-    user-select: none;
-    overflow: hidden;
-    overscroll-behavior: none;
+  :root {
+    --bg-top: #1c2a2c;
+    --bg-mid: #0a1012;
+    --bg-bottom: #06090a;
+    --stage-bg: #081017;
+    --ink: #eafcff;
+    --stage-offset: 58px;
   }
-  #stage {
-    position: relative;
-    width: min(100%, calc((100dvh - 58px) * 0.75));
-    aspect-ratio: 3 / 4;
-    border-radius: 20px;
-    overflow: hidden;
-    background: #081017;
-    box-shadow:
-      0 30px 70px -28px rgba(0, 0, 0, 0.95),
-      0 0 0 1px rgba(255, 255, 255, 0.07),
-      inset 0 0 0 1px rgba(94, 231, 199, 0.08);
-    touch-action: none;
-  }
-  canvas { display: block; width: 100%; height: 100%; touch-action: none; }
-  .hint {
-    margin: 0;
-    font-size: 9px;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: rgba(234, 252, 255, 0.3);
-    white-space: nowrap;
-  }
-  .overlay {
-    position: absolute;
-    inset: 0;
-    display: grid;
-    place-items: center;
-    padding: 20px;
-    background: rgba(4, 10, 12, 0.86);
-    -webkit-backdrop-filter: blur(4px);
-    backdrop-filter: blur(4px);
-    animation: fade-in 160ms ease-out;
-  }
-  .overlay[hidden] { display: none; }
-  @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
-  .panel {
-    width: 100%;
-    max-width: 330px;
-    max-height: 100%;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    text-align: center;
-    padding: 2px;
-    scrollbar-width: thin;
-  }
-  .eyebrow {
-    margin: 0 0 5px;
-    font-size: 9px;
-    letter-spacing: 0.24em;
-    text-transform: uppercase;
-    color: rgba(234, 252, 255, 0.4);
-  }
-  .title {
-    margin: 0 0 10px;
-    font-size: clamp(24px, 6.6vw, 32px);
-    line-height: 1.12;
-    color: #8fffdc;
-    text-shadow: 0 0 26px rgba(94, 231, 199, 0.32);
-  }
+  .panel { max-width: 330px; }
+  .title { color: #8fffdc; }
   .sub {
     margin: 0;
     font-size: 11px;
@@ -168,29 +100,7 @@
     text-align: left;
   }
   .explain.bad { border-left-color: rgba(255, 159, 110, 0.7); }
-  .btn {
-    margin-top: 18px;
-    padding: 13px 28px;
-    border: 0;
-    border-radius: 999px;
-    cursor: pointer;
-    font: inherit;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
-    color: #06211c;
-    background: linear-gradient(180deg, #7ff0d4, #46c8a9);
-    box-shadow:
-      0 14px 30px -14px rgba(94, 231, 199, 0.95),
-      inset 0 -2px 0 rgba(0, 0, 0, 0.16);
-    transition: transform 100ms ease, filter 150ms ease;
-  }
-  .btn:hover { filter: brightness(1.06); }
-  .btn:active { transform: translateY(1px) scale(0.99); }
-  .btn:focus-visible, .choice:focus-visible { outline: 2px solid #bff9ec; outline-offset: 3px; }
-  [hidden] { display: none !important; }
-  @media (prefers-reduced-motion: reduce) { .overlay { animation: none; } }
+  .btn { margin-top: 18px; padding: 13px 28px; font-size: 11px; font-weight: 700; letter-spacing: 0.16em; }
 </style>
 </head>
 <body>

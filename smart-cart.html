@@ -5,16 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0d1518">
 <title>Smart Cart &middot; School Event Shopping Puzzle</title>
+<link rel="stylesheet" href="common.css">
 <style>
   :root {
     --bg: #0c1417;
     --bg-2: #132025;
+    --bg-top: #1d3238;
+    --bg-mid: #0d1619;
+    --bg-bottom: #070c0e;
     --panel: #162328;
-    --panel-border: rgba(255, 255, 255, 0.09);
-    --paper: #f6f1e4;
-    --paper-2: #ebe3d0;
-    --paper-ink: #1b2224;
-    --paper-muted: #5d6463;
     --ink: #f4f1e8;
     --muted: rgba(244, 241, 232, 0.66);
     --faint: rgba(244, 241, 232, 0.28);
@@ -30,31 +29,9 @@
     --radius: 16px;
   }
 
-  * { box-sizing: border-box; }
-  html, body { height: 100%; margin: 0; }
-  body {
+  body.layout-wide {
     background:
       radial-gradient(120% 80% at 20% 0%, #1d3238 0%, #0d1619 52%, #070c0e 100%);
-    color: var(--ink);
-    font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    line-height: 1.4;
-    padding: 14px;
-    display: flex;
-    justify-content: center;
-    align-items: flex-start;
-    overflow-y: auto;
-  }
-
-  .mono {
-    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .app {
-    width: min(1160px, 100%);
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
   }
 
   /* Top HUD */
@@ -71,11 +48,7 @@
     box-shadow: var(--shadow);
   }
 
-  .brand {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
+  .brand { gap: 12px; }
 
   .avatar {
     width: 42px;
@@ -688,8 +661,8 @@
   }
 </style>
 </head>
-<body>
-<div class="app">
+<body class="layout-wide">
+<div class="app-wide">
   <!-- Top HUD -->
   <header class="hud">
     <div class="brand">

@@ -5,41 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#080b12">
 <title>Magma Vault</title>
+<link rel="stylesheet" href="common.css">
 <style>
-  :root { color-scheme: dark; }
-  * { box-sizing: border-box; }
-  html, body { height: 100%; }
-  body {
-    margin: 0;
-    min-height: 100dvh;
-    padding: 12px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    background: radial-gradient(120% 85% at 50% 0%, #2a1a2c 0%, #0c0a12 58%, #070609 100%);
-    color: #f3ecff;
-    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-    -webkit-user-select: none;
-    user-select: none;
-    overflow: hidden;
-    overscroll-behavior: none;
+  :root {
+    --bg-top: #2a1a2c;
+    --bg-mid: #0c0a12;
+    --bg-bottom: #070609;
+    --stage-bg: #0b0d14;
+    --ink: #f3ecff;
+    --stage-offset: 112px;
   }
-  #stage {
-    position: relative;
-    width: min(100%, calc((100dvh - 112px) * 0.75));
-    aspect-ratio: 3 / 4;
-    border-radius: 20px;
-    overflow: hidden;
-    background: #0b0d14;
-    box-shadow:
-      0 30px 70px -28px rgba(0, 0, 0, 0.95),
-      0 0 0 1px rgba(255, 255, 255, 0.07),
-      inset 0 0 0 1px rgba(255, 138, 92, 0.08);
-    touch-action: none;
-  }
-  canvas { display: block; width: 100%; height: 100%; touch-action: none; }
   .controls { display: flex; gap: 8px; }
   .ghost {
     padding: 9px 22px;
@@ -58,53 +33,11 @@
   .ghost:hover { background: rgba(255, 255, 255, 0.08); color: #fff; border-color: rgba(243, 236, 255, 0.28); }
   .ghost:active { transform: translateY(1px); }
   .ghost:focus-visible { outline: 2px solid #ffd166; outline-offset: 3px; }
-  .hint {
-    margin: 0;
-    font-size: 10px;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: rgba(243, 236, 255, 0.32);
-    white-space: nowrap;
-  }
-  .overlay {
-    position: absolute;
-    inset: 0;
-    display: grid;
-    place-items: center;
-    padding: 22px;
-    background: rgba(6, 7, 11, 0.84);
-    -webkit-backdrop-filter: blur(4px);
-    backdrop-filter: blur(4px);
-    animation: fade-in 160ms ease-out;
-  }
-  .overlay[hidden] { display: none; }
-  @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
-  .panel { width: 100%; max-width: 300px; text-align: center; }
-  .eyebrow {
-    margin: 0 0 4px;
-    font-size: 10px;
-    letter-spacing: 0.34em;
-    text-transform: uppercase;
-    color: rgba(243, 236, 255, 0.4);
-  }
-  .title {
-    margin: 0 0 18px;
-    font-size: clamp(26px, 7.5vw, 36px);
-    letter-spacing: 0.02em;
-    color: #ffb703;
-    text-shadow: 0 0 26px rgba(255, 183, 3, 0.3);
-  }
+  .panel { max-width: 300px; }
+  .title { margin-bottom: 18px; color: #ffb703; text-shadow: 0 0 26px rgba(255, 183, 3, 0.3); }
   .overlay.dead .title { color: #ff7a4d; text-shadow: 0 0 26px rgba(255, 90, 40, 0.35); }
   .overlay.won .title { color: #5ee7c7; text-shadow: 0 0 26px rgba(94, 231, 199, 0.35); }
-  .label {
-    margin: 0;
-    font-size: 10px;
-    letter-spacing: 0.28em;
-    text-transform: uppercase;
-    color: rgba(243, 236, 255, 0.45);
-  }
   .score {
-    margin: 2px 0 0;
     font-size: 54px;
     line-height: 1;
     font-weight: 700;
@@ -112,40 +45,23 @@
     text-shadow: 0 0 30px rgba(255, 183, 3, 0.3);
   }
   .overlay.won .score { color: #5ee7c7; text-shadow: 0 0 30px rgba(94, 231, 199, 0.35); }
-  .best {
-    margin: 10px 0 0;
-    font-size: 11px;
-    letter-spacing: 0.18em;
-    color: rgba(243, 236, 255, 0.5);
-  }
+  .best { margin-top: 10px; font-size: 11px; letter-spacing: 0.18em; }
   .btn {
     margin-top: 22px;
     padding: 15px 32px;
-    border: 0;
-    border-radius: 999px;
-    cursor: pointer;
-    font: inherit;
     font-size: 12px;
     font-weight: 700;
     letter-spacing: 0.18em;
-    text-transform: uppercase;
     color: #241104;
     background: linear-gradient(180deg, #ffd27a, #ff9f43);
     box-shadow:
       0 14px 30px -14px rgba(255, 159, 67, 0.9),
       inset 0 -2px 0 rgba(0, 0, 0, 0.16);
-    transition: transform 100ms ease, filter 150ms ease;
   }
   .overlay.won .btn {
     color: #06211c;
     background: linear-gradient(180deg, #7ff0d4, #46c8a9);
     box-shadow: 0 14px 30px -14px rgba(94, 231, 199, 0.95), inset 0 -2px 0 rgba(0, 0, 0, 0.16);
-  }
-  .btn:hover { filter: brightness(1.06); }
-  .btn:active { transform: translateY(1px) scale(0.99); }
-  .btn:focus-visible { outline: 2px solid #bff9ec; outline-offset: 3px; }
-  @media (prefers-reduced-motion: reduce) {
-    .overlay { animation: none; }
   }
 </style>
 </head>

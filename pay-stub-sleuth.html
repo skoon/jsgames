@@ -5,128 +5,54 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0c1210">
 <title>The Short Check &middot; Pay Stub Sleuth</title>
+<link rel="stylesheet" href="common.css">
 <style>
   :root {
-    color-scheme: dark;
+    --bg-top: #29352d;
+    --bg-mid: #0c1411;
+    --bg-bottom: #030706;
+    --stage-bg: #08100d;
     --ink: #f4f0e4;
     --muted: rgba(239, 233, 215, 0.5);
     --faint: rgba(239, 233, 215, 0.23);
     --mint: #82e3be;
-    --mint-deep: #3ec49d;
     --amber: #ffc96b;
-    --amber-deep: #d99e38;
     --red: #ff8d79;
-    --blue: #8bc8ff;
     --violet: #c6abff;
     --line: rgba(232, 205, 153, 0.16);
     --paper: #eee5d2;
     --paper-ink: #20241f;
     --paper-muted: #6e695c;
-    --paper-line: rgba(63, 57, 44, 0.2);
+    --topbar-bg: linear-gradient(180deg, rgba(31, 43, 35, 0.97), rgba(7, 15, 11, 0.92));
+    --stage-offset: 55px;
   }
-  * { box-sizing: border-box; }
-  html, body { height: 100%; }
-  body {
-    margin: 0;
-    min-height: 100dvh;
-    padding: 12px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 9px;
-    overflow: hidden;
-    overscroll-behavior: none;
-    background:
-      radial-gradient(110% 80% at 50% 0%, #29352d 0%, #0c1411 54%, #030706 100%);
-    color: var(--ink);
-    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-    -webkit-user-select: none;
-    user-select: none;
-  }
-  #stage {
-    position: relative;
-    width: min(100%, calc((100dvh - 55px) * 0.75));
-    aspect-ratio: 3 / 4;
-    overflow: hidden;
-    border-radius: 20px;
-    background: #08100d;
-    box-shadow:
-      0 30px 70px -28px rgba(0, 0, 0, 0.96),
-      0 0 0 1px rgba(255, 255, 255, 0.07),
-      inset 0 0 0 1px rgba(255, 201, 107, 0.06);
-    container-type: size;
-  }
-  .hint {
-    margin: 0;
-    color: rgba(239, 233, 215, 0.26);
-    font-size: clamp(6.5px, 1.8vw, 8px);
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    white-space: nowrap;
-  }
-  button, input { font: inherit; }
-  button:focus-visible, input:focus-visible { outline: 2px solid #e5ffe9; outline-offset: 2px; }
-  [hidden] { display: none !important; }
+  input { font: inherit; }
 
   #app {
     position: absolute;
-    inset: 0;
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
     background:
       radial-gradient(75% 42% at 50% 0%, rgba(78, 91, 64, 0.2), transparent 76%),
       linear-gradient(180deg, #101a15 0%, #08100d 72%, #040907 100%);
   }
 
   /* top bar */
-  .topbar {
-    flex: 0 0 auto;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    margin: 8px 8px 0;
-    padding: 6px 8px;
-    border: 1px solid var(--line);
-    border-radius: 12px;
-    background: linear-gradient(180deg, rgba(31, 43, 35, 0.97), rgba(7, 15, 11, 0.92));
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045);
-  }
-  .brand { display: flex; align-items: center; gap: 7px; min-width: 0; }
   .brand-mark {
     width: 24px;
     height: 24px;
-    flex: none;
-    display: grid;
-    place-items: center;
-    border: 1px solid rgba(255, 201, 107, 0.48);
-    border-radius: 6px;
-    background: rgba(255, 201, 107, 0.08);
-    color: var(--amber);
-    font-size: 11px;
-    font-weight: 800;
-    line-height: 1;
-    letter-spacing: -0.04em;
+    border-color: rgba(255, 201, 107, 0.48);
   }
   .brand b {
-    display: block;
     color: var(--ink);
     font-size: clamp(9.5px, 2.15cqw, 12px);
     line-height: 1.05;
     letter-spacing: 0.12em;
-    white-space: nowrap;
   }
   .brand small {
-    display: block;
     margin-top: 2px;
-    color: var(--muted);
     font-size: clamp(5px, 1.15cqw, 6.5px);
     letter-spacing: 0.13em;
-    white-space: nowrap;
   }
-  .hud { display: flex; align-items: center; gap: clamp(8px, 2.4cqw, 14px); flex: none; }
+  .hud { gap: clamp(8px, 2.4cqw, 14px); }
   .stat { text-align: right; }
   .stat span {
     display: block;

@@ -5,9 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#070b15">
 <title>Time Vault</title>
+<link rel="stylesheet" href="common.css">
 <style>
   :root {
-    color-scheme: dark;
+    --bg-top: #273257;
+    --bg-mid: #0a1020;
+    --bg-bottom: #030610;
+    --stage-bg: #060b16;
     --ink: #eff5ff;
     --muted: rgba(225, 236, 255, 0.51);
     --faint: rgba(225, 236, 255, 0.23);
@@ -20,111 +24,37 @@
     --red: #ff8d7a;
     --line: rgba(151, 193, 246, 0.15);
     --panel: rgba(11, 19, 35, 0.97);
+    --topbar-bg: linear-gradient(180deg, rgba(27, 38, 65, 0.97), rgba(7, 13, 26, 0.93));
+    --stage-offset: 55px;
   }
-  * { box-sizing: border-box; }
-  html, body { height: 100%; }
-  body {
-    margin: 0;
-    min-height: 100dvh;
-    padding: 12px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 9px;
-    background:
-      radial-gradient(110% 82% at 50% 0%, #273257 0%, #0a1020 54%, #030610 100%);
-    color: var(--ink);
-    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-    -webkit-user-select: none;
-    user-select: none;
-    overflow: hidden;
-    overscroll-behavior: none;
-  }
-  #stage {
-    position: relative;
-    width: min(100%, calc((100dvh - 55px) * 0.75));
-    aspect-ratio: 3 / 4;
-    border-radius: 20px;
-    overflow: hidden;
-    background: #060b16;
-    box-shadow:
-      0 30px 70px -28px rgba(0, 0, 0, 0.96),
-      0 0 0 1px rgba(255, 255, 255, 0.07),
-      inset 0 0 0 1px rgba(125, 216, 255, 0.06);
-    container-type: size;
-  }
-  .hint {
-    margin: 0;
-    color: rgba(233, 242, 255, 0.28);
-    font-size: clamp(6.5px, 1.8vw, 8px);
-    letter-spacing: 0.11em;
-    text-transform: uppercase;
-    white-space: nowrap;
-  }
-  button, input { font: inherit; }
-  button:focus-visible, input:focus-visible, summary:focus-visible {
-    outline: 2px solid #d8f3ff;
-    outline-offset: 2px;
-  }
-  [hidden] { display: none !important; }
+  input { font: inherit; }
 
   #app {
     position: absolute;
-    inset: 0;
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
     background:
       radial-gradient(78% 46% at 50% 0%, rgba(58, 74, 121, 0.26), transparent 76%),
       linear-gradient(180deg, #0c1426 0%, #070d19 72%, #040812 100%);
   }
 
   /* ---------- top bar ---------- */
-  .topbar {
-    flex: 0 0 auto;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    margin: 8px 8px 0;
-    padding: 6px 8px;
-    border: 1px solid var(--line);
-    border-radius: 12px;
-    background: linear-gradient(180deg, rgba(27, 38, 65, 0.97), rgba(7, 13, 26, 0.93));
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045);
-  }
-  .brand { display: flex; align-items: center; gap: 7px; min-width: 0; }
   .brand-mark {
-    width: 23px;
-    height: 23px;
-    flex: none;
-    display: grid;
-    place-items: center;
-    border: 1px solid rgba(185, 166, 255, 0.5);
-    border-radius: 6px;
+    border-color: rgba(185, 166, 255, 0.5);
     background: rgba(185, 166, 255, 0.09);
     color: var(--violet);
     font-size: 8px;
-    font-weight: 800;
     letter-spacing: -0.04em;
   }
   .brand b {
-    display: block;
     font-size: clamp(9.5px, 2.1cqw, 12px);
     letter-spacing: 0.11em;
     line-height: 1.05;
-    white-space: nowrap;
   }
   .brand small {
-    display: block;
     margin-top: 2px;
-    color: var(--muted);
     font-size: clamp(5px, 1.12cqw, 6.6px);
     letter-spacing: 0.12em;
-    white-space: nowrap;
   }
-  .hud { display: flex; align-items: center; gap: clamp(8px, 2.2cqw, 14px); flex: none; }
+  .hud { gap: clamp(8px, 2.2cqw, 14px); }
   .stat { text-align: right; }
   .stat span {
     display: block;

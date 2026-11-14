@@ -5,41 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#080b12">
 <title>Creature Nursery</title>
+<link rel="stylesheet" href="common.css">
 <style>
-  :root { color-scheme: dark; }
-  * { box-sizing: border-box; }
-  html, body { height: 100%; }
-  body {
-    margin: 0;
-    min-height: 100dvh;
-    padding: 12px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 9px;
-    background: radial-gradient(120% 85% at 50% 0%, #1c2c33 0%, #0a1014 58%, #06090b 100%);
-    color: #eafff6;
-    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-    -webkit-user-select: none;
-    user-select: none;
-    overflow: hidden;
-    overscroll-behavior: none;
+  :root {
+    --bg-top: #1c2c33;
+    --bg-mid: #0a1014;
+    --bg-bottom: #06090b;
+    --stage-bg: #0a1013;
+    --ink: #eafff6;
+    --stage-offset: 122px;
   }
-  #stage {
-    position: relative;
-    width: min(100%, calc((100dvh - 122px) * 0.75));
-    aspect-ratio: 3 / 4;
-    border-radius: 20px;
-    overflow: hidden;
-    background: #0a1013;
-    box-shadow:
-      0 30px 70px -28px rgba(0, 0, 0, 0.95),
-      0 0 0 1px rgba(255, 255, 255, 0.07),
-      inset 0 0 0 1px rgba(94, 231, 199, 0.08);
-    touch-action: none;
-  }
-  canvas { display: block; width: 100%; height: 100%; touch-action: none; }
   .actions { display: flex; gap: 8px; }
   .act {
     display: flex;
@@ -71,51 +46,9 @@
   .act:active:not(:disabled) { transform: translateY(1px); }
   .act:focus-visible { outline: 2px solid #bff9ec; outline-offset: 3px; }
   .act:disabled { opacity: 0.34; cursor: default; }
-  .hint {
-    margin: 0;
-    font-size: 9.5px;
-    letter-spacing: 0.13em;
-    text-transform: uppercase;
-    color: rgba(234, 255, 246, 0.3);
-    white-space: nowrap;
-  }
-  .overlay {
-    position: absolute;
-    inset: 0;
-    display: grid;
-    place-items: center;
-    padding: 22px;
-    background: rgba(5, 9, 11, 0.84);
-    -webkit-backdrop-filter: blur(4px);
-    backdrop-filter: blur(4px);
-    animation: fade-in 160ms ease-out;
-  }
-  .overlay[hidden] { display: none; }
-  @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
-  .panel { width: 100%; max-width: 310px; text-align: center; }
-  .eyebrow {
-    margin: 0 0 4px;
-    font-size: 10px;
-    letter-spacing: 0.3em;
-    text-transform: uppercase;
-    color: rgba(234, 255, 246, 0.4);
-  }
-  .title {
-    margin: 0 0 12px;
-    font-size: clamp(26px, 7vw, 34px);
-    letter-spacing: 0.01em;
-    color: #8fffdc;
-    text-shadow: 0 0 26px rgba(94, 231, 199, 0.35);
-  }
-  .label {
-    margin: 0;
-    font-size: 10px;
-    letter-spacing: 0.28em;
-    text-transform: uppercase;
-    color: rgba(234, 255, 246, 0.45);
-  }
+  .panel { max-width: 310px; }
+  .title { color: #8fffdc; }
   .score {
-    margin: 2px 0 0;
     font-size: 50px;
     line-height: 1;
     font-weight: 700;
@@ -127,6 +60,7 @@
     font-size: 11px;
     line-height: 1.5;
     letter-spacing: 0.03em;
+    text-transform: none;
     color: rgba(234, 255, 246, 0.58);
   }
   .dex {
@@ -158,30 +92,7 @@
     flex: none;
   }
   .dex-item.found .pip { background: #5ee7c7; box-shadow: 0 0 7px rgba(94, 231, 199, 0.8); }
-  .btn {
-    margin-top: 20px;
-    padding: 14px 30px;
-    border: 0;
-    border-radius: 999px;
-    cursor: pointer;
-    font: inherit;
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    color: #06211c;
-    background: linear-gradient(180deg, #7ff0d4, #46c8a9);
-    box-shadow:
-      0 14px 30px -14px rgba(94, 231, 199, 0.95),
-      inset 0 -2px 0 rgba(0, 0, 0, 0.16);
-    transition: transform 100ms ease, filter 150ms ease;
-  }
-  .btn:hover { filter: brightness(1.06); }
-  .btn:active { transform: translateY(1px) scale(0.99); }
-  .btn:focus-visible { outline: 2px solid #bff9ec; outline-offset: 3px; }
-  @media (prefers-reduced-motion: reduce) {
-    .overlay { animation: none; }
-  }
+  .btn { margin-top: 20px; padding: 14px 30px; font-size: 12px; font-weight: 700; letter-spacing: 0.18em; }
 </style>
 </head>
 <body>
