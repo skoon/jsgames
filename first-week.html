@@ -1,0 +1,2358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#081012">
+<title>First Week</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --ink: #f0f7ef;
+    --muted: rgba(224, 240, 232, 0.48);
+    --faint: rgba(224, 240, 232, 0.24);
+    --teal: #6ee7cf;
+    --amber: #ffc86b;
+    --blue: #85c9ff;
+    --red: #ff8275;
+    --line: rgba(143, 220, 205, 0.16);
+    --panel: rgba(8, 19, 21, 0.94);
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    background:
+      radial-gradient(120% 85% at 50% 0%, #24362f 0%, #0b1415 55%, #05090a 100%);
+    color: var(--ink);
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    -webkit-user-select: none;
+    user-select: none;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+  #stage {
+    position: relative;
+    width: min(100%, calc((100dvh - 55px) * 0.75));
+    aspect-ratio: 3 / 4;
+    border-radius: 20px;
+    overflow: hidden;
+    background: #081012;
+    box-shadow:
+      0 30px 70px -28px rgba(0, 0, 0, 0.95),
+      0 0 0 1px rgba(255, 255, 255, 0.07),
+      inset 0 0 0 1px rgba(110, 231, 207, 0.07);
+    touch-action: none;
+    container-type: size;
+  }
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    touch-action: none;
+  }
+  .hint {
+    margin: 0;
+    font-size: clamp(6.5px, 1.8vw, 8px);
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    color: rgba(240, 247, 239, 0.27);
+    white-space: nowrap;
+  }
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  #ui {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px 12px 9px;
+    pointer-events: none;
+  }
+  #ui > * { pointer-events: auto; }
+  .hud {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 6px 9px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background:
+      linear-gradient(180deg, rgba(21, 37, 36, 0.95), rgba(7, 16, 18, 0.88));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045);
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+  }
+  .brand-mark {
+    width: 21px;
+    height: 21px;
+    flex: none;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(255, 200, 107, 0.5);
+    border-radius: 5px;
+    background: rgba(255, 200, 107, 0.08);
+    color: var(--amber);
+    font-size: 11px;
+    line-height: 1;
+  }
+  .brand b {
+    display: block;
+    font-size: 12px;
+    line-height: 1.05;
+    letter-spacing: 0.1em;
+  }
+  .brand small {
+    display: block;
+    margin-top: 2px;
+    font-size: 6px;
+    letter-spacing: 0.14em;
+    color: var(--muted);
+  }
+  .stats { display: flex; align-items: center; gap: 13px; flex: none; }
+  .stat { text-align: right; }
+  .stat span {
+    display: block;
+    color: var(--muted);
+    font-size: 6px;
+    letter-spacing: 0.14em;
+  }
+  .stat strong {
+    display: block;
+    margin-top: 1px;
+    color: var(--teal);
+    font-size: 15px;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .stat:last-child strong { color: rgba(240, 247, 239, 0.52); }
+  .stat strong.flash { animation: score-flash 300ms ease-out; }
+  @keyframes score-flash {
+    0% { color: #ffffff; text-shadow: 0 0 18px rgba(110, 231, 207, 0.9); }
+    100% { color: var(--teal); text-shadow: none; }
+  }
+
+  .dayline {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 0 3px;
+    color: var(--muted);
+    font-size: 7px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  #dayTag {
+    color: var(--amber);
+    font-weight: 700;
+  }
+  #sceneTag {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .dayline .dot {
+    width: 3px;
+    height: 3px;
+    flex: none;
+    border-radius: 50%;
+    background: rgba(255, 200, 107, 0.5);
+  }
+  #modeTag { margin-left: auto; color: rgba(224, 240, 232, 0.28); font-size: 6px; }
+
+  .scene-space {
+    flex: 1 1 0;
+    min-height: 56px;
+    pointer-events: none;
+  }
+
+  .storybox {
+    flex: 0 0 auto;
+    max-height: 67%;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 10px 11px 8px;
+    border: 1px solid rgba(143, 220, 205, 0.18);
+    border-radius: 13px;
+    background:
+      linear-gradient(180deg, rgba(17, 34, 33, 0.97), rgba(6, 15, 17, 0.98));
+    box-shadow:
+      0 18px 44px -20px rgba(0, 0, 0, 0.9),
+      inset 0 1px 0 rgba(255, 255, 255, 0.045);
+    scrollbar-width: thin;
+  }
+  .speakerline {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+  }
+  .portrait {
+    width: 27px;
+    height: 27px;
+    flex: none;
+    display: grid;
+    place-items: center;
+    border: 1px solid color-mix(in srgb, var(--speaker, #6ee7cf) 48%, transparent);
+    border-radius: 50%;
+    background:
+      radial-gradient(circle at 35% 28%, color-mix(in srgb, var(--speaker, #6ee7cf) 32%, transparent), rgba(255, 255, 255, 0.03));
+    color: var(--speaker, #6ee7cf);
+    font-size: 10px;
+    font-weight: 700;
+    box-shadow: 0 0 16px color-mix(in srgb, var(--speaker, #6ee7cf) 12%, transparent);
+  }
+  .speaker-meta { min-width: 0; flex: 1; }
+  .speaker-meta b {
+    display: block;
+    color: var(--ink);
+    font-size: 10px;
+    line-height: 1.1;
+    letter-spacing: 0.04em;
+  }
+  .speaker-meta small {
+    display: block;
+    margin-top: 2px;
+    color: var(--muted);
+    font-size: 6.5px;
+    letter-spacing: 0.05em;
+  }
+  .feedback {
+    flex: none;
+    padding: 3px 5px;
+    border: 1px solid rgba(143, 220, 205, 0.25);
+    border-radius: 4px;
+    background: rgba(110, 231, 207, 0.08);
+    color: var(--teal);
+    font-size: 6.5px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    white-space: nowrap;
+  }
+  .feedback.report {
+    border-color: rgba(255, 200, 107, 0.32);
+    background: rgba(255, 200, 107, 0.09);
+    color: #ffd88f;
+  }
+  .feedback.train {
+    border-color: rgba(133, 201, 255, 0.32);
+    background: rgba(133, 201, 255, 0.09);
+    color: #b9e1ff;
+  }
+  .feedback.safe {
+    border-color: rgba(110, 231, 207, 0.3);
+    background: rgba(110, 231, 207, 0.08);
+    color: #b6ffef;
+  }
+  .feedback.unsafe {
+    border-color: rgba(255, 130, 117, 0.4);
+    background: rgba(255, 130, 117, 0.1);
+    color: #ffb3aa;
+  }
+  #storyText {
+    margin: 8px 1px 0;
+    color: rgba(240, 247, 239, 0.78);
+    font-size: 9.5px;
+    line-height: 1.58;
+    letter-spacing: 0.005em;
+    white-space: pre-line;
+  }
+  .outcome {
+    margin: 8px 0 0;
+    padding: 5px 7px;
+    border-left: 2px solid rgba(110, 231, 207, 0.5);
+    border-radius: 0 5px 5px 0;
+    background: rgba(110, 231, 207, 0.04);
+    color: rgba(224, 240, 232, 0.52);
+    font-size: 7.5px;
+    line-height: 1.45;
+  }
+  .outcome.unsafe {
+    border-left-color: rgba(255, 130, 117, 0.65);
+    background: rgba(255, 130, 117, 0.055);
+    color: rgba(255, 207, 202, 0.7);
+  }
+  .choices {
+    display: grid;
+    gap: 5px;
+    margin-top: 9px;
+  }
+  .choice {
+    width: 100%;
+    display: flex;
+    align-items: flex-start;
+    gap: 7px;
+    padding: 7px 8px;
+    border: 1px solid rgba(143, 220, 205, 0.2);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.034);
+    color: var(--ink);
+    font: inherit;
+    font-size: 8.5px;
+    line-height: 1.4;
+    letter-spacing: 0.005em;
+    text-align: left;
+    cursor: pointer;
+    transition:
+      background 110ms ease,
+      border-color 110ms ease,
+      transform 100ms ease;
+  }
+  .choice:hover {
+    border-color: rgba(110, 231, 207, 0.52);
+    background: rgba(110, 231, 207, 0.065);
+  }
+  .choice:active { transform: translateY(1px); }
+  .choice:focus-visible {
+    outline: 2px solid var(--amber);
+    outline-offset: 2px;
+  }
+  .choice.final {
+    border-color: rgba(255, 200, 107, 0.28);
+    background: rgba(255, 200, 107, 0.045);
+  }
+  .key {
+    width: 16px;
+    height: 16px;
+    flex: none;
+    display: grid;
+    place-items: center;
+    margin-top: 1px;
+    border: 1px solid rgba(255, 200, 107, 0.35);
+    border-radius: 4px;
+    background: rgba(255, 200, 107, 0.08);
+    color: var(--amber);
+    font-size: 7px;
+    font-weight: 700;
+    line-height: 1;
+  }
+  .choice-text { min-width: 0; }
+  .controls {
+    margin: 7px 1px 0;
+    color: rgba(224, 240, 232, 0.28);
+    font-size: 6.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .controls b { color: rgba(255, 200, 107, 0.62); font-weight: 700; }
+
+  /* ---------- overlays ---------- */
+  .overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 6;
+    display: grid;
+    place-items: center;
+    padding: 18px;
+    background: rgba(3, 8, 9, 0.88);
+    -webkit-backdrop-filter: blur(5px);
+    backdrop-filter: blur(5px);
+    animation: fade-in 160ms ease-out;
+  }
+  .overlay[hidden] { display: none; }
+  @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+  .panel {
+    width: 100%;
+    max-width: 330px;
+    max-height: 100%;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 18px 17px 15px;
+    border: 1px solid rgba(143, 220, 205, 0.16);
+    border-radius: 14px;
+    background:
+      linear-gradient(180deg, rgba(20, 38, 37, 0.99), rgba(6, 15, 17, 0.99));
+    box-shadow:
+      0 24px 60px -25px rgba(0, 0, 0, 0.95),
+      inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    text-align: center;
+    scrollbar-width: thin;
+  }
+  .eyebrow {
+    margin: 0 0 5px;
+    color: var(--amber);
+    font-size: 7.5px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+  }
+  .title {
+    margin: 0 0 9px;
+    color: var(--ink);
+    font-size: clamp(26px, 7.2vw, 36px);
+    line-height: 1.03;
+    letter-spacing: 0.015em;
+    text-shadow: 0 0 30px rgba(110, 231, 207, 0.15);
+  }
+  .title .accent { color: var(--teal); }
+  .lead {
+    margin: 0;
+    color: rgba(224, 240, 232, 0.62);
+    font-size: 9.5px;
+    line-height: 1.55;
+    letter-spacing: 0.005em;
+  }
+  .lead b { color: rgba(255, 200, 107, 0.85); font-weight: 700; }
+  .rules {
+    display: grid;
+    gap: 4px;
+    margin: 11px 0 0;
+    text-align: left;
+  }
+  .rule {
+    position: relative;
+    padding-left: 13px;
+    color: rgba(224, 240, 232, 0.58);
+    font-size: 8px;
+    line-height: 1.45;
+  }
+  .rule::before {
+    content: "▸";
+    position: absolute;
+    left: 1px;
+    color: var(--amber);
+  }
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 5px;
+    margin-top: 12px;
+  }
+  .metric {
+    padding: 7px 3px 6px;
+    border: 1px solid rgba(255, 255, 255, 0.065);
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.025);
+  }
+  .metric span {
+    display: block;
+    color: var(--muted);
+    font-size: 5.8px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .metric strong {
+    display: block;
+    margin-top: 3px;
+    color: var(--ink);
+    font-size: 11px;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+  }
+  .result {
+    margin: 13px 0 0;
+    padding: 9px;
+    border: 1px solid rgba(110, 231, 207, 0.16);
+    border-radius: 9px;
+    background: rgba(110, 231, 207, 0.045);
+  }
+  .result span {
+    display: block;
+    color: var(--muted);
+    font-size: 6px;
+    letter-spacing: 0.18em;
+  }
+  .result strong {
+    display: block;
+    margin-top: 1px;
+    color: var(--teal);
+    font-size: 34px;
+    line-height: 1;
+    letter-spacing: 0.02em;
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 26px rgba(110, 231, 207, 0.25);
+  }
+  .result small {
+    display: block;
+    margin-top: 5px;
+    color: var(--muted);
+    font-size: 6.5px;
+    letter-spacing: 0.12em;
+  }
+  .week-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 5px;
+    margin-top: 8px;
+  }
+  .week-stat {
+    padding: 6px 3px 5px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.02);
+  }
+  .week-stat span {
+    display: block;
+    color: var(--muted);
+    font-size: 5.6px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .week-stat strong {
+    display: block;
+    margin-top: 2px;
+    color: var(--ink);
+    font-size: 12px;
+  }
+  .week-stat.ask strong { color: var(--teal); }
+  .week-stat.report strong { color: var(--amber); }
+  .week-stat.train strong { color: var(--blue); }
+  .btn {
+    margin-top: 14px;
+    padding: 11px 24px;
+    border: 0;
+    border-radius: 999px;
+    background: linear-gradient(180deg, #7ff0d4, #46c8a9);
+    box-shadow:
+      0 14px 30px -14px rgba(94, 231, 199, 0.9),
+      inset 0 -2px 0 rgba(0, 0, 0, 0.16);
+    color: #06211c;
+    font: inherit;
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: filter 120ms ease, transform 100ms ease;
+  }
+  .btn:hover { filter: brightness(1.06); }
+  .btn:active { transform: translateY(1px) scale(0.99); }
+  .btn:focus-visible { outline: 2px solid #c9fff3; outline-offset: 3px; }
+  .fine {
+    margin: 8px 0 0;
+    color: rgba(224, 240, 232, 0.28);
+    font-size: 6.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .fine:empty { display: none; }
+  [hidden] { display: none !important; }
+
+  /* ---------- compact stages ---------- */
+  @container (max-height: 540px) {
+    #ui { gap: 4px; padding: 7px 9px; }
+    .hud { padding: 4px 7px; }
+    .brand b { font-size: 10px; }
+    .brand small { display: none; }
+    .brand-mark { width: 18px; height: 18px; font-size: 10px; }
+    .stat strong { font-size: 13px; }
+    .dayline { font-size: 6px; }
+    #modeTag { display: none; }
+    .scene-space { min-height: 34px; }
+    .storybox { max-height: 72%; padding: 7px 8px 6px; }
+    .portrait { width: 23px; height: 23px; font-size: 9px; }
+    .speaker-meta b { font-size: 9px; }
+    .speaker-meta small { font-size: 5.8px; }
+    #storyText { margin-top: 6px; font-size: 8px; line-height: 1.5; }
+    .outcome { margin-top: 5px; padding: 4px 6px; font-size: 6.5px; }
+    .choices { gap: 4px; margin-top: 6px; }
+    .choice { padding: 5px 6px; font-size: 7.5px; gap: 5px; }
+    .key { width: 14px; height: 14px; font-size: 6px; }
+    .controls { margin-top: 5px; font-size: 5.8px; }
+    .overlay { padding: 11px; }
+    .panel { padding: 13px 13px 11px; }
+    .title { font-size: 26px; margin-bottom: 6px; }
+    .lead { font-size: 8.5px; }
+    .rule { font-size: 7px; }
+    .metrics { margin-top: 8px; }
+    .metric { padding: 5px 2px; }
+    .metric strong { font-size: 9.5px; }
+    .result { margin-top: 8px; padding: 7px; }
+    .result strong { font-size: 28px; }
+    .btn { margin-top: 10px; padding: 8px 16px; font-size: 8px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .overlay { animation: none; }
+    .stat strong.flash { animation: none; }
+    .choice { transition: none; }
+  }
+</style>
+</head>
+<body>
+  <h1 class="sr-only">First Week: a workplace safety branching story</h1>
+  <div id="stage">
+    <canvas id="game" width="480" height="640" aria-hidden="true"></canvas>
+    <div id="ui">
+      <header class="hud">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">▤</span>
+          <span>
+            <b>FIRST WEEK</b>
+            <small>NORTHLIGHT MARKET</small>
+          </span>
+        </div>
+        <div class="stats">
+          <div class="stat"><span>SCORE</span><strong id="score">000</strong></div>
+          <div class="stat"><span>BEST</span><strong id="best">000</strong></div>
+        </div>
+      </header>
+      <div class="dayline">
+        <span id="dayTag">DAY 01 / 05</span>
+        <span class="dot" aria-hidden="true"></span>
+        <span id="sceneTag">FRONT COUNTER</span>
+        <span id="modeTag">NO TIMER</span>
+      </div>
+      <div class="scene-space" aria-hidden="true"></div>
+      <section id="storybox" class="storybox" aria-live="polite">
+        <div class="speakerline">
+          <span id="portrait" class="portrait" aria-hidden="true">D</span>
+          <div class="speaker-meta">
+            <b id="speakerName">Dana Park</b>
+            <small id="speakerRole">Store manager</small>
+          </div>
+          <span id="feedback" class="feedback" hidden></span>
+        </div>
+        <p id="storyText"></p>
+        <p id="outcome" class="outcome" hidden></p>
+        <div id="choices" class="choices"></div>
+        <p id="controls" class="controls">Press <b>1–3</b> to choose · or click</p>
+      </section>
+    </div>
+    <div id="overlay" class="overlay" role="dialog" aria-modal="true" aria-labelledby="ovTitle" hidden>
+      <div class="panel">
+        <p id="ovKicker" class="eyebrow"></p>
+        <h2 id="ovTitle" class="title"></h2>
+        <p id="ovLead" class="lead"></p>
+        <div id="ovRules" class="rules" hidden></div>
+        <div id="ovScore" class="result" hidden>
+          <span>WEEK SCORE</span>
+          <strong id="ovScoreValue">0</strong>
+          <small id="ovBest">BEST 000</small>
+        </div>
+        <div id="ovWeekStats" class="week-stats" hidden>
+          <div class="week-stat ask"><span>Questions</span><strong id="statAsk">0</strong></div>
+          <div class="week-stat report"><span>Reports</span><strong id="statReport">0</strong></div>
+          <div class="week-stat train"><span>Training</span><strong id="statTrain">0</strong></div>
+        </div>
+        <div id="ovMetrics" class="metrics"></div>
+        <button id="ovBtn" class="btn" type="button">Clock in</button>
+        <p id="ovFine" class="fine"></p>
+      </div>
+    </div>
+  </div>
+  <p class="hint">click or press 1–3 · ask · report · train · no timer</p>
+<script>
+(() => {
+  'use strict';
+
+  const W = 480;
+  const H = 640;
+  const TAU = Math.PI * 2;
+  const BEST_KEY = 'firstweek.best.v1';
+
+  const SPEAKERS = {
+    Dana: {
+      name: 'Dana Park',
+      role: 'Store manager',
+      initial: 'D',
+      color: '#ffc86b',
+    },
+    Nico: {
+      name: 'Nico Alvarez',
+      role: 'Coworker · one year in',
+      initial: 'N',
+      color: '#ff8a7a',
+    },
+    Riley: {
+      name: 'Riley',
+      role: 'You · first week',
+      initial: 'R',
+      color: '#6ee7cf',
+    },
+    Narrator: {
+      name: 'Riley’s log',
+      role: 'End of shift',
+      initial: 'R',
+      color: '#9ab8b3',
+    },
+  };
+
+  const SCENES = {
+    front: 'FRONT COUNTER',
+    aisle: 'DAIRY AISLE',
+    stockroom: 'STOCKROOM',
+    breakroom: 'BREAK ROOM',
+  };
+
+  const CATEGORY = {
+    ASK: { label: 'ASK', tone: 'ask' },
+    REPORT: { label: 'REPORT', tone: 'report' },
+    TRAIN: { label: 'TRAINING', tone: 'train' },
+    SAFE: { label: 'SAFE CALL', tone: 'safe' },
+    UNSAFE: { label: 'SHORTCUT', tone: 'unsafe' },
+  };
+
+  const NODES = {
+    /* ---------- MONDAY ---------- */
+    d1_intro: {
+      day: 1,
+      scene: 'front',
+      prop: 'none',
+      speaker: 'Dana',
+      mood: 'neutral',
+      text: 'Riley, right? Welcome to Northlight. Before the morning rush, can you face the cereal aisle? You know what that means.',
+      choices: [
+        {
+          label: '“Could you show me what ‘face’ means?”',
+          kind: 'ASK',
+          points: 30,
+          flag: 'askedTask',
+          feedback: 'You asked before guessing.',
+          next: 'd1_ask',
+        },
+        {
+          label: '“Nico, what does Dana mean by face?”',
+          kind: 'ASK',
+          points: 25,
+          flag: 'askedNico',
+          feedback: 'You asked a coworker for help.',
+          next: 'd1_ask_nico',
+        },
+        {
+          label: 'Say “got it” and figure it out alone.',
+          kind: 'UNSAFE',
+          points: 0,
+          flag: 'guessedTask',
+          feedback: 'You guessed instead of asking.',
+          next: 'd1_guess',
+        },
+      ],
+    },
+    d1_ask: {
+      day: 1,
+      scene: 'aisle',
+      prop: 'boxes',
+      speaker: 'Dana',
+      mood: 'smile',
+      text: 'Face means pull every box to the front, labels out, and check the sell-by dates. Anything past today goes in the returns bin. Grab the date gun—I’ll check your first row.',
+      next: 'd1_nico',
+    },
+    d1_ask_nico: {
+      day: 1,
+      scene: 'aisle',
+      prop: 'boxes',
+      speaker: 'Nico',
+      mood: 'smile',
+      text: 'Easy. Pull the boxes forward so the shelf looks full. Dates? Dana never checks those. You finish fast, but two expired boxes stay on the shelf. When Dana spots them, she raises an eyebrow. “Who told you that?”',
+      next: 'd1_nico',
+    },
+    d1_guess: {
+      day: 1,
+      scene: 'aisle',
+      prop: 'boxes',
+      speaker: 'Dana',
+      mood: 'concerned',
+      text: 'You pull the boxes forward, but leave the stock cart sideways across the aisle. Dana wheels it clear. “A blocked aisle is a hazard, Riley. If a task is unclear, ask. That’s not a bad look—it’s the job.”',
+      next: 'd1_nico',
+    },
+    d1_nico: {
+      day: 1,
+      scene: 'stockroom',
+      prop: 'crate',
+      speaker: 'Nico',
+      mood: 'smile',
+      text: 'Before break, help me get these soda cases on the top shelf. The ladder’s all the way in the back. We’ll use this milk crate—faster.',
+      choices: [
+        {
+          label: '“Can you train me on the ladder procedure first?”',
+          kind: 'TRAIN',
+          points: 35,
+          flag: 'ladderTraining',
+          feedback: 'You asked for training before climbing.',
+          next: 'd1_train',
+        },
+        {
+          label: '“I’ll grab the rolling ladder and you spot me.”',
+          kind: 'SAFE',
+          points: 25,
+          flag: 'ladderSafe',
+          feedback: 'You chose the right equipment.',
+          next: 'd1_safe',
+        },
+        {
+          label: '“Okay, hold the crate steady.”',
+          kind: 'UNSAFE',
+          points: 0,
+          flag: 'usedCrate',
+          feedback: 'You took the shortcut.',
+          next: 'd1_crate',
+        },
+      ],
+    },
+    d1_train: {
+      day: 1,
+      scene: 'stockroom',
+      prop: 'ladder',
+      speaker: 'Dana',
+      mood: 'smile',
+      text: 'Dana overhears and joins you. She shows you the ladder lock, three-point contact, and how to keep the aisle clear. Nico gets the same refresher, grumbling. “Safety training isn’t a punishment,” Dana says. “It’s the shortcut that costs you.”',
+      next: 'd1_end',
+    },
+    d1_safe: {
+      day: 1,
+      scene: 'stockroom',
+      prop: 'ladder',
+      speaker: 'Nico',
+      mood: 'annoyed',
+      text: 'You fetch the rolling ladder, lock the wheels, and ask Nico to spot you. He sighs but steadies it. The cases go up without a wobble. “Fine,” he says. “You’re careful. I get it.”',
+      next: 'd1_end',
+    },
+    d1_crate: {
+      day: 1,
+      scene: 'stockroom',
+      prop: 'crate',
+      speaker: 'Dana',
+      mood: 'stern',
+      text: 'The crate tips. You catch the shelf as a soda case thuds to the floor. Dana appears before Nico can say anything. No one is hurt, but the near miss goes in the log—and you both get a ladder refresher.',
+      next: 'd1_end',
+    },
+    d1_end: {
+      day: 1,
+      scene: 'front',
+      prop: 'none',
+      speaker: 'Narrator',
+      mood: 'neutral',
+      text: 'At five, Dana posts Tuesday’s tasks. Nico catches you at the lockers. “You’re not like the last new kid,” he says. “Just don’t make me look slow.”',
+      next: 'd2_spill',
+      continueLabel: 'Head home',
+    },
+
+    /* ---------- TUESDAY ---------- */
+    d2_spill: {
+      day: 2,
+      scene: 'aisle',
+      prop: 'spill',
+      speaker: 'Dana',
+      mood: 'neutral',
+      text: 'Riley, can you finish dairy before the eleven o’clock rush? She leaves. A puddle spreads by the milk case with no sign. Nico: “Leave it. Janitor comes at noon. Put a sign out and Dana will make us mop—we’ll miss the bus.”',
+      choices: [
+        {
+          label: 'Put out a wet-floor sign and tell Dana now.',
+          kind: 'REPORT',
+          points: 40,
+          flag: 'reportedSpill',
+          feedback: 'You reported the hazard immediately.',
+          next: 'd2_report',
+        },
+        {
+          label: 'Ask Nico to help you mop it and set the sign.',
+          kind: 'SAFE',
+          points: 25,
+          flag: 'fixedSpill',
+          feedback: 'You fixed the hazard right away.',
+          next: 'd2_mop',
+        },
+        {
+          label: 'Step around it and keep stocking.',
+          kind: 'UNSAFE',
+          points: 0,
+          flag: 'ignoredSpill',
+          feedback: 'You left the hazard in place.',
+          next: 'd2_ignore',
+        },
+      ],
+    },
+    d2_report: {
+      day: 2,
+      scene: 'aisle',
+      prop: 'spill',
+      speaker: 'Dana',
+      mood: 'smile',
+      text: 'You plant the wet-floor sign, then call Dana. She comes back with the mop bucket and a second pair of gloves. “Good. A spill gets reported the second you see it—not after the rush.” Nico mutters but grabs a mop.',
+      next: 'd2_cutter',
+    },
+    d2_mop: {
+      day: 2,
+      scene: 'aisle',
+      prop: 'spill',
+      speaker: 'Nico',
+      mood: 'annoyed',
+      text: 'Nico groans, but he mops while you set the sign at both ends of the aisle. A customer with a full cart turns away safely. Dana sees the cones and gives you a small nod.',
+      next: 'd2_cutter',
+    },
+    d2_ignore: {
+      day: 2,
+      scene: 'aisle',
+      prop: 'spill',
+      speaker: 'Dana',
+      mood: 'stern',
+      text: 'A cart skids at the edge of the puddle. The customer catches the shelf; no one falls. Dana closes the aisle and asks who saw the water. You admit it. “Hazards don’t get better when we stay quiet,” she says. Report review, first thing tomorrow.',
+      next: 'd2_cutter',
+    },
+    d2_cutter: {
+      day: 2,
+      scene: 'breakroom',
+      prop: 'cutter',
+      speaker: 'Nico',
+      mood: 'smile',
+      text: 'The box cutter is lying open on the shelf. “Blade’s still out. It saves time—everyone does it. Open the next case.”',
+      choices: [
+        {
+          label: '“Can you train me on the safety cutter?”',
+          kind: 'TRAIN',
+          points: 35,
+          flag: 'cutterTraining',
+          feedback: 'You asked for hands-on training.',
+          next: 'd2_train',
+        },
+        {
+          label: 'Close the blade and swap it for a safety cutter.',
+          kind: 'SAFE',
+          points: 25,
+          flag: 'cutterSafe',
+          feedback: 'You chose the safer tool.',
+          next: 'd2_safe',
+        },
+        {
+          label: '“I’ll be quick.” Use it as it is.',
+          kind: 'UNSAFE',
+          points: 0,
+          flag: 'usedOpenCutter',
+          feedback: 'You took the shortcut.',
+          next: 'd2_nick',
+        },
+      ],
+    },
+    d2_train: {
+      day: 2,
+      scene: 'breakroom',
+      prop: 'cutter',
+      speaker: 'Dana',
+      mood: 'smile',
+      text: 'Dana shows you the retract-blade grip and the cut-away-from-body rule, then signs off your box-cutter training card. “Ask for training on anything with an edge,” she says. “That includes the pallet jack.”',
+      next: 'd2_end',
+    },
+    d2_safe: {
+      day: 2,
+      scene: 'breakroom',
+      prop: 'cutter',
+      speaker: 'Dana',
+      mood: 'smile',
+      text: 'You click the blade shut, return it to its holster, and find a self-retracting safety cutter. Dana gives you a thirty-second demo before you open the first case. Nico watches without a joke.',
+      next: 'd2_end',
+    },
+    d2_nick: {
+      day: 2,
+      scene: 'breakroom',
+      prop: 'cutter',
+      speaker: 'Dana',
+      mood: 'concerned',
+      text: 'The blade skips through the tape and nicks your thumb. It’s small, but Dana still fills out an incident report and walks you through first aid. Nico tosses the open cutter into the bin. “My bad,” he says quietly.',
+      next: 'd2_end',
+    },
+    d2_end: {
+      day: 2,
+      scene: 'stockroom',
+      prop: 'boxes',
+      speaker: 'Narrator',
+      mood: 'neutral',
+      text: 'Wednesday’s board says receiving. Nico is already in the stockroom when you clock in, stacking cases like he’s late for something.',
+      next: 'd3_exit',
+      continueLabel: 'Start Wednesday',
+    },
+
+    /* ---------- WEDNESDAY ---------- */
+    d3_exit: {
+      day: 3,
+      scene: 'stockroom',
+      prop: 'exit',
+      speaker: 'Dana',
+      mood: 'neutral',
+      text: 'Delivery’s here. Stack these cases anywhere out of the way. She waves vaguely at the room and heads for the office. Nico: “Back exit’s perfect. Nobody uses it.”',
+      choices: [
+        {
+          label: '“Where’s the marked storage zone?”',
+          kind: 'ASK',
+          points: 30,
+          flag: 'askedStorage',
+          feedback: 'You asked where the stock belongs.',
+          next: 'd3_ask',
+        },
+        {
+          label: 'Follow the floor markings and keep the exit clear.',
+          kind: 'SAFE',
+          points: 25,
+          flag: 'keptExitClear',
+          feedback: 'You kept the exit route clear.',
+          next: 'd3_safe',
+        },
+        {
+          label: 'Stack the cases in front of the back exit.',
+          kind: 'UNSAFE',
+          points: 0,
+          flag: 'blockedExit',
+          feedback: 'You took the shortcut.',
+          next: 'd3_block',
+        },
+      ],
+    },
+    d3_ask: {
+      day: 3,
+      scene: 'stockroom',
+      prop: 'exit',
+      speaker: 'Dana',
+      mood: 'smile',
+      text: 'Dana points to the yellow line. “Good question. The exit has to stay clear—always. Stack inside the tape and keep the path to the door open.” She walks the route with you once.',
+      next: 'd3_pallet',
+    },
+    d3_safe: {
+      day: 3,
+      scene: 'stockroom',
+      prop: 'exit',
+      speaker: 'Nico',
+      mood: 'annoyed',
+      text: 'You follow the yellow floor tape to the storage zone. The back exit stays clear. Nico starts to stack a case by the door and you stop him. “Fine,” he says. “Dana’s tape, Dana’s rules.”',
+      next: 'd3_pallet',
+    },
+    d3_block: {
+      day: 3,
+      scene: 'stockroom',
+      prop: 'exit',
+      speaker: 'Dana',
+      mood: 'stern',
+      text: 'The cases cover most of the back exit. Dana returns and makes you move every one. “If we need that door, seconds matter. Never block an exit.” You add it to the near-miss log.',
+      next: 'd3_pallet',
+    },
+    d3_pallet: {
+      day: 3,
+      scene: 'stockroom',
+      prop: 'pallet',
+      speaker: 'Dana',
+      mood: 'neutral',
+      text: 'Riley, move this pallet to aisle six with the jack. You’ve used one, right? Nico grins. “It’s easy. Just yank it.”',
+      choices: [
+        {
+          label: '“Show me how to use it safely first.”',
+          kind: 'TRAIN',
+          points: 35,
+          flag: 'palletTraining',
+          feedback: 'You asked for a demonstration.',
+          next: 'd3_train',
+        },
+        {
+          label: '“Nico, demo it—then I’ll try with Dana watching.”',
+          kind: 'ASK',
+          points: 25,
+          flag: 'askedDemo',
+          feedback: 'You asked for a supervised demo.',
+          next: 'd3_demo',
+        },
+        {
+          label: '“Yeah, I’ve got it.” Yank the jack.',
+          kind: 'UNSAFE',
+          points: 0,
+          flag: 'yankedJack',
+          feedback: 'You took the shortcut.',
+          next: 'd3_yank',
+        },
+      ],
+    },
+    d3_train: {
+      day: 3,
+      scene: 'stockroom',
+      prop: 'pallet',
+      speaker: 'Dana',
+      mood: 'smile',
+      text: 'Dana shows you the forks, the brake, and how to check the path before lifting. You move the pallet slowly, horn first, with a spotter. “Slow is smooth,” she says. “Smooth is safe.”',
+      next: 'd3_end',
+    },
+    d3_demo: {
+      day: 3,
+      scene: 'stockroom',
+      prop: 'pallet',
+      speaker: 'Nico',
+      mood: 'concerned',
+      text: 'Nico starts to whip the jack around a corner. Dana stops him and demonstrates the brake and the blind spot. You try at half his speed. Nico shrugs. “Okay, that was smoother.”',
+      next: 'd3_end',
+    },
+    d3_yank: {
+      day: 3,
+      scene: 'stockroom',
+      prop: 'pallet',
+      speaker: 'Dana',
+      mood: 'stern',
+      text: 'You yank the jack; the pallet tips and a case slides. Dana hits the brake and steadies it. No one is hurt, but she writes a near miss and schedules pallet-jack training before your next shift.',
+      next: 'd3_end',
+    },
+    d3_end: {
+      day: 3,
+      scene: 'breakroom',
+      prop: 'none',
+      speaker: 'Narrator',
+      mood: 'neutral',
+      text: 'Thursday is deep clean. The supply cabinet smells like bleach and lemon, and Dana leaves a note on the sink: “Supplies underneath. Ask if anything is unclear.”',
+      next: 'd4_chem',
+      continueLabel: 'Start Thursday',
+    },
+
+    /* ---------- THURSDAY ---------- */
+    d4_chem: {
+      day: 4,
+      scene: 'breakroom',
+      prop: 'chemical',
+      speaker: 'Dana',
+      mood: 'neutral',
+      text: 'Clean the prep sink—supplies are under there. You find an unlabeled bottle. Nico: “Probably floor cleaner. Mix it with bleach. Cuts through anything.”',
+      choices: [
+        {
+          label: '“Dana, what is this, and can you train me on it?”',
+          kind: 'TRAIN',
+          points: 35,
+          flag: 'chemicalTraining',
+          feedback: 'You asked before using a chemical.',
+          next: 'd4_train',
+        },
+        {
+          label: 'Report the unlabeled bottle and do not mix it.',
+          kind: 'REPORT',
+          points: 40,
+          flag: 'reportedChemical',
+          feedback: 'You reported an unlabeled chemical.',
+          next: 'd4_report',
+        },
+        {
+          label: 'Mix it with bleach and get the sink done.',
+          kind: 'UNSAFE',
+          points: 0,
+          flag: 'mixedChemicals',
+          feedback: 'You took the shortcut.',
+          next: 'd4_mix',
+        },
+      ],
+    },
+    d4_train: {
+      day: 4,
+      scene: 'breakroom',
+      prop: 'chemical',
+      speaker: 'Dana',
+      mood: 'smile',
+      text: 'Dana identifies it as sanitizer, reads the label with you, and hands you gloves and the safety data sheet. “Never mix cleaning chemicals. Ever.” She logs the unlabeled bottle and retrains the whole team.',
+      next: 'd4_jar',
+    },
+    d4_report: {
+      day: 4,
+      scene: 'breakroom',
+      prop: 'chemical',
+      speaker: 'Dana',
+      mood: 'smile',
+      text: 'Dana removes the bottle, starts a labeling sweep, and thanks you. “Unlabeled chemicals are a stop-work hazard. You did the right thing.” Nico avoids your eyes and quietly checks the next bottle.',
+      next: 'd4_jar',
+    },
+    d4_mix: {
+      day: 4,
+      scene: 'breakroom',
+      prop: 'chemical',
+      speaker: 'Dana',
+      mood: 'stern',
+      text: 'The sink fumes. You step back and open a window; Dana stops the shift and ventilates the room. No one is hurt, but the near miss triggers a chemical-safety review for everyone.',
+      next: 'd4_jar',
+    },
+    d4_jar: {
+      day: 4,
+      scene: 'stockroom',
+      prop: 'jar',
+      speaker: 'Nico',
+      mood: 'concerned',
+      text: 'Nico knocks a jar off the shelf. It cracks but doesn’t shatter. “Don’t tell Dana. She’ll write me up. Just toss it in the normal bin.” Glass and sauce spread across the floor.',
+      choices: [
+        {
+          label: '“I’m telling Dana and marking the area.”',
+          kind: 'REPORT',
+          points: 40,
+          flag: 'reportedJar',
+          feedback: 'You reported the near miss.',
+          next: 'd4_report_jar',
+        },
+        {
+          label: '“Gloves. We contain it and get the spill kit.”',
+          kind: 'SAFE',
+          points: 30,
+          flag: 'containedJar',
+          feedback: 'You contained the hazard.',
+          next: 'd4_safe_jar',
+        },
+        {
+          label: 'Help Nico hide it in the normal trash.',
+          kind: 'UNSAFE',
+          points: 0,
+          flag: 'hidJar',
+          feedback: 'You hid the hazard.',
+          next: 'd4_hide',
+        },
+      ],
+    },
+    d4_report_jar: {
+      day: 4,
+      scene: 'stockroom',
+      prop: 'jar',
+      speaker: 'Dana',
+      mood: 'smile',
+      text: 'Dana arrives with the glass kit, thanks you, and helps Nico clean. Nico apologizes. “Near misses get reported,” Dana says. “That’s how we stop the next one.”',
+      next: 'd4_end',
+    },
+    d4_safe_jar: {
+      day: 4,
+      scene: 'stockroom',
+      prop: 'jar',
+      speaker: 'Dana',
+      mood: 'smile',
+      text: 'You block the aisle, pull on gloves, and call Dana for the glass kit. She shows you the scoop and sharps box, then writes the near-miss report with Nico. “Good containment,” she says.',
+      next: 'd4_end',
+    },
+    d4_hide: {
+      day: 4,
+      scene: 'stockroom',
+      prop: 'jar',
+      speaker: 'Dana',
+      mood: 'stern',
+      text: 'A customer’s shoe crunches near the aisle. Dana finds the jar, the sauce, and the two of you. Nico owns up. No one is hurt, but the near miss goes on both your records and the cleanup is done properly.',
+      next: 'd4_end',
+    },
+    d4_end: {
+      day: 4,
+      scene: 'front',
+      prop: 'none',
+      speaker: 'Narrator',
+      mood: 'neutral',
+      text: 'Friday. Dana hands you the closing checklist and leaves for a delivery. Nico leans on the counter as the door swings shut.',
+      next: 'd5_final',
+      continueLabel: 'Start Friday',
+    },
+
+    /* ---------- FRIDAY ---------- */
+    d5_final: {
+      day: 5,
+      scene: 'front',
+      prop: 'checklist',
+      speaker: 'Nico',
+      mood: 'smile',
+      text: 'She’s gone. Skip the checklist, leave the wet-floor sign in the back, and we can clock out ten minutes early. Nobody will know.',
+      choices: [
+        {
+          label: 'Do the checklist and tell Dana about the shortcut.',
+          kind: 'REPORT',
+          points: 40,
+          flag: 'finalReport',
+          feedback: 'You refused the shortcut and reported it.',
+          next: 'd5_refuse',
+        },
+        {
+          label: 'Call Dana before skipping anything.',
+          kind: 'ASK',
+          points: 30,
+          flag: 'finalCall',
+          feedback: 'You checked with the manager.',
+          next: 'd5_call',
+        },
+        {
+          label: '“Okay. Let’s just go.”',
+          kind: 'UNSAFE',
+          points: 0,
+          flag: 'skippedChecklist',
+          feedback: 'You went along with the shortcut.',
+          next: 'd5_shortcut',
+        },
+      ],
+    },
+    d5_refuse: {
+      day: 5,
+      scene: 'front',
+      prop: 'checklist',
+      speaker: 'Dana',
+      mood: 'smile',
+      text: 'You work the checklist: doors, lights, floors, lockers. Nico complains, then helps. You text Dana about the shortcut. She replies: “Good. Safety isn’t a vote.” When she returns, she thanks you in front of Nico.',
+      next: 'd5_ending',
+    },
+    d5_call: {
+      day: 5,
+      scene: 'front',
+      prop: 'checklist',
+      speaker: 'Dana',
+      mood: 'neutral',
+      text: 'Dana answers on the second ring. “The checklist isn’t optional. Stay on the line while you do it.” Nico hears her voice and starts checking the back door. You finish every line together.',
+      next: 'd5_ending',
+    },
+    d5_shortcut: {
+      day: 5,
+      scene: 'front',
+      prop: 'checklist',
+      speaker: 'Dana',
+      mood: 'stern',
+      text: 'You skip the checklist. Halfway to the bus, Dana calls: she forgot her keys and found the back door unlocked and a spill still out. No one is hurt, but she meets you back at the store for a formal reset and retraining.',
+      next: 'd5_ending',
+    },
+    d5_ending: {
+      day: 5,
+      scene: 'front',
+      prop: 'none',
+      speaker: 'Dana',
+      mood: (s) => (s.flags.skippedChecklist ? 'stern' : 'smile'),
+      text: (s) => {
+        let opening;
+        if (s.flags.finalReport) {
+          opening = 'Dana reads your note and looks at Nico. “You did the right thing. A shortcut that skips safety isn’t a shortcut; it’s a delay with interest.”';
+        } else if (s.flags.finalCall) {
+          opening = 'Dana pockets her phone. “You called instead of guessing. That’s exactly what I need on a closing shift.”';
+        } else {
+          opening = 'Dana sets the checklist on the counter. “We don’t trade safety for ten minutes. Monday, we start again—with training.”';
+        }
+        let close;
+        if (s.stats.UNSAFE === 0) {
+          close = 'She slides a new name tag across the counter. “Same shift next week?”';
+        } else if (s.stats.UNSAFE < 3) {
+          close = '“You made some calls I didn’t like,” she says. “But you kept showing up and listening. We build on that.”';
+        } else {
+          close = '“A rough week,” she says. “But you’re still here. Next week we slow down and do it right.”';
+        }
+        return `${opening} ${close}`;
+      },
+      next: '__final',
+      continueLabel: 'See weekly report',
+    },
+  };
+
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d', { alpha: false });
+  const scoreEl = document.getElementById('score');
+  const bestEl = document.getElementById('best');
+  const dayTagEl = document.getElementById('dayTag');
+  const sceneTagEl = document.getElementById('sceneTag');
+  const portraitEl = document.getElementById('portrait');
+  const speakerNameEl = document.getElementById('speakerName');
+  const speakerRoleEl = document.getElementById('speakerRole');
+  const feedbackEl = document.getElementById('feedback');
+  const storyboxEl = document.getElementById('storybox');
+  const storyTextEl = document.getElementById('storyText');
+  const outcomeEl = document.getElementById('outcome');
+  const choicesEl = document.getElementById('choices');
+  const controlsEl = document.getElementById('controls');
+  const overlayEl = document.getElementById('overlay');
+  const ovKickerEl = document.getElementById('ovKicker');
+  const ovTitleEl = document.getElementById('ovTitle');
+  const ovLeadEl = document.getElementById('ovLead');
+  const ovRulesEl = document.getElementById('ovRules');
+  const ovScoreEl = document.getElementById('ovScore');
+  const ovScoreValueEl = document.getElementById('ovScoreValue');
+  const ovBestEl = document.getElementById('ovBest');
+  const ovWeekStatsEl = document.getElementById('ovWeekStats');
+  const statAskEl = document.getElementById('statAsk');
+  const statReportEl = document.getElementById('statReport');
+  const statTrainEl = document.getElementById('statTrain');
+  const ovMetricsEl = document.getElementById('ovMetrics');
+  const ovBtn = document.getElementById('ovBtn');
+  const ovFineEl = document.getElementById('ovFine');
+
+  const state = {
+    mode: 'title',
+    nodeId: 'd1_intro',
+    score: 0,
+    best: 0,
+    stats: { ASK: 0, REPORT: 0, TRAIN: 0, SAFE: 0, UNSAFE: 0 },
+    flags: {},
+    feedback: null,
+    choices: [],
+    history: [],
+  };
+
+  const pad3 = (n) => String(Math.max(0, Math.floor(n))).padStart(3, '0');
+  const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
+
+  function readBest() {
+    try {
+      const v = Number(window.localStorage.getItem(BEST_KEY));
+      return Number.isFinite(v) && v > 0 ? Math.floor(v) : 0;
+    } catch (err) {
+      return 0;
+    }
+  }
+
+  function writeBest(value) {
+    try {
+      window.localStorage.setItem(BEST_KEY, String(value));
+    } catch (err) {
+      /* local storage can be unavailable in private mode or on file:// */
+    }
+  }
+
+  state.best = readBest();
+
+  function updateHud(flash) {
+    scoreEl.textContent = pad3(state.score);
+    bestEl.textContent = pad3(Math.max(state.best, state.score));
+    if (flash) {
+      scoreEl.classList.remove('flash');
+      void scoreEl.offsetWidth;
+      scoreEl.classList.add('flash');
+      window.setTimeout(() => scoreEl.classList.remove('flash'), 340);
+    }
+  }
+
+  function currentSpeaker(node) {
+    return SPEAKERS[node.speaker] || SPEAKERS.Narrator;
+  }
+
+  function resolve(value) {
+    return typeof value === 'function' ? value(state) : value;
+  }
+
+  function updateFeedback() {
+    const fb = state.feedback;
+    if (!fb) {
+      feedbackEl.hidden = true;
+      outcomeEl.hidden = true;
+      outcomeEl.textContent = '';
+      return;
+    }
+    const category = CATEGORY[fb.kind] || CATEGORY.SAFE;
+    feedbackEl.hidden = false;
+    feedbackEl.className = `feedback ${category.tone}`;
+    feedbackEl.textContent = fb.points > 0
+      ? `${category.label} +${fb.points}`
+      : `${category.label} · 0 PTS`;
+    outcomeEl.hidden = false;
+    outcomeEl.className = `outcome${fb.kind === 'UNSAFE' ? ' unsafe' : ''}`;
+    outcomeEl.textContent = fb.feedback;
+  }
+
+  function makeChoiceButton(choice, index) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'choice';
+
+    const key = document.createElement('span');
+    key.className = 'key';
+    key.textContent = String(index + 1);
+    key.setAttribute('aria-hidden', 'true');
+
+    const text = document.createElement('span');
+    text.className = 'choice-text';
+    text.textContent = choice.label || 'Continue';
+
+    button.append(key, text);
+    button.addEventListener('click', () => {
+      if (button.disabled) return;
+      if (choice.continue) advance();
+      else choose(index);
+    });
+    return button;
+  }
+
+  function makeContinueButton(label) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'choice final';
+
+    const key = document.createElement('span');
+    key.className = 'key';
+    key.textContent = '1';
+    key.setAttribute('aria-hidden', 'true');
+
+    const text = document.createElement('span');
+    text.className = 'choice-text';
+    text.textContent = label || 'Continue';
+
+    button.append(key, text);
+    button.addEventListener('click', () => {
+      if (!button.disabled) advance();
+    });
+    return button;
+  }
+
+  function focusFirstChoice() {
+    const first = choicesEl.querySelector('.choice');
+    if (!first) return;
+    try {
+      first.focus({ preventScroll: true });
+    } catch (err) {
+      first.focus();
+    }
+  }
+
+  function renderNode(nodeId) {
+    const node = NODES[nodeId];
+    if (!node) {
+      showFinal();
+      return;
+    }
+    state.nodeId = nodeId;
+    state.mode = 'story';
+    state.feedback = state.feedback || null;
+    state.choices = node.choices ? node.choices.slice() : [];
+
+    const speaker = currentSpeaker(node);
+    portraitEl.textContent = speaker.initial;
+    portraitEl.style.setProperty('--speaker', speaker.color);
+    speakerNameEl.textContent = speaker.name;
+    speakerRoleEl.textContent = speaker.role;
+
+    dayTagEl.textContent = `DAY ${String(node.day).padStart(2, '0')} / 05`;
+    sceneTagEl.textContent = SCENES[node.scene] || 'NORTHLIGHT MARKET';
+
+    storyTextEl.textContent = resolve(node.text);
+    updateFeedback();
+
+    choicesEl.innerHTML = '';
+    if (node.choices && node.choices.length) {
+      node.choices.forEach((choice, index) => {
+        choicesEl.appendChild(makeChoiceButton(choice, index));
+      });
+      controlsEl.innerHTML = `Press <b>1–${node.choices.length}</b> to choose · or click`;
+    } else {
+      choicesEl.appendChild(makeContinueButton(node.continueLabel));
+      controlsEl.innerHTML = 'Press <b>Enter</b> or <b>1</b> to continue';
+    }
+
+    storyboxEl.scrollTop = 0;
+    window.setTimeout(focusFirstChoice, 20);
+  }
+
+  function goTo(nodeId) {
+    if (nodeId === '__final') {
+      showFinal();
+      return;
+    }
+    renderNode(nodeId);
+  }
+
+  function choose(index) {
+    if (state.mode !== 'story') return;
+    const node = NODES[state.nodeId];
+    if (!node || !node.choices) return;
+    const choice = node.choices[index];
+    if (!choice) return;
+
+    state.score += choice.points;
+    state.stats[choice.kind] = (state.stats[choice.kind] || 0) + 1;
+    if (choice.flag) state.flags[choice.flag] = true;
+    state.feedback = {
+      kind: choice.kind,
+      points: choice.points,
+      feedback: choice.feedback,
+    };
+    state.history.push({ node: state.nodeId, choice: choice.label, kind: choice.kind });
+    updateHud(true);
+    goTo(choice.next);
+  }
+
+  function advance() {
+    if (state.mode !== 'story') return;
+    const node = NODES[state.nodeId];
+    if (!node || node.choices) return;
+    state.feedback = null;
+    goTo(node.next);
+  }
+
+  /* ---------- overlays ---------- */
+  let overlayAction = null;
+
+  function closeOverlay() {
+    overlayEl.hidden = true;
+    document.getElementById('ui').removeAttribute('inert');
+    overlayAction = null;
+  }
+
+  function openOverlay(options) {
+    ovKickerEl.textContent = options.kicker || '';
+    ovTitleEl.textContent = options.title || '';
+    ovLeadEl.textContent = options.lead || '';
+    ovFineEl.textContent = options.fine || '';
+    ovBtn.textContent = options.button || 'Continue';
+
+    ovRulesEl.innerHTML = '';
+    ovRulesEl.hidden = !(options.rules && options.rules.length);
+    (options.rules || []).forEach((rule) => {
+      const div = document.createElement('div');
+      div.className = 'rule';
+      div.textContent = rule;
+      ovRulesEl.appendChild(div);
+    });
+
+    ovMetricsEl.hidden = !(options.metrics && options.metrics.length);
+    ovMetricsEl.innerHTML = (options.metrics || []).map((metric) => (
+      `<div class="metric"><span>${metric.label}</span><strong>${metric.value}</strong></div>`
+    )).join('');
+
+    ovScoreEl.hidden = !options.showScore;
+    if (options.showScore) {
+      ovScoreValueEl.textContent = pad3(state.score);
+      ovBestEl.textContent = `BEST ${pad3(state.best)}`;
+    }
+
+    ovWeekStatsEl.hidden = !options.showStats;
+    if (options.showStats) {
+      statAskEl.textContent = String(state.stats.ASK);
+      statReportEl.textContent = String(state.stats.REPORT);
+      statTrainEl.textContent = String(state.stats.TRAIN);
+    }
+
+    overlayAction = options.onAction || null;
+    ovBtn.onclick = () => {
+      const action = overlayAction;
+      overlayAction = null;
+      if (action) action();
+    };
+
+    document.getElementById('ui').setAttribute('inert', '');
+    overlayEl.hidden = false;
+    try {
+      ovBtn.focus({ preventScroll: true });
+    } catch (err) {
+      ovBtn.focus();
+    }
+  }
+
+  function resetRun() {
+    state.nodeId = 'd1_intro';
+    state.score = 0;
+    state.best = readBest();
+    state.stats = { ASK: 0, REPORT: 0, TRAIN: 0, SAFE: 0, UNSAFE: 0 };
+    state.flags = {};
+    state.feedback = null;
+    state.choices = [];
+    state.history = [];
+    updateHud(false);
+  }
+
+  function showTitle() {
+    resetRun();
+    state.mode = 'title';
+    openOverlay({
+      kicker: 'NORTHLIGHT MARKET · WEEK ONE',
+      title: 'First Week',
+      lead: 'You’re Riley, sixteen, starting your first job. Ask when instructions are unclear. Report hazards. Ask for training. Nico will keep offering shortcuts.',
+      rules: [
+        'Questions, hazard reports, and training requests earn points.',
+        'Every choice branches to a different consequence.',
+        'No timer. No speed bonus. Speak up at your own pace.',
+      ],
+      metrics: [
+        { label: 'Days', value: '5' },
+        { label: 'Decisions', value: '9' },
+        { label: 'Timer', value: 'None' },
+      ],
+      button: 'Clock in',
+      fine: 'A branching workplace safety story',
+      onAction: () => {
+        closeOverlay();
+        state.mode = 'story';
+        renderNode('d1_intro');
+      },
+    });
+  }
+
+  function showFinal() {
+    if (state.score > state.best) {
+      state.best = state.score;
+      writeBest(state.best);
+    }
+    updateHud(false);
+
+    let rank = 'Rough start';
+    if (state.score >= 280 && state.stats.UNSAFE === 0) rank = 'Safety star';
+    else if (state.score >= 210) rank = 'Trusted shift';
+    else if (state.score >= 130) rank = 'Learning fast';
+
+    let lead;
+    if (state.stats.UNSAFE === 0) {
+      lead = 'You made it through your first week without taking a single shortcut. Dana noticed. So did Nico.';
+    } else if (state.stats.UNSAFE < 3) {
+      lead = 'You made it through the week. A few shortcuts cost you points, but you kept showing up and learning.';
+    } else {
+      lead = 'It was a rough week. Shortcuts stacked up, but the report makes the next shift a fresh start.';
+    }
+
+    state.mode = 'final';
+    openOverlay({
+      kicker: 'WEEK ONE COMPLETE',
+      title: rank,
+      lead,
+      showScore: true,
+      showStats: true,
+      metrics: [
+        { label: 'Safe calls', value: String(state.stats.SAFE) },
+        { label: 'Shortcuts', value: String(state.stats.UNSAFE) },
+        { label: 'Days', value: '5 / 5' },
+      ],
+      button: 'Work another week',
+      fine: 'Best score saved on this device · no timer',
+      onAction: () => {
+        closeOverlay();
+        showTitle();
+      },
+    });
+  }
+
+  /* ---------- keyboard ---------- */
+  document.addEventListener('keydown', (event) => {
+    if (!overlayEl.hidden) {
+      if (event.key === '1') {
+        event.preventDefault();
+        ovBtn.click();
+      }
+      return;
+    }
+    if (state.mode !== 'story') return;
+
+    if (/^[1-4]$/.test(event.key)) {
+      const index = Number(event.key) - 1;
+      if (state.choices.length) {
+        event.preventDefault();
+        choose(index);
+      } else if (event.key === '1') {
+        event.preventDefault();
+        advance();
+      }
+      return;
+    }
+
+    if (event.key === 'Enter' || event.key === ' ') {
+      const active = document.activeElement;
+      if (active && active.tagName === 'BUTTON') return;
+      if (!state.choices.length) {
+        event.preventDefault();
+        advance();
+      }
+    }
+  });
+
+  updateHud(false);
+  showTitle();
+
+  /* ---------- canvas scenes ---------- */
+  let bgGradient = null;
+  let vignette = null;
+
+  const PEOPLE = {
+    Riley: {
+      skin: '#d9a078',
+      hair: '#25201d',
+      shirt: '#d7e5df',
+      apron: '#3bbfa8',
+      apronDark: '#16796d',
+      hairStyle: 'short',
+    },
+    Dana: {
+      skin: '#c58a62',
+      hair: '#2a1a18',
+      shirt: '#efe0c8',
+      apron: '#d8a23e',
+      apronDark: '#7e5518',
+      hairStyle: 'bun',
+    },
+    Nico: {
+      skin: '#a86f4e',
+      hair: '#17191f',
+      shirt: '#5d3431',
+      apron: '#cf675e',
+      apronDark: '#6e2924',
+      hairStyle: 'cap',
+    },
+  };
+
+  function sizeCanvas() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+    bgGradient = null;
+    vignette = null;
+  }
+
+  sizeCanvas();
+  window.addEventListener('resize', sizeCanvas);
+
+  function rr(x, y, w, h, radius) {
+    const r = Math.min(radius, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function drawWall(scene) {
+    ctx.fillStyle = '#101d1e';
+    ctx.fillRect(0, 0, W, 330);
+
+    const light = ctx.createRadialGradient(W * 0.52, 80, 20, W * 0.52, 120, 340);
+    light.addColorStop(0, scene === 'breakroom' ? 'rgba(255, 205, 125, 0.12)' : 'rgba(175, 235, 218, 0.08)');
+    light.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = light;
+    ctx.fillRect(0, 0, W, 360);
+
+    ctx.strokeStyle = 'rgba(213, 234, 225, 0.045)';
+    ctx.lineWidth = 1;
+    for (let x = 30; x < W; x += 60) {
+      ctx.beginPath();
+      ctx.moveTo(x + 0.5, 58);
+      ctx.lineTo(x + 0.5, 318);
+      ctx.stroke();
+    }
+    ctx.beginPath();
+    ctx.moveTo(0, 120.5);
+    ctx.lineTo(W, 120.5);
+    ctx.stroke();
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(240, 247, 239, 0.62)';
+    ctx.font = '700 13px ui-monospace, Menlo, monospace';
+    ctx.fillText('NORTHLIGHT', W / 2, 74);
+    ctx.fillStyle = 'rgba(255, 200, 107, 0.5)';
+    ctx.font = '700 6px ui-monospace, Menlo, monospace';
+    ctx.letterSpacing = '3px';
+    ctx.fillText('NEIGHBORHOOD MARKET', W / 2, 88);
+    ctx.letterSpacing = '0px';
+
+    ctx.strokeStyle = 'rgba(255, 200, 107, 0.22)';
+    ctx.beginPath();
+    ctx.moveTo(W / 2 - 111, 96);
+    ctx.lineTo(W / 2 + 111, 96);
+    ctx.stroke();
+  }
+
+  function drawFloor(t) {
+    const g = ctx.createLinearGradient(0, 300, 0, 430);
+    g.addColorStop(0, '#111d1e');
+    g.addColorStop(1, '#081012');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 300, W, 160);
+
+    ctx.strokeStyle = 'rgba(135, 210, 195, 0.05)';
+    ctx.lineWidth = 1;
+    for (let x = -80; x < W + 100; x += 70) {
+      ctx.beginPath();
+      ctx.moveTo(W / 2, 300);
+      ctx.lineTo(x, 420);
+      ctx.stroke();
+    }
+    for (let y = 312; y < 430; y += 24) {
+      ctx.beginPath();
+      ctx.moveTo(0, y + 0.5);
+      ctx.lineTo(W, y + 0.5);
+      ctx.stroke();
+    }
+    ctx.fillStyle = 'rgba(255, 200, 107, 0.16)';
+    ctx.fillRect(0, 299, W, 1);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.015)';
+    ctx.fillRect(0, 390 + Math.sin(t * 0.6) * 2, W, 1);
+  }
+
+  function drawShelfProducts(x, y, w, rows, seed) {
+    const colors = ['#cf675e', '#d8a23e', '#4d9d86', '#547fa5', '#9b6b9d'];
+    ctx.fillStyle = 'rgba(18, 35, 35, 0.95)';
+    ctx.fillRect(x, y, w, rows * 24 + 8);
+    ctx.strokeStyle = 'rgba(143, 220, 205, 0.16)';
+    ctx.strokeRect(x + 0.5, y + 0.5, w - 1, rows * 24 + 8);
+    for (let r = 0; r < rows; r++) {
+      const sy = y + 5 + r * 24;
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.06)';
+      ctx.fillRect(x + 3, sy + 15, w - 6, 1);
+      for (let c = 0; c < Math.floor(w / 17); c++) {
+        const px = x + 5 + c * 17;
+        const h = 10 + ((seed + r * 3 + c * 5) % 4);
+        ctx.fillStyle = colors[(seed + r + c) % colors.length];
+        ctx.globalAlpha = 0.65;
+        ctx.fillRect(px, sy + 15 - h, 11, h);
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawFront(t) {
+    drawShelfProducts(34, 128, 174, 3, 2);
+    drawShelfProducts(272, 128, 174, 3, 4);
+
+    ctx.fillStyle = '#142426';
+    ctx.fillRect(58, 282, 364, 86);
+    ctx.fillStyle = '#1d3435';
+    ctx.fillRect(58, 282, 364, 10);
+    ctx.strokeStyle = 'rgba(143, 220, 205, 0.18)';
+    ctx.strokeRect(58.5, 282.5, 363, 85);
+
+    ctx.fillStyle = '#0e1c1d';
+    ctx.fillRect(332, 244, 52, 38);
+    ctx.strokeStyle = 'rgba(110, 231, 207, 0.28)';
+    ctx.strokeRect(332.5, 244.5, 51, 37);
+    ctx.fillStyle = 'rgba(110, 231, 207, 0.7)';
+    ctx.font = '700 6px ui-monospace, Menlo, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('REGISTER', 358, 250);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.06)';
+    ctx.fillRect(340, 258, 36, 2);
+    ctx.fillRect(340, 264, 25, 2);
+
+    for (let i = 0; i < 4; i++) {
+      ctx.fillStyle = 'rgba(255, 200, 107, 0.2)';
+      ctx.fillRect(78 + i * 62, 300, 46, 2);
+    }
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+    ctx.beginPath();
+    ctx.ellipse(110, 408 + Math.sin(t) * 1.5, 46, 8, 0, 0, TAU);
+    ctx.fill();
+  }
+
+  function drawAisle(t, prop) {
+    drawShelfProducts(34, 116, 170, 5, 1);
+    drawShelfProducts(276, 116, 170, 5, 3);
+
+    ctx.fillStyle = '#1a2e2f';
+    ctx.fillRect(204, 112, 72, 142);
+    ctx.strokeStyle = 'rgba(143, 220, 205, 0.14)';
+    ctx.strokeRect(204.5, 112.5, 71, 141);
+    ctx.fillStyle = 'rgba(255, 200, 107, 0.35)';
+    ctx.font = '700 6px ui-monospace, Menlo, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('DAIRY', 240, 126);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.045)';
+    for (let y = 142; y < 250; y += 24) {
+      ctx.fillRect(212, y, 56, 1);
+      ctx.fillStyle = 'rgba(202, 232, 238, 0.18)';
+      ctx.fillRect(216, y - 13, 9, 12);
+      ctx.fillRect(229, y - 13, 9, 12);
+      ctx.fillRect(242, y - 13, 9, 12);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.045)';
+    }
+
+    if (prop === 'spill') {
+      ctx.fillStyle = 'rgba(115, 198, 205, 0.23)';
+      ctx.beginPath();
+      ctx.ellipse(292, 346, 53, 10, -0.08, 0, TAU);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(190, 255, 250, 0.34)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.ellipse(292, 344, 42, 6, -0.08, 0, Math.PI);
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(255, 200, 107, 0.6)';
+      ctx.fillRect(247, 326, 19, 3);
+    }
+  }
+
+  function drawStockroom(t, prop) {
+    drawShelfProducts(30, 116, 204, 4, 5);
+    drawShelfProducts(30, 230, 204, 2, 2);
+
+    ctx.fillStyle = '#122021';
+    ctx.fillRect(290, 120, 140, 195);
+    ctx.strokeStyle = 'rgba(143, 220, 205, 0.16)';
+    ctx.strokeRect(290.5, 120.5, 139, 194);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.035)';
+    ctx.fillRect(300, 134, 120, 165);
+
+    ctx.fillStyle = 'rgba(111, 230, 181, 0.16)';
+    ctx.fillRect(352, 104, 64, 18);
+    ctx.fillStyle = 'rgba(157, 255, 210, 0.72)';
+    ctx.font = '700 7px ui-monospace, Menlo, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('EXIT', 384, 115);
+
+    ctx.fillStyle = '#0a1516';
+    ctx.fillRect(326, 146, 65, 160);
+    ctx.strokeStyle = 'rgba(255, 200, 107, 0.15)';
+    ctx.strokeRect(326.5, 146.5, 64, 159);
+    ctx.fillStyle = 'rgba(255, 200, 107, 0.55)';
+    ctx.fillRect(370, 226, 4, 9);
+
+    if (prop === 'boxes' || prop === 'exit') {
+      for (let i = 0; i < 3; i++) {
+        ctx.fillStyle = i % 2 ? '#6e5233' : '#7e603b';
+        ctx.fillRect(238 + i * 4, 304 - i * 27, 45, 24);
+        ctx.strokeStyle = 'rgba(255, 230, 180, 0.15)';
+        ctx.strokeRect(238.5 + i * 4, 304.5 - i * 27, 44, 23);
+      }
+    }
+    if (prop === 'crate') {
+      ctx.fillStyle = '#6d5132';
+      ctx.fillRect(316, 294, 42, 30);
+      ctx.strokeStyle = 'rgba(255, 230, 180, 0.25)';
+      ctx.strokeRect(316.5, 294.5, 41, 29);
+      ctx.strokeRect(326.5, 294.5, 1, 29);
+    }
+    if (prop === 'ladder') {
+      ctx.strokeStyle = 'rgba(165, 210, 203, 0.5)';
+      ctx.lineWidth = 2;
+      for (let i = 0; i < 4; i++) {
+        const y = 254 + i * 16;
+        ctx.beginPath();
+        ctx.moveTo(388, y);
+        ctx.lineTo(420, y);
+        ctx.stroke();
+      }
+      ctx.beginPath();
+      ctx.moveTo(390, 246); ctx.lineTo(412, 330);
+      ctx.moveTo(416, 246); ctx.lineTo(395, 330);
+      ctx.stroke();
+      ctx.lineWidth = 1;
+    }
+    if (prop === 'pallet') {
+      ctx.fillStyle = '#6e5639';
+      ctx.fillRect(260, 315, 110, 14);
+      ctx.fillStyle = '#263637';
+      ctx.fillRect(284, 304, 44, 11);
+      ctx.strokeStyle = 'rgba(255, 200, 107, 0.4)';
+      ctx.strokeRect(284.5, 304.5, 43, 10);
+      ctx.fillStyle = '#1c2e2f';
+      ctx.fillRect(240, 326, 160, 5);
+    }
+    if (prop === 'jar') {
+      ctx.fillStyle = 'rgba(151, 207, 182, 0.18)';
+      ctx.beginPath();
+      ctx.ellipse(266, 342, 48, 8, 0, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(207, 227, 211, 0.5)';
+      ctx.beginPath();
+      ctx.moveTo(244, 320);
+      ctx.lineTo(257, 318);
+      ctx.lineTo(261, 329);
+      ctx.lineTo(247, 330);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+      ctx.beginPath();
+      ctx.moveTo(261, 323);
+      ctx.lineTo(274, 329);
+      ctx.stroke();
+    }
+  }
+
+  function drawBreakroom(t, prop) {
+    ctx.fillStyle = '#152526';
+    ctx.fillRect(36, 118, 82, 202);
+    ctx.strokeStyle = 'rgba(143, 220, 205, 0.18)';
+    ctx.strokeRect(36.5, 118.5, 81, 201);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+    for (let i = 0; i < 3; i++) {
+      ctx.fillRect(44, 130 + i * 60, 66, 1);
+      ctx.fillStyle = 'rgba(255, 200, 107, 0.3)';
+      ctx.fillRect(80 + i * 8, 152 + i * 60, 7, 2);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+    }
+
+    ctx.fillStyle = '#1d3334';
+    ctx.fillRect(172, 272, 162, 12);
+    ctx.fillStyle = '#142728';
+    ctx.fillRect(184, 284, 7, 55);
+    ctx.fillRect(315, 284, 7, 55);
+
+    ctx.fillStyle = '#203738';
+    ctx.fillRect(362, 198, 64, 80);
+    ctx.strokeStyle = 'rgba(143, 220, 205, 0.16)';
+    ctx.strokeRect(362.5, 198.5, 63, 79);
+    ctx.fillStyle = 'rgba(190, 235, 231, 0.24)';
+    ctx.fillRect(370, 209, 48, 3);
+    ctx.fillStyle = 'rgba(110, 231, 207, 0.25)';
+    ctx.beginPath();
+    ctx.arc(394, 248, 9, 0, TAU);
+    ctx.fill();
+
+    ctx.fillStyle = 'rgba(255, 200, 107, 0.18)';
+    ctx.fillRect(152, 250, 202, 2);
+
+    if (prop === 'cutter') {
+      ctx.fillStyle = '#283d3e';
+      ctx.fillRect(210, 256, 58, 12);
+      ctx.fillStyle = '#aec3bc';
+      ctx.fillRect(220, 251, 28, 5);
+      ctx.fillStyle = '#d88d64';
+      ctx.fillRect(248, 253, 14, 3);
+    }
+    if (prop === 'chemical' || prop === 'none') {
+      ctx.fillStyle = 'rgba(170, 205, 178, 0.65)';
+      ctx.fillRect(380, 252, 12, 20);
+      ctx.fillStyle = 'rgba(240, 226, 181, 0.7)';
+      ctx.fillRect(382, 258, 8, 6);
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.28)';
+      ctx.strokeRect(380.5, 252.5, 11, 19);
+    }
+    if (prop === 'spill') {
+      ctx.fillStyle = 'rgba(120, 198, 198, 0.2)';
+      ctx.beginPath();
+      ctx.ellipse(230, 342, 42, 7, 0, 0, TAU);
+      ctx.fill();
+    }
+  }
+
+  function drawChecklist() {
+    ctx.save();
+    ctx.translate(222, 306);
+    ctx.rotate(-0.12);
+    ctx.fillStyle = '#d8cfb5';
+    ctx.fillRect(-15, -21, 30, 42);
+    ctx.fillStyle = '#8f7f61';
+    ctx.fillRect(-10, -18, 20, 3);
+    ctx.strokeStyle = 'rgba(31, 43, 42, 0.55)';
+    for (let i = 0; i < 4; i++) {
+      ctx.beginPath();
+      ctx.moveTo(-7, -8 + i * 8);
+      ctx.lineTo(3, -8 + i * 8);
+      ctx.stroke();
+      ctx.strokeRect(6, -10 + i * 8, 4, 4);
+    }
+    ctx.restore();
+  }
+
+  function drawScene() {
+    const node = NODES[state.nodeId] || NODES.d1_intro;
+    const scene = node.scene || 'front';
+    const prop = node.prop || 'none';
+    const t = performance.now() / 1000;
+
+    if (!bgGradient) {
+      bgGradient = ctx.createLinearGradient(0, 0, 0, H);
+      bgGradient.addColorStop(0, '#132324');
+      bgGradient.addColorStop(0.58, '#091315');
+      bgGradient.addColorStop(1, '#04090a');
+      vignette = ctx.createRadialGradient(W / 2, H * 0.37, 60, W / 2, H * 0.37, 380);
+      vignette.addColorStop(0, 'rgba(0, 0, 0, 0)');
+      vignette.addColorStop(1, 'rgba(0, 0, 0, 0.54)');
+    }
+    ctx.fillStyle = bgGradient;
+    ctx.fillRect(0, 0, W, H);
+
+    drawWall(scene);
+    if (scene === 'front') drawFront(t);
+    else if (scene === 'aisle') drawAisle(t, prop);
+    else if (scene === 'stockroom') drawStockroom(t, prop);
+    else if (scene === 'breakroom') drawBreakroom(t, prop);
+
+    drawFloor(t);
+
+    if (prop === 'checklist') drawChecklist();
+
+    const speakerKey = node.speaker;
+    const speaker = SPEAKERS[speakerKey] || SPEAKERS.Narrator;
+    const mood = resolve(node.mood) || 'neutral';
+
+    if (speakerKey === 'Dana' || speakerKey === 'Nico') {
+      drawPerson(146, 348, 'Riley', 'neutral', false, t, 0.86);
+      drawPerson(340, 346, speakerKey, mood, true, t, 1);
+    } else {
+      drawPerson(252, 348, 'Riley', mood, speakerKey === 'Riley', t, 0.96);
+    }
+
+    ctx.fillStyle = vignette;
+    ctx.fillRect(0, 0, W, H);
+
+    // dim the area behind the dialogue without hiding the characters
+    const fade = ctx.createLinearGradient(0, 300, 0, 420);
+    fade.addColorStop(0, 'rgba(5, 11, 12, 0)');
+    fade.addColorStop(1, 'rgba(5, 11, 12, 0.55)');
+    ctx.fillStyle = fade;
+    ctx.fillRect(0, 300, W, 130);
+  }
+
+  function drawPerson(x, baseY, personId, mood, active, t, scale) {
+    const p = PEOPLE[personId] || PEOPLE.Riley;
+    const bob = Math.sin(t * 1.7 + x * 0.03) * 1.3;
+    const blink = Math.sin(t * 0.83 + x * 0.05) > 0.985;
+    const s = scale;
+
+    ctx.save();
+    ctx.translate(x, baseY + bob);
+    ctx.scale(s, s);
+
+    if (active) {
+      ctx.fillStyle = 'rgba(110, 231, 207, 0.09)';
+      ctx.beginPath();
+      ctx.ellipse(0, 2, 47, 8, 0, 0, TAU);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255, 200, 107, 0.32)';
+      ctx.beginPath();
+      ctx.ellipse(0, 4, 42, 6, 0, 0, TAU);
+      ctx.stroke();
+    } else {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
+      ctx.beginPath();
+      ctx.ellipse(0, 3, 40, 6, 0, 0, TAU);
+      ctx.fill();
+    }
+
+    // legs
+    ctx.fillStyle = '#182324';
+    ctx.fillRect(-17, -54, 13, 56);
+    ctx.fillRect(4, -54, 13, 56);
+
+    // body
+    ctx.fillStyle = p.shirt;
+    rr(-28, -132, 56, 82, 13);
+    ctx.fill();
+
+    // apron
+    ctx.fillStyle = p.apron;
+    rr(-23, -122, 46, 70, 8);
+    ctx.fill();
+    ctx.fillStyle = p.apronDark;
+    ctx.fillRect(-3, -122, 6, 27);
+    ctx.fillRect(-23, -80, 46, 4);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
+    ctx.fillRect(10, -108, 12, 6);
+    ctx.fillStyle = 'rgba(20, 27, 28, 0.65)';
+    ctx.fillRect(11, -107, 10, 1);
+
+    // arms
+    ctx.strokeStyle = p.skin;
+    ctx.lineWidth = 9;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(-25, -116);
+    ctx.lineTo(-34, -82);
+    ctx.lineTo(-28, -62);
+    ctx.moveTo(25, -116);
+    ctx.lineTo(34, -84);
+    ctx.lineTo(28, -64);
+    ctx.stroke();
+
+    // neck
+    ctx.fillStyle = p.skin;
+    ctx.fillRect(-8, -146, 16, 18);
+
+    // ears
+    ctx.fillStyle = p.skin;
+    ctx.beginPath();
+    ctx.arc(-22, -169, 5, 0, TAU);
+    ctx.arc(22, -169, 5, 0, TAU);
+    ctx.fill();
+
+    // head
+    ctx.beginPath();
+    ctx.ellipse(0, -172, 23, 26, 0, 0, TAU);
+    ctx.fill();
+
+    // hair
+    ctx.fillStyle = p.hair;
+    if (p.hairStyle === 'cap') {
+      ctx.beginPath();
+      ctx.arc(0, -184, 23, Math.PI, TAU);
+      ctx.fill();
+      ctx.fillRect(-24, -187, 40, 5);
+      ctx.fillStyle = '#7a302c';
+      ctx.fillRect(-4, -209, 8, 7);
+      ctx.fillStyle = p.hair;
+    } else if (p.hairStyle === 'bun') {
+      ctx.beginPath();
+      ctx.arc(0, -181, 23, Math.PI, TAU);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(18, -199, 10, 0, TAU);
+      ctx.fill();
+    } else {
+      ctx.beginPath();
+      ctx.arc(0, -184, 23, Math.PI * 0.94, TAU * 1.02);
+      ctx.lineTo(22, -166);
+      ctx.lineTo(12, -177);
+      ctx.lineTo(-4, -164);
+      ctx.lineTo(-16, -178);
+      ctx.lineTo(-23, -166);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // face
+    const eyeY = -174;
+    ctx.strokeStyle = '#231b18';
+    ctx.fillStyle = '#231b18';
+    ctx.lineWidth = 2;
+    if (blink) {
+      ctx.beginPath();
+      ctx.moveTo(-15, eyeY);
+      ctx.lineTo(-7, eyeY);
+      ctx.moveTo(7, eyeY);
+      ctx.lineTo(15, eyeY);
+      ctx.stroke();
+    } else {
+      ctx.beginPath();
+      ctx.arc(-11, eyeY, 2.1, 0, TAU);
+      ctx.arc(11, eyeY, 2.1, 0, TAU);
+      ctx.fill();
+    }
+
+    ctx.strokeStyle = 'rgba(60, 38, 29, 0.75)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    if (mood === 'concerned' || mood === 'stern') {
+      ctx.moveTo(-15, -183);
+      ctx.lineTo(-7, -185);
+      ctx.moveTo(7, -185);
+      ctx.lineTo(15, -183);
+    } else {
+      ctx.moveTo(-15, -185);
+      ctx.lineTo(-7, -185);
+      ctx.moveTo(7, -185);
+      ctx.lineTo(15, -185);
+    }
+    ctx.stroke();
+
+    ctx.strokeStyle = 'rgba(75, 39, 31, 0.8)';
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    if (mood === 'smile') {
+      ctx.arc(0, -162, 8, 0.18, Math.PI - 0.18);
+    } else if (mood === 'concerned') {
+      ctx.arc(0, -154, 6, Math.PI + 0.25, TAU - 0.25);
+    } else if (mood === 'stern' || mood === 'annoyed') {
+      ctx.moveTo(-6, -157);
+      ctx.lineTo(6, -157);
+    } else {
+      ctx.moveTo(-6, -158);
+      ctx.lineTo(6, -158);
+    }
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  function frame(now) {
+    drawScene();
+    requestAnimationFrame(frame);
+  }
+
+  requestAnimationFrame(frame);
+
+  // Read-only test hook for the local verification harness.
+  window.__FIRSTWEEK__ = {
+    state,
+    nodes: NODES,
+    speakers: SPEAKERS,
+    scenes: SCENES,
+    choose,
+    advance,
+    renderNode,
+    showTitle,
+    showFinal,
+    resolve,
+  };
+})();
+
+</script>
+</body>
+</html>

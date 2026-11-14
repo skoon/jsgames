@@ -1,0 +1,2228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#081012">
+<title>Tag Yard</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --ink: #eef8f2;
+    --muted: rgba(226, 244, 237, 0.46);
+    --faint: rgba(226, 244, 237, 0.24);
+    --teal: #6ee7cf;
+    --teal-deep: #2dbfa7;
+    --amber: #ffc86b;
+    --amber-deep: #e0a53b;
+    --red: #ff7d70;
+    --line: rgba(142, 220, 206, 0.16);
+    --panel: rgba(10, 20, 23, 0.9);
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    background:
+      radial-gradient(110% 80% at 50% 0%, #213531 0%, #0b1416 54%, #05090b 100%);
+    color: var(--ink);
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    -webkit-user-select: none;
+    user-select: none;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+  #stage {
+    position: relative;
+    width: min(100%, calc((100dvh - 55px) * 0.75));
+    aspect-ratio: 3 / 4;
+    border-radius: 20px;
+    overflow: hidden;
+    background: #081012;
+    box-shadow:
+      0 30px 70px -28px rgba(0, 0, 0, 0.95),
+      0 0 0 1px rgba(255, 255, 255, 0.07),
+      inset 0 0 0 1px rgba(110, 231, 207, 0.07);
+    touch-action: none;
+    container-type: size;
+  }
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    touch-action: none;
+  }
+  .hint {
+    margin: 0;
+    font-size: clamp(6.5px, 1.8vw, 8px);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: rgba(238, 248, 242, 0.27);
+    white-space: nowrap;
+  }
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  #ui {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    padding: 11px 13px 10px;
+    pointer-events: none;
+  }
+  #ui > * { pointer-events: auto; }
+
+  /* ---------- HUD ---------- */
+  .hud {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 7px 9px 6px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background:
+      linear-gradient(180deg, rgba(22, 38, 40, 0.92), rgba(8, 17, 19, 0.84));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045);
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+  }
+  .brand-mark {
+    width: 21px;
+    height: 21px;
+    flex: none;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(255, 200, 107, 0.5);
+    border-radius: 5px;
+    background: rgba(255, 200, 107, 0.08);
+    color: var(--amber);
+    font-size: 12px;
+    line-height: 1;
+  }
+  .brand b {
+    display: block;
+    font-size: 12px;
+    line-height: 1.05;
+    letter-spacing: 0.11em;
+  }
+  .brand small {
+    display: block;
+    margin-top: 2px;
+    font-size: 6.5px;
+    letter-spacing: 0.15em;
+    color: var(--muted);
+  }
+  .stats {
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    flex: none;
+  }
+  .stat { text-align: right; }
+  .stat span {
+    display: block;
+    font-size: 6.5px;
+    letter-spacing: 0.15em;
+    color: var(--muted);
+  }
+  .stat strong {
+    display: block;
+    margin-top: 1px;
+    font-size: 15px;
+    line-height: 1;
+    color: var(--teal);
+    font-variant-numeric: tabular-nums;
+  }
+  .stat:last-child strong { color: rgba(238, 248, 242, 0.55); }
+  .stat strong.flash { animation: score-flash 280ms ease-out; }
+  @keyframes score-flash {
+    0% { color: #ffffff; text-shadow: 0 0 16px rgba(110, 231, 207, 0.9); }
+    100% { color: var(--teal); text-shadow: none; }
+  }
+
+  /* ---------- job strip ---------- */
+  .jobline {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    padding: 0 2px;
+    font-size: 8px;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .badge {
+    flex: none;
+    padding: 2px 5px;
+    border: 1px solid rgba(255, 200, 107, 0.28);
+    border-radius: 999px;
+    color: var(--amber);
+    background: rgba(255, 200, 107, 0.07);
+    font-size: 6.5px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+  }
+  .badge.revision {
+    border-color: rgba(255, 125, 112, 0.36);
+    color: #ffb2a9;
+    background: rgba(255, 125, 112, 0.08);
+    animation: badge-pulse 1.8s ease-in-out infinite;
+  }
+  @keyframes badge-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255, 125, 112, 0); }
+    50% { box-shadow: 0 0 0 3px rgba(255, 125, 112, 0.08); }
+  }
+  #jobName {
+    margin-left: auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: rgba(238, 248, 242, 0.8);
+    font-weight: 700;
+  }
+
+  /* ---------- blueprint ---------- */
+  .blueprint {
+    flex: 1 1 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  .toprow {
+    flex: 0 0 20%;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 5px;
+  }
+  .mainframe {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding: 6px;
+    border: 1px solid rgba(110, 231, 207, 0.16);
+    border-radius: 10px;
+    background:
+      linear-gradient(180deg, rgba(24, 65, 61, 0.18), rgba(7, 15, 17, 0.42));
+  }
+  .mainframe::before {
+    content: "MAIN LANDMARK";
+    position: absolute;
+    z-index: 1;
+    top: -5px;
+    left: 12px;
+    padding: 0 4px;
+    background: #0a1416;
+    color: rgba(110, 231, 207, 0.38);
+    font-size: 5.5px;
+    letter-spacing: 0.16em;
+  }
+  .content-grid {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-auto-rows: minmax(0, 1fr);
+    gap: 5px;
+  }
+  .content-grid .bay:nth-child(3):last-child { grid-column: 1 / -1; }
+  .bottomrow {
+    flex: 0 0 17%;
+    min-height: 0;
+  }
+  .bay {
+    position: relative;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    padding: 5px 6px;
+    border: 1px dashed rgba(146, 220, 208, 0.25);
+    border-radius: 8px;
+    background: rgba(8, 19, 21, 0.65);
+    color: var(--ink);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    touch-action: none;
+    transition:
+      border-color 120ms ease,
+      background 120ms ease,
+      box-shadow 120ms ease,
+      transform 100ms ease;
+  }
+  .bay:hover,
+  .bay:focus-visible {
+    border-color: rgba(110, 231, 207, 0.56);
+    background: rgba(20, 43, 42, 0.82);
+    outline: none;
+    box-shadow: 0 0 0 1px rgba(110, 231, 207, 0.16);
+  }
+  .bay:active { transform: translateY(1px); }
+  .bay.filled {
+    border-style: solid;
+    border-color: rgba(110, 231, 207, 0.3);
+    background:
+      linear-gradient(180deg, rgba(110, 231, 207, 0.075), rgba(8, 19, 21, 0.7));
+  }
+  .bay.is-changed {
+    border-color: rgba(255, 200, 107, 0.5);
+    background: rgba(255, 200, 107, 0.06);
+  }
+  .bay.is-added {
+    border-color: rgba(255, 200, 107, 0.55);
+    box-shadow: inset 0 0 0 1px rgba(255, 200, 107, 0.06);
+  }
+  .bay.is-added::after {
+    content: "NEW";
+    position: absolute;
+    top: 3px;
+    right: 4px;
+    padding: 1px 3px;
+    border-radius: 3px;
+    background: var(--amber);
+    color: #241805;
+    font-size: 5px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+  }
+  .bay.is-added:not(.filled) .bay-tag { display: none; }
+  .bay.is-added.filled::after { display: none; }
+  .bay.is-wrong {
+    border-color: rgba(255, 125, 112, 0.82);
+    background: rgba(255, 125, 112, 0.09);
+    animation: bay-shake 220ms ease-in-out;
+  }
+  @keyframes bay-shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-2px); }
+    75% { transform: translateX(2px); }
+  }
+  .bay.is-missing {
+    border-color: rgba(255, 200, 107, 0.68);
+    background: rgba(255, 200, 107, 0.055);
+  }
+  .bay.drop-hover {
+    border-color: var(--amber);
+    background: rgba(255, 200, 107, 0.14);
+    box-shadow: 0 0 0 2px rgba(255, 200, 107, 0.12);
+    transform: translateY(-1px);
+  }
+  .bay-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 4px;
+    min-width: 0;
+  }
+  .bay-name {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    font-size: 9px;
+    font-weight: 700;
+    line-height: 1.16;
+    letter-spacing: 0.005em;
+  }
+  .bay-tag {
+    flex: none;
+    max-width: 55%;
+    padding: 2px 4px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.13);
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.045);
+    color: rgba(238, 248, 242, 0.34);
+    font-size: 8px;
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .bay.filled .bay-tag { color: var(--ink); }
+  .bay.filled .bay-tag.kind-landmark {
+    border-color: rgba(110, 231, 207, 0.32);
+    background: rgba(110, 231, 207, 0.11);
+    color: #b7fff0;
+  }
+  .bay.filled .bay-tag.kind-content {
+    border-color: rgba(255, 200, 107, 0.32);
+    background: rgba(255, 200, 107, 0.1);
+    color: #ffdda1;
+  }
+  .bay.filled .bay-tag.kind-generic {
+    border-color: rgba(255, 125, 112, 0.45);
+    background: rgba(255, 125, 112, 0.1);
+    color: #ffc0ba;
+  }
+  .bay-hint {
+    overflow: hidden;
+    color: var(--muted);
+    font-size: 7px;
+    line-height: 1.22;
+    letter-spacing: 0.005em;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* ---------- materials ---------- */
+  .tray {
+    flex: 0 0 auto;
+    padding: 5px 7px 5px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background:
+      linear-gradient(180deg, rgba(17, 31, 33, 0.94), rgba(7, 15, 17, 0.92));
+  }
+  .tray-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 4px;
+    font-size: 7px;
+    letter-spacing: 0.16em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+  .tray-head span:last-child {
+    overflow: hidden;
+    color: rgba(255, 200, 107, 0.62);
+    font-size: 6px;
+    letter-spacing: 0.09em;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .chips {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+  }
+  .chip {
+    position: relative;
+    height: 25px;
+    padding: 0 6px 0 13px;
+    overflow: hidden;
+    border: 1px solid rgba(146, 220, 208, 0.2);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.028);
+    color: var(--ink);
+    font: inherit;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: grab;
+    touch-action: none;
+    transition:
+      border-color 110ms ease,
+      background 110ms ease,
+      transform 100ms ease;
+  }
+  .chip::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 6px;
+    width: 3px;
+    height: 10px;
+    margin-top: -5px;
+    border-radius: 1px;
+    background: var(--teal);
+    opacity: 0.7;
+  }
+  .chip.kind-content::before { background: var(--amber); }
+  .chip.kind-generic::before { background: var(--red); }
+  .chip:hover {
+    border-color: rgba(110, 231, 207, 0.5);
+    background: rgba(110, 231, 207, 0.06);
+  }
+  .chip:active { cursor: grabbing; transform: translateY(1px); }
+  .chip:focus-visible {
+    outline: 2px solid var(--amber);
+    outline-offset: 1px;
+  }
+  .chip[aria-pressed="true"] {
+    border-color: var(--amber);
+    background: rgba(255, 200, 107, 0.12);
+    box-shadow: 0 0 0 1px rgba(255, 200, 107, 0.12);
+  }
+  .chip.used {
+    visibility: hidden;
+    pointer-events: none;
+  }
+  .tag-help {
+    min-height: 9px;
+    margin: 4px 1px 0;
+    overflow: hidden;
+    color: rgba(226, 244, 237, 0.37);
+    font-size: 7px;
+    line-height: 1.35;
+    letter-spacing: 0.005em;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+  .tag-help b {
+    color: rgba(255, 200, 107, 0.82);
+    font-weight: 700;
+  }
+
+  /* ---------- notice + action ---------- */
+  .notice {
+    flex: 0 0 auto;
+    min-height: 25px;
+    display: flex;
+    align-items: flex-start;
+    gap: 5px;
+    padding: 4px 7px;
+    overflow: hidden;
+    border: 1px solid transparent;
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.028);
+    color: var(--muted);
+    font-size: 8.5px;
+    line-height: 1.35;
+    letter-spacing: 0.005em;
+    transition: background 140ms ease, border-color 140ms ease;
+  }
+  .notice-dot {
+    flex: none;
+    width: 4px;
+    height: 4px;
+    margin-top: 4px;
+    border-radius: 50%;
+    background: var(--teal);
+    box-shadow: 0 0 8px rgba(110, 231, 207, 0.5);
+  }
+  .notice.bad {
+    border-color: rgba(255, 125, 112, 0.28);
+    background: rgba(255, 125, 112, 0.065);
+    color: #ffd2ce;
+  }
+  .notice.bad .notice-dot {
+    background: var(--red);
+    box-shadow: 0 0 8px rgba(255, 125, 112, 0.5);
+  }
+  .notice.good {
+    border-color: rgba(110, 231, 207, 0.24);
+    background: rgba(110, 231, 207, 0.06);
+    color: #c9fff3;
+  }
+  .notice b { color: var(--ink); }
+  .inspect {
+    flex: 0 0 auto;
+    padding: 9px 12px;
+    border: 0;
+    border-radius: 9px;
+    background: linear-gradient(180deg, #ffd98e, #efb64f);
+    box-shadow:
+      0 12px 26px -14px rgba(255, 200, 107, 0.8),
+      inset 0 -2px 0 rgba(65, 39, 0, 0.18);
+    color: #251705;
+    font: inherit;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: filter 120ms ease, transform 100ms ease;
+  }
+  .inspect:hover { filter: brightness(1.06); }
+  .inspect:active { transform: translateY(1px); }
+  .inspect:focus-visible { outline: 2px solid #fff1c9; outline-offset: 3px; }
+
+  /* ---------- overlay ---------- */
+  .overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    display: grid;
+    place-items: center;
+    padding: 18px;
+    background: rgba(3, 8, 9, 0.86);
+    -webkit-backdrop-filter: blur(5px);
+    backdrop-filter: blur(5px);
+    animation: fade-in 160ms ease-out;
+  }
+  .overlay[hidden] { display: none; }
+  @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+  .panel {
+    width: 100%;
+    max-width: 330px;
+    max-height: 100%;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 17px 17px 15px;
+    border: 1px solid rgba(146, 220, 208, 0.15);
+    border-radius: 14px;
+    background:
+      linear-gradient(180deg, rgba(20, 36, 37, 0.98), rgba(7, 15, 17, 0.99));
+    box-shadow:
+      0 24px 60px -25px rgba(0, 0, 0, 0.95),
+      inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    text-align: center;
+    scrollbar-width: thin;
+  }
+  .eyebrow {
+    margin: 0 0 5px;
+    font-size: 7.5px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--amber);
+  }
+  .title {
+    margin: 0 0 9px;
+    color: var(--ink);
+    font-size: clamp(22px, 6.4vw, 30px);
+    line-height: 1.08;
+    letter-spacing: 0.015em;
+    text-shadow: 0 0 28px rgba(110, 231, 207, 0.14);
+  }
+  .lead {
+    margin: 0;
+    color: rgba(238, 248, 242, 0.6);
+    font-size: 10px;
+    line-height: 1.55;
+    letter-spacing: 0.005em;
+  }
+  .quote {
+    position: relative;
+    margin: 12px 0 0;
+    padding: 9px 10px 9px 12px;
+    border-left: 2px solid rgba(255, 200, 107, 0.7);
+    border-radius: 0 7px 7px 0;
+    background: rgba(255, 200, 107, 0.055);
+    color: rgba(255, 245, 222, 0.82);
+    font-size: 9.5px;
+    line-height: 1.55;
+    text-align: left;
+  }
+  .steps {
+    display: grid;
+    gap: 5px;
+    margin: 11px 0 0;
+    padding: 0;
+    list-style: none;
+    text-align: left;
+  }
+  .steps li {
+    position: relative;
+    padding-left: 14px;
+    color: rgba(238, 248, 242, 0.68);
+    font-size: 9px;
+    line-height: 1.45;
+  }
+  .steps li::before {
+    content: "▸";
+    position: absolute;
+    left: 1px;
+    color: var(--amber);
+  }
+  .steps code, .lead code {
+    padding: 0 2px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.07);
+    color: #b7fff0;
+    font: inherit;
+  }
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 5px;
+    margin-top: 12px;
+  }
+  .metric {
+    padding: 7px 3px 6px;
+    border: 1px solid rgba(255, 255, 255, 0.065);
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.025);
+  }
+  .metric span {
+    display: block;
+    color: var(--muted);
+    font-size: 5.8px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .metric strong {
+    display: block;
+    margin-top: 3px;
+    color: var(--ink);
+    font-size: 11px;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+  }
+  .result {
+    margin: 13px 0 0;
+    padding: 10px;
+    border: 1px solid rgba(110, 231, 207, 0.16);
+    border-radius: 9px;
+    background: rgba(110, 231, 207, 0.045);
+  }
+  .result span {
+    display: block;
+    color: var(--muted);
+    font-size: 6px;
+    letter-spacing: 0.18em;
+  }
+  .result strong {
+    display: block;
+    margin-top: 1px;
+    color: var(--teal);
+    font-size: 34px;
+    line-height: 1;
+    letter-spacing: 0.02em;
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 26px rgba(110, 231, 207, 0.25);
+  }
+  .result small {
+    display: block;
+    margin-top: 5px;
+    color: var(--muted);
+    font-size: 6.5px;
+    letter-spacing: 0.12em;
+  }
+  .btn {
+    margin-top: 15px;
+    padding: 11px 24px;
+    border: 0;
+    border-radius: 999px;
+    background: linear-gradient(180deg, #7ff0d4, #46c8a9);
+    box-shadow:
+      0 14px 30px -14px rgba(94, 231, 199, 0.9),
+      inset 0 -2px 0 rgba(0, 0, 0, 0.16);
+    color: #06211c;
+    font: inherit;
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: filter 120ms ease, transform 100ms ease;
+  }
+  .btn:hover { filter: brightness(1.06); }
+  .btn:active { transform: translateY(1px) scale(0.99); }
+  .btn:focus-visible { outline: 2px solid #c9fff3; outline-offset: 3px; }
+  .fine {
+    margin: 8px 0 0;
+    color: rgba(238, 248, 242, 0.28);
+    font-size: 6.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .fine:empty { display: none; }
+  [hidden] { display: none !important; }
+
+  /* ---------- drag ghost ---------- */
+  .drag-ghost {
+    position: fixed;
+    z-index: 50;
+    padding: 6px 9px;
+    border: 1px solid rgba(255, 200, 107, 0.75);
+    border-radius: 6px;
+    background: #142426;
+    color: #ffe0a8;
+    box-shadow: 0 14px 28px -12px rgba(0, 0, 0, 0.9);
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 11px;
+    font-weight: 700;
+    pointer-events: none;
+    transform: translate(-50%, -50%) rotate(-2deg);
+    opacity: 0.95;
+  }
+  .drag-ghost.kind-generic {
+    border-color: rgba(255, 125, 112, 0.8);
+    color: #ffc0ba;
+  }
+
+  /* ---------- compact screens ---------- */
+  @container (max-height: 540px) {
+    #ui { gap: 5px; padding: 8px 10px 7px; }
+    .hud { padding: 5px 7px; }
+    .brand b { font-size: 10px; }
+    .brand small { display: none; }
+    .brand-mark { width: 18px; height: 18px; font-size: 10px; }
+    .stat strong { font-size: 13px; }
+    .jobline { font-size: 6.5px; }
+    .blueprint { gap: 4px; }
+    .toprow, .content-grid { gap: 4px; }
+    .mainframe { gap: 4px; padding: 5px; }
+    .bay { padding: 3px 5px; }
+    .bay-name { font-size: 8px; }
+    .bay-hint { display: none; }
+    .tray { padding: 4px 6px; }
+    .tray-head { margin-bottom: 3px; }
+    .chip { height: 22px; font-size: 8px; }
+    .tag-help { display: none; }
+    .notice { min-height: 21px; padding: 3px 6px; font-size: 7.5px; }
+    .inspect { padding: 7px; font-size: 8px; }
+    .overlay { padding: 11px; }
+    .panel { padding: 13px 13px 11px; }
+    .title { font-size: 22px; margin-bottom: 6px; }
+    .lead { font-size: 8.5px; }
+    .quote { margin-top: 9px; font-size: 8px; padding: 7px 8px 7px 10px; }
+    .steps { margin-top: 8px; gap: 3px; }
+    .steps li { font-size: 7.5px; }
+    .metrics { margin-top: 9px; }
+    .metric { padding: 5px 2px; }
+    .metric strong { font-size: 9.5px; }
+    .result strong { font-size: 28px; }
+    .btn { margin-top: 11px; padding: 9px 18px; font-size: 8.5px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .overlay { animation: none; }
+    .badge.revision { animation: none; }
+    .bay.is-wrong { animation: none; }
+    .stat strong.flash { animation: none; }
+  }
+</style>
+</head>
+<body>
+  <h1 class="sr-only">Tag Yard: Semantic Build Co.</h1>
+  <div id="stage">
+    <canvas id="game" width="480" height="640" aria-hidden="true"></canvas>
+    <div id="ui">
+      <header class="hud">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">▦</span>
+          <span>
+            <b>TAG YARD</b>
+            <small>SEMANTIC BUILD CO.</small>
+          </span>
+        </div>
+        <div class="stats">
+          <div class="stat"><span>SCORE</span><strong id="score">0000</strong></div>
+          <div class="stat"><span>BEST</span><strong id="best">0000</strong></div>
+        </div>
+      </header>
+      <div class="jobline">
+        <span id="jobLabel">JOB 01 / 03</span>
+        <span id="stageBadge" class="badge">BASE BUILD</span>
+        <span id="jobName">ROSA'S RAMEN</span>
+      </div>
+      <div id="blueprint" class="blueprint" aria-label="Page blueprint"></div>
+      <section class="tray" aria-label="Semantic tag materials">
+        <div class="tray-head">
+          <span>MATERIALS</span>
+          <span id="trayNote">NO TIMER · PICK A TAG</span>
+        </div>
+        <div id="chips" class="chips"></div>
+        <p id="tagHelp" class="tag-help">Drag a tag into a bay. Keyboard: pick a tag, arrows choose a bay.</p>
+      </section>
+      <p id="notice" class="notice" aria-live="polite">
+        <span class="notice-dot" aria-hidden="true"></span>
+        <span id="noticeText">Drag the right semantic tags into the blueprint.</span>
+      </p>
+      <button id="inspect" class="inspect" type="button">Inspect structure</button>
+    </div>
+    <div id="overlay" class="overlay" role="dialog" aria-modal="true" aria-labelledby="ovTitle" hidden>
+      <div class="panel">
+        <p id="ovKicker" class="eyebrow"></p>
+        <h2 id="ovTitle" class="title"></h2>
+        <p id="ovLead" class="lead"></p>
+        <div id="ovScore" class="result" hidden>
+          <span>FINAL SCORE</span>
+          <strong id="ovScoreValue">0</strong>
+          <small id="ovBest">BEST 0000</small>
+        </div>
+        <blockquote id="ovQuote" class="quote" hidden></blockquote>
+        <ul id="ovSteps" class="steps" hidden></ul>
+        <div id="ovMetrics" class="metrics"></div>
+        <button id="ovBtn" class="btn" type="button">Open blueprint</button>
+        <p id="ovFine" class="fine"></p>
+      </div>
+    </div>
+  </div>
+  <p class="hint">drag tags · keyboard: enter picks · arrows choose · backspace clears</p>
+<script>
+(() => {
+  'use strict';
+
+  const W = 480;
+  const H = 640;
+  const TAU = Math.PI * 2;
+  const BEST_KEY = 'tagyard.best.v1';
+  const BASE_POINTS = 800;
+  const REVISION_POINTS = 400;
+
+  const TAGS = [
+    {
+      id: 'header',
+      kind: 'landmark',
+      desc: 'A site-wide banner for the logo, page title, and intro.',
+    },
+    {
+      id: 'nav',
+      kind: 'landmark',
+      desc: 'A set of links for moving between pages or major sections.',
+    },
+    {
+      id: 'main',
+      kind: 'landmark',
+      desc: 'The one unique content area for this page.',
+    },
+    {
+      id: 'footer',
+      kind: 'landmark',
+      desc: 'Site-wide closing info: contact, copyright, and small print.',
+    },
+    {
+      id: 'article',
+      kind: 'content',
+      desc: 'A complete, reusable piece of content, such as a story.',
+    },
+    {
+      id: 'section',
+      kind: 'content',
+      desc: 'A themed group of related content, usually with a heading.',
+    },
+    {
+      id: 'aside',
+      kind: 'content',
+      desc: 'Related but separate info, like hours or a quick fact card.',
+    },
+    {
+      id: 'div',
+      kind: 'generic',
+      desc: 'A generic block with no meaning. Use only when nothing else fits.',
+    },
+    {
+      id: 'span',
+      kind: 'generic',
+      desc: 'A generic inline wrapper for a few words, not a page block.',
+    },
+  ];
+  const TAG_BY_ID = Object.fromEntries(TAGS.map((tag) => [tag.id, tag]));
+
+  const JOBS = [
+    {
+      id: 'ramen',
+      company: "Rosa's Ramen",
+      short: "ROSA'S RAMEN",
+      client: 'Rosa',
+      trade: 'Restaurant',
+      lead: 'Rosa needs a homepage framed before the lunch rush.',
+      quote: '“I want the menu, our story, and the hours to be easy to find.”',
+      base: [
+        {
+          id: 'banner',
+          zone: 'top',
+          name: 'Brand + page title',
+          hint: 'Logo, restaurant name, tagline',
+          answer: 'header',
+          why: 'A site-wide banner with the name and logo is a header.',
+        },
+        {
+          id: 'nav',
+          zone: 'top',
+          name: 'Links between pages',
+          hint: 'Menu, story, hours, contact',
+          answer: 'nav',
+          why: 'A set of links for moving around the site is a nav.',
+        },
+        {
+          id: 'main',
+          zone: 'main',
+          name: 'Unique page content',
+          hint: 'Everything that belongs only on this page',
+          answer: 'main',
+          why: 'The unique content of this page belongs in main.',
+        },
+        {
+          id: 'special',
+          zone: 'content',
+          name: 'Daily specials',
+          hint: "A themed board of today's dishes",
+          answer: 'section',
+          why: "A themed board of today's dishes is a section.",
+        },
+        {
+          id: 'hours',
+          zone: 'content',
+          name: 'Hours + address',
+          hint: 'Related facts beside the story',
+          answer: 'aside',
+          why: 'Related facts beside the main content are an aside.',
+        },
+        {
+          id: 'footer',
+          zone: 'bottom',
+          name: 'Contact + small print',
+          hint: 'Phone, address, copyright',
+          answer: 'footer',
+          why: 'Contact details and small print belong in a footer.',
+        },
+      ],
+      revision: {
+        headline: 'Rosa calls back',
+        lead: 'The daily special is being syndicated, and the regulars want their reviews online.',
+        quote: '“Make the special a complete article we can reuse, and give the reviews their own themed section.”',
+        steps: [
+          'The Daily specials bay becomes a reusable article.',
+          'A new Reviews bay appears inside main.',
+        ],
+        change: {
+          slot: 'special',
+          name: 'Syndicated special',
+          hint: 'A complete story we can reuse',
+          answer: 'article',
+          why: 'A complete story that can be reused elsewhere is an article.',
+        },
+        add: [
+          {
+            id: 'reviews',
+            zone: 'content',
+            name: "Regulars' reviews",
+            hint: 'A themed group with a heading',
+            answer: 'section',
+            why: 'A themed group of related reviews is a section.',
+            added: true,
+          },
+        ],
+      },
+    },
+    {
+      id: 'bike',
+      company: 'Harbor Bike Co-op',
+      short: 'HARBOR BIKE CO-OP',
+      client: 'Marco',
+      trade: 'Workshop',
+      lead: 'Marco needs a practical homepage for a volunteer-run bike workshop.',
+      quote: '“People need repairs, classes, and our story without digging through clutter.”',
+      base: [
+        {
+          id: 'banner',
+          zone: 'top',
+          name: 'Workshop banner',
+          hint: 'Name, logo, one-line promise',
+          answer: 'header',
+          why: 'The site-wide name and logo banner is a header.',
+        },
+        {
+          id: 'nav',
+          zone: 'top',
+          name: 'Links to pages',
+          hint: 'Repairs, classes, visit, contact',
+          answer: 'nav',
+          why: 'Page-to-page links belong in a nav.',
+        },
+        {
+          id: 'main',
+          zone: 'main',
+          name: 'This page only',
+          hint: 'The unique content of the homepage',
+          answer: 'main',
+          why: 'The unique content of this page belongs in main.',
+        },
+        {
+          id: 'story',
+          zone: 'content',
+          name: "A rider's repair story",
+          hint: 'A complete story with a beginning and end',
+          answer: 'article',
+          why: "A complete rider's story is an article.",
+        },
+        {
+          id: 'prices',
+          zone: 'content',
+          name: 'Drop-in prices',
+          hint: 'Related facts beside the story',
+          answer: 'aside',
+          why: 'Quick reference facts beside the main story are an aside.',
+        },
+        {
+          id: 'footer',
+          zone: 'bottom',
+          name: 'Visit + small print',
+          hint: 'Address, opening days, copyright',
+          answer: 'footer',
+          why: 'Visit details and small print belong in a footer.',
+        },
+      ],
+      revision: {
+        headline: 'Marco calls back',
+        lead: 'The repair stories are becoming a monthly series, with a founder interview on the way.',
+        quote: '“Group the repair episodes as a section. And my founder interview should stand alone as an article.”',
+        steps: [
+          'The repair story bay grows into a monthly series section.',
+          'A new Founder interview article joins the page.',
+        ],
+        change: {
+          slot: 'story',
+          name: 'Repair stories series',
+          hint: 'A themed group of monthly episodes',
+          answer: 'section',
+          why: 'A recurring themed series is a section.',
+        },
+        add: [
+          {
+            id: 'interview',
+            zone: 'content',
+            name: 'Founder interview',
+            hint: 'A complete story we can reuse',
+            answer: 'article',
+            why: 'An interview that can be reused on its own is an article.',
+            added: true,
+          },
+        ],
+      },
+    },
+    {
+      id: 'records',
+      company: 'Static Bloom Records',
+      short: 'STATIC BLOOM RECORDS',
+      client: 'Nia',
+      trade: 'Record store',
+      lead: 'Nia needs a storefront page for new releases and listening sessions.',
+      quote: '“The new releases should feel like a shelf you can browse, not a pile of boxes.”',
+      base: [
+        {
+          id: 'banner',
+          zone: 'top',
+          name: 'Shop name + tagline',
+          hint: 'Logo, store name, short intro',
+          answer: 'header',
+          why: 'The shop-wide name and logo banner is a header.',
+        },
+        {
+          id: 'nav',
+          zone: 'top',
+          name: 'Browse links',
+          hint: 'New releases, staff picks, visit',
+          answer: 'nav',
+          why: 'Links for browsing different pages belong in a nav.',
+        },
+        {
+          id: 'main',
+          zone: 'main',
+          name: 'This page only',
+          hint: 'The unique content of the storefront',
+          answer: 'main',
+          why: 'The unique content of this page belongs in main.',
+        },
+        {
+          id: 'feature',
+          zone: 'content',
+          name: 'New this week',
+          hint: 'A themed shelf of related releases',
+          answer: 'section',
+          why: 'A themed shelf of related releases is a section.',
+        },
+        {
+          id: 'hours',
+          zone: 'content',
+          name: 'Listening station',
+          hint: 'Related session times beside the shelf',
+          answer: 'aside',
+          why: 'Related session times beside the content are an aside.',
+        },
+        {
+          id: 'footer',
+          zone: 'bottom',
+          name: 'Visit + small print',
+          hint: 'Address, hours, copyright',
+          answer: 'footer',
+          why: 'Visit details and small print belong in a footer.',
+        },
+      ],
+      revision: {
+        headline: 'Nia calls back',
+        lead: 'The album spotlight is going to a music blog, and the staff want their picks on the page.',
+        quote: '“Make the album spotlight a standalone article. Then add a themed section for our staff picks.”',
+        steps: [
+          'The album spotlight becomes a standalone article.',
+          'A new Staff picks section appears inside main.',
+        ],
+        change: {
+          slot: 'feature',
+          name: 'Album spotlight',
+          hint: 'A complete story for the music blog',
+          answer: 'article',
+          why: 'A standalone story that can be republished is an article.',
+        },
+        add: [
+          {
+            id: 'picks',
+            zone: 'content',
+            name: 'Staff picks',
+            hint: 'A themed group chosen by the crew',
+            answer: 'section',
+            why: 'A themed group of staff picks is a section.',
+            added: true,
+          },
+        ],
+      },
+    },
+  ];
+
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d', { alpha: false });
+  const stage = document.getElementById('stage');
+  const ui = document.getElementById('ui');
+  const scoreEl = document.getElementById('score');
+  const bestEl = document.getElementById('best');
+  const jobLabelEl = document.getElementById('jobLabel');
+  const jobNameEl = document.getElementById('jobName');
+  const stageBadgeEl = document.getElementById('stageBadge');
+  const blueprintEl = document.getElementById('blueprint');
+  const chipsEl = document.getElementById('chips');
+  const trayNoteEl = document.getElementById('trayNote');
+  const tagHelpEl = document.getElementById('tagHelp');
+  const noticeEl = document.getElementById('notice');
+  const noticeTextEl = document.getElementById('noticeText');
+  const inspectBtn = document.getElementById('inspect');
+  const overlayEl = document.getElementById('overlay');
+  const ovKickerEl = document.getElementById('ovKicker');
+  const ovTitleEl = document.getElementById('ovTitle');
+  const ovLeadEl = document.getElementById('ovLead');
+  const ovScoreEl = document.getElementById('ovScore');
+  const ovScoreValueEl = document.getElementById('ovScoreValue');
+  const ovBestEl = document.getElementById('ovBest');
+  const ovQuoteEl = document.getElementById('ovQuote');
+  const ovStepsEl = document.getElementById('ovSteps');
+  const ovMetricsEl = document.getElementById('ovMetrics');
+  const ovBtn = document.getElementById('ovBtn');
+  const ovFineEl = document.getElementById('ovFine');
+
+  const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
+  const pad4 = (n) => String(Math.max(0, Math.floor(n))).padStart(4, '0');
+  const escapeHtml = (s) => String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+
+  function readBest() {
+    try {
+      const v = Number(window.localStorage.getItem(BEST_KEY));
+      return Number.isFinite(v) && v > 0 ? Math.floor(v) : 0;
+    } catch (err) {
+      return 0;
+    }
+  }
+
+  function writeBest(v) {
+    try {
+      window.localStorage.setItem(BEST_KEY, String(v));
+    } catch (err) {
+      /* storage may be unavailable on file:// or in private mode */
+    }
+  }
+
+  /* ---------- canvas backdrop ---------- */
+  let bgGradient = null;
+  let vignette = null;
+  const dust = [];
+
+  function sizeCanvas() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+    bgGradient = null;
+    vignette = null;
+  }
+
+  sizeCanvas();
+  window.addEventListener('resize', sizeCanvas);
+
+  for (let i = 0; i < 34; i++) {
+    dust.push({
+      x: Math.random() * W,
+      y: Math.random() * H,
+      r: 0.5 + Math.random() * 1.5,
+      speed: 4 + Math.random() * 12,
+      drift: -5 + Math.random() * 10,
+      alpha: 0.05 + Math.random() * 0.13,
+      phase: Math.random() * TAU,
+    });
+  }
+
+  function drawSite(t) {
+    if (!bgGradient) {
+      bgGradient = ctx.createLinearGradient(0, 0, 0, H);
+      bgGradient.addColorStop(0, '#132327');
+      bgGradient.addColorStop(0.5, '#0a1417');
+      bgGradient.addColorStop(1, '#050a0c');
+      vignette = ctx.createRadialGradient(W / 2, H * 0.44, 70, W / 2, H * 0.44, 430);
+      vignette.addColorStop(0, 'rgba(0, 0, 0, 0)');
+      vignette.addColorStop(1, 'rgba(0, 0, 0, 0.55)');
+    }
+    ctx.fillStyle = bgGradient;
+    ctx.fillRect(0, 0, W, H);
+
+    // blueprint grid
+    ctx.strokeStyle = 'rgba(110, 231, 207, 0.035)';
+    ctx.lineWidth = 1;
+    for (let x = -16; x < W + 32; x += 32) {
+      ctx.beginPath();
+      ctx.moveTo(x + 0.5, 0);
+      ctx.lineTo(x + 0.5, H);
+      ctx.stroke();
+    }
+    for (let y = -16; y < H + 32; y += 32) {
+      ctx.beginPath();
+      ctx.moveTo(0, y + 0.5);
+      ctx.lineTo(W, y + 0.5);
+      ctx.stroke();
+    }
+
+    // distant girders
+    ctx.strokeStyle = 'rgba(146, 220, 208, 0.065)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(16, H - 80);
+    ctx.lineTo(16, 132);
+    ctx.moveTo(16, 132);
+    ctx.lineTo(206, 132);
+    ctx.moveTo(16, 132);
+    ctx.lineTo(94, 70);
+    ctx.moveTo(206, 132);
+    ctx.lineTo(164, 198);
+    ctx.stroke();
+    ctx.lineWidth = 1;
+    for (let y = 148; y < H - 60; y += 34) {
+      ctx.beginPath();
+      ctx.moveTo(16, y);
+      ctx.lineTo(42, y + 17);
+      ctx.lineTo(16, y + 34);
+      ctx.stroke();
+    }
+
+    // right scaffold
+    ctx.strokeStyle = 'rgba(255, 200, 107, 0.045)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(W - 24, 206);
+    ctx.lineTo(W - 24, H);
+    ctx.moveTo(W - 24, 236);
+    ctx.lineTo(W - 82, 236);
+    ctx.moveTo(W - 24, 300);
+    ctx.lineTo(W - 82, 300);
+    ctx.moveTo(W - 82, 236);
+    ctx.lineTo(W - 82, 300);
+    ctx.stroke();
+    for (let y = 236; y < 300; y += 32) {
+      ctx.beginPath();
+      ctx.moveTo(W - 82, y);
+      ctx.lineTo(W - 24, y + 32);
+      ctx.stroke();
+    }
+
+    // crane warning light
+    const pulse = 0.45 + 0.55 * (0.5 + 0.5 * Math.sin(t * 2.2));
+    ctx.fillStyle = `rgba(255, 200, 107, ${0.15 + pulse * 0.45})`;
+    ctx.beginPath();
+    ctx.arc(16, 130, 3 + pulse * 2, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = `rgba(255, 200, 107, ${0.05 * pulse})`;
+    ctx.beginPath();
+    ctx.arc(16, 130, 13 + pulse * 6, 0, TAU);
+    ctx.fill();
+
+    // caution strip at the floor
+    ctx.fillStyle = 'rgba(5, 10, 12, 0.8)';
+    ctx.fillRect(0, H - 16, W, 16);
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, H - 16, W, 16);
+    ctx.clip();
+    ctx.strokeStyle = 'rgba(255, 200, 107, 0.09)';
+    ctx.lineWidth = 5;
+    for (let x = -24 + (t * 8) % 44; x < W + 44; x += 44) {
+      ctx.beginPath();
+      ctx.moveTo(x, H - 16);
+      ctx.lineTo(x + 22, H);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // dust motes
+    for (const p of dust) {
+      const y = ((p.y - t * p.speed) % (H + 20) + H + 20) % (H + 20);
+      const x = p.x + Math.sin(t * 0.5 + p.phase) * 7 + p.drift * t * 0.08;
+      ctx.globalAlpha = p.alpha;
+      ctx.fillStyle = p.r > 1.3 ? '#ffd58f' : '#9df2e1';
+      ctx.fillRect(x, y, p.r, p.r);
+    }
+    ctx.globalAlpha = 1;
+
+    ctx.fillStyle = vignette;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  function frame(now) {
+    drawSite(now / 1000);
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  /* ---------- game state ---------- */
+  const state = {
+    mode: 'brief',
+    job: 0,
+    stage: 'base',
+    slots: [],
+    assignments: {},
+    wrong: {},
+    missing: {},
+    selected: null,
+    selectedFrom: null,
+    score: 0,
+    best: readBest(),
+    attempts: 0,
+    failed: 0,
+    jobEarned: 0,
+  };
+
+  const slotEls = new Map();
+  const chipEls = new Map();
+  let suppressClickUntil = 0;
+  let dragCandidate = null;
+  let activeDrag = null;
+  let dragGhost = null;
+  let lastHoverBay = null;
+
+  function currentJob() {
+    return JOBS[state.job];
+  }
+
+  function currentSlot(slotId) {
+    return state.slots.find((slot) => slot.id === slotId) || null;
+  }
+
+  function computeSlots() {
+    const job = currentJob();
+    let slots = job.base.map((slot) => ({ ...slot }));
+    if (state.stage === 'revision') {
+      const change = job.revision.change;
+      slots = slots.map((slot) => {
+        if (slot.id !== change.slot) return slot;
+        return {
+          ...slot,
+          name: change.name,
+          hint: change.hint,
+          answer: change.answer,
+          why: change.why,
+          changed: true,
+        };
+      });
+      const added = job.revision.add.map((slot) => ({ ...slot }));
+      const footerIndex = slots.findIndex((slot) => slot.zone === 'bottom');
+      const insertAt = footerIndex < 0 ? slots.length : footerIndex;
+      slots.splice(insertAt, 0, ...added);
+    }
+    return slots;
+  }
+
+  function updateHud(flash) {
+    scoreEl.textContent = pad4(state.score);
+    bestEl.textContent = pad4(Math.max(state.best, state.score));
+    if (flash) {
+      scoreEl.classList.remove('flash');
+      void scoreEl.offsetWidth;
+      scoreEl.classList.add('flash');
+      window.setTimeout(() => scoreEl.classList.remove('flash'), 320);
+    }
+  }
+
+  function updateJobStrip() {
+    const job = currentJob();
+    jobLabelEl.textContent = `JOB ${String(state.job + 1).padStart(2, '0')} / ${String(JOBS.length).padStart(2, '0')}`;
+    jobNameEl.textContent = job.short;
+    stageBadgeEl.textContent = state.stage === 'revision' ? 'REVISION' : 'BASE BUILD';
+    stageBadgeEl.classList.toggle('revision', state.stage === 'revision');
+    trayNoteEl.textContent = state.stage === 'revision'
+      ? 'CLIENT REVISION · NO TIMER'
+      : 'NO TIMER · PICK A TAG';
+  }
+
+  function setNotice(html, tone) {
+    noticeTextEl.innerHTML = html;
+    noticeEl.classList.remove('bad', 'good');
+    if (tone) noticeEl.classList.add(tone);
+  }
+
+  function defaultNotice() {
+    setNotice('Drag the right semantic tags into the blueprint.', '');
+  }
+
+  function defaultTagHelp() {
+    tagHelpEl.innerHTML = 'Drag a tag into a bay. Keyboard: <b>Enter</b> picks, arrows move, <b>Enter</b> places.';
+  }
+
+  function setTagHelp(tagId) {
+    const tag = TAG_BY_ID[tagId];
+    if (!tag) {
+      defaultTagHelp();
+      return;
+    }
+    tagHelpEl.innerHTML = `<b>${escapeHtml('<' + tag.id + '>')}</b> ${escapeHtml(tag.desc)}`;
+  }
+
+  function createBayElement(slot) {
+    const bay = document.createElement('button');
+    bay.type = 'button';
+    bay.className = 'bay';
+    bay.dataset.slot = slot.id;
+    bay.title = slot.hint;
+
+    const top = document.createElement('span');
+    top.className = 'bay-top';
+
+    const name = document.createElement('span');
+    name.className = 'bay-name';
+    name.textContent = slot.name;
+
+    const tag = document.createElement('span');
+    tag.className = 'bay-tag';
+    tag.textContent = '+ tag';
+
+    const hint = document.createElement('span');
+    hint.className = 'bay-hint';
+    hint.textContent = slot.hint;
+
+    top.append(name, tag);
+    bay.append(top, hint);
+    return bay;
+  }
+
+  function buildBlueprint() {
+    blueprintEl.innerHTML = '';
+    slotEls.clear();
+
+    const topRow = document.createElement('div');
+    topRow.className = 'toprow';
+    state.slots.filter((slot) => slot.zone === 'top').forEach((slot) => {
+      const bay = createBayElement(slot);
+      slotEls.set(slot.id, bay);
+      topRow.appendChild(bay);
+    });
+
+    const frame = document.createElement('section');
+    frame.className = 'mainframe';
+    const mainSlot = state.slots.find((slot) => slot.zone === 'main');
+    if (mainSlot) {
+      const bay = createBayElement(mainSlot);
+      bay.style.flex = '0 0 27%';
+      slotEls.set(mainSlot.id, bay);
+      frame.appendChild(bay);
+    }
+
+    const grid = document.createElement('div');
+    grid.className = 'content-grid';
+    state.slots.filter((slot) => slot.zone === 'content').forEach((slot) => {
+      const bay = createBayElement(slot);
+      slotEls.set(slot.id, bay);
+      grid.appendChild(bay);
+    });
+    frame.appendChild(grid);
+
+    const bottomRow = document.createElement('div');
+    bottomRow.className = 'bottomrow';
+    state.slots.filter((slot) => slot.zone === 'bottom').forEach((slot) => {
+      const bay = createBayElement(slot);
+      slotEls.set(slot.id, bay);
+      bottomRow.appendChild(bay);
+    });
+
+    blueprintEl.append(topRow, frame, bottomRow);
+  }
+
+  function buildTray() {
+    chipsEl.innerHTML = '';
+    chipEls.clear();
+    TAGS.forEach((tag) => {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = `chip kind-${tag.kind}`;
+      chip.dataset.tag = tag.id;
+      chip.textContent = `<${tag.id}>`;
+      chip.title = tag.desc;
+      chip.setAttribute('aria-pressed', 'false');
+      chip.setAttribute('aria-label', `${tag.id} tag. ${tag.desc}`);
+      chipsEl.appendChild(chip);
+      chipEls.set(tag.id, chip);
+    });
+  }
+
+  function syncBoard() {
+    const used = new Set(Object.values(state.assignments));
+
+    state.slots.forEach((slot) => {
+      const bay = slotEls.get(slot.id);
+      if (!bay) return;
+      const tagId = state.assignments[slot.id] || null;
+      const tag = tagId ? TAG_BY_ID[tagId] : null;
+      const tagEl = bay.querySelector('.bay-tag');
+      if (!tagEl) return;
+
+      bay.classList.toggle('filled', Boolean(tagId));
+      bay.classList.toggle('is-changed', Boolean(slot.changed));
+      bay.classList.toggle('is-added', Boolean(slot.added));
+      bay.classList.toggle('is-wrong', Boolean(state.wrong[slot.id]));
+      bay.classList.toggle('is-missing', Boolean(state.missing[slot.id]));
+      tagEl.className = 'bay-tag' + (tag ? ` kind-${tag.kind}` : '');
+      tagEl.textContent = tagId ? `<${tagId}>` : '+ tag';
+      bay.setAttribute(
+        'aria-label',
+        `${slot.name}. ${slot.hint}. ${tagId ? `Current tag: ${tagId}.` : 'Empty bay.'}`
+      );
+    });
+
+    TAGS.forEach((tag) => {
+      const chip = chipEls.get(tag.id);
+      if (!chip) return;
+      const isUsed = used.has(tag.id);
+      const isSelected = state.selected === tag.id;
+      chip.classList.toggle('used', isUsed);
+      chip.disabled = isUsed;
+      chip.tabIndex = isUsed ? -1 : 0;
+      chip.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
+      chip.setAttribute(
+        'aria-label',
+        `${tag.id} tag. ${tag.desc}${isSelected ? ' Selected.' : ''}`
+      );
+    });
+
+    const tag = state.selected ? TAG_BY_ID[state.selected] : null;
+    if (tag) {
+      setTagHelp(tag.id);
+      trayNoteEl.textContent = `HOLDING <${tag.id}>`;
+    } else {
+      defaultTagHelp();
+      updateJobStrip();
+    }
+  }
+
+  function loadStage(keepAssignments) {
+    state.slots = computeSlots();
+    if (!keepAssignments) state.assignments = {};
+    state.wrong = {};
+    state.missing = {};
+    state.selected = null;
+    state.selectedFrom = null;
+    state.mode = 'build';
+    buildBlueprint();
+    buildTray();
+    syncBoard();
+    updateHud(false);
+    updateJobStrip();
+    defaultNotice();
+    defaultTagHelp();
+  }
+
+  function cancelSelection(silent) {
+    const had = state.selected;
+    state.selected = null;
+    state.selectedFrom = null;
+    syncBoard();
+    if (!silent) {
+      if (had) {
+        setNotice(`<b>${escapeHtml('<' + had + '>')}</b> returned to materials.`, '');
+      } else {
+        defaultNotice();
+      }
+    }
+  }
+
+  function selectChip(tagId, fromSlot) {
+    if (!TAG_BY_ID[tagId]) return;
+    if (fromSlot) {
+      delete state.assignments[fromSlot];
+      delete state.wrong[fromSlot];
+      delete state.missing[fromSlot];
+    }
+    state.selected = tagId;
+    state.selectedFrom = fromSlot || null;
+    syncBoard();
+    const source = fromSlot ? ` from ${currentSlot(fromSlot).name}` : '';
+    setNotice(
+      `Holding <b>${escapeHtml('<' + tagId + '>')}</b>${escapeHtml(source)}. Choose a bay, or press Esc to cancel.`,
+      ''
+    );
+  }
+
+  function placeSelected(slotId) {
+    if (!state.selected) return;
+    const slot = currentSlot(slotId);
+    if (!slot) return;
+    const tagId = state.selected;
+
+    if (state.selectedFrom === slotId) {
+      delete state.assignments[slotId];
+      state.selected = null;
+      state.selectedFrom = null;
+      syncBoard();
+      setNotice(`<b>${escapeHtml('<' + tagId + '>')}</b> returned to materials.`, '');
+      return;
+    }
+
+    state.assignments[slotId] = tagId;
+    delete state.wrong[slotId];
+    delete state.missing[slotId];
+    state.selected = null;
+    state.selectedFrom = null;
+    syncBoard();
+    setNotice(
+      `<b>${escapeHtml('<' + tagId + '>')}</b> set in ${escapeHtml(slot.name)}.`,
+      ''
+    );
+  }
+
+  function removeFromSlot(slotId) {
+    const tagId = state.assignments[slotId];
+    if (!tagId) return;
+    delete state.assignments[slotId];
+    delete state.wrong[slotId];
+    delete state.missing[slotId];
+    syncBoard();
+    setNotice(`<b>${escapeHtml('<' + tagId + '>')}</b> returned to materials.`, '');
+  }
+
+  function dropTag(tagId, fromSlot, targetSlotId) {
+    if (fromSlot === targetSlotId) return;
+    const target = currentSlot(targetSlotId);
+    if (!target || !TAG_BY_ID[tagId]) return;
+
+    state.assignments[targetSlotId] = tagId;
+    if (fromSlot) delete state.assignments[fromSlot];
+    delete state.wrong[targetSlotId];
+    delete state.missing[targetSlotId];
+    if (fromSlot) {
+      delete state.wrong[fromSlot];
+      delete state.missing[fromSlot];
+    }
+    state.selected = null;
+    state.selectedFrom = null;
+    syncBoard();
+    setNotice(
+      `<b>${escapeHtml('<' + tagId + '>')}</b> dropped into ${escapeHtml(target.name)}.`,
+      ''
+    );
+  }
+
+  /* ---------- click controls ---------- */
+  chipsEl.addEventListener('click', (event) => {
+    if (performance.now() < suppressClickUntil) return;
+    const chip = event.target.closest('.chip');
+    if (!chip || chip.disabled) return;
+    const tagId = chip.dataset.tag;
+    if (state.selected === tagId && !state.selectedFrom) {
+      cancelSelection(false);
+    } else {
+      selectChip(tagId, null);
+    }
+  });
+
+  blueprintEl.addEventListener('click', (event) => {
+    if (performance.now() < suppressClickUntil) return;
+    const bay = event.target.closest('.bay');
+    if (!bay) return;
+    const slotId = bay.dataset.slot;
+    if (state.selected) {
+      placeSelected(slotId);
+      return;
+    }
+    if (state.assignments[slotId]) {
+      selectChip(state.assignments[slotId], slotId);
+      return;
+    }
+    setNotice('Pick a tag from Materials first, then choose a bay.', '');
+  });
+
+  inspectBtn.addEventListener('click', () => {
+    if (state.mode !== 'build') return;
+    inspectStructure();
+  });
+
+  /* ---------- keyboard controls ---------- */
+  document.addEventListener('keydown', (event) => {
+    if (!overlayEl.hidden) return;
+
+    if (event.key === 'Escape' && state.selected) {
+      event.preventDefault();
+      cancelSelection(false);
+      return;
+    }
+
+    const active = document.activeElement;
+    const activeBay = active && active.closest ? active.closest('.bay') : null;
+
+    if ((event.key === 'Backspace' || event.key === 'Delete') && activeBay) {
+      if (state.assignments[activeBay.dataset.slot]) {
+        event.preventDefault();
+        removeFromSlot(activeBay.dataset.slot);
+      }
+      return;
+    }
+
+    if (!event.key.startsWith('Arrow')) return;
+    const bays = Array.from(blueprintEl.querySelectorAll('.bay'));
+    if (!bays.length) return;
+
+    const isBay = Boolean(activeBay);
+    if (!state.selected && !isBay) return;
+
+    let nextIndex;
+    if (!isBay) {
+      nextIndex = (event.key === 'ArrowLeft' || event.key === 'ArrowUp') ? bays.length - 1 : 0;
+    } else {
+      const current = bays.indexOf(activeBay);
+      const forward = event.key === 'ArrowRight' || event.key === 'ArrowDown';
+      nextIndex = forward ? (current + 1) % bays.length : (current - 1 + bays.length) % bays.length;
+    }
+    event.preventDefault();
+    bays[nextIndex].focus({ preventScroll: true });
+  });
+
+  /* ---------- pointer dragging ---------- */
+  function clearDragHover() {
+    if (lastHoverBay) {
+      lastHoverBay.classList.remove('drop-hover');
+      lastHoverBay = null;
+    }
+  }
+
+  function cleanupDrag() {
+    clearDragHover();
+    if (dragGhost) {
+      dragGhost.remove();
+      dragGhost = null;
+    }
+    if (activeDrag && activeDrag.el) activeDrag.el.classList.remove('dragging');
+    dragCandidate = null;
+    activeDrag = null;
+  }
+
+  function makeGhost(tagId) {
+    const tag = TAG_BY_ID[tagId];
+    const ghost = document.createElement('div');
+    ghost.className = `drag-ghost kind-${tag ? tag.kind : 'generic'}`;
+    ghost.textContent = `<${tagId}>`;
+    document.body.appendChild(ghost);
+    return ghost;
+  }
+
+  ui.addEventListener('pointerdown', (event) => {
+    if (state.mode !== 'build' || event.button > 0) return;
+    const chip = event.target.closest('.chip');
+    const bay = event.target.closest('.bay');
+    let info = null;
+
+    if (chip && !chip.disabled) {
+      info = { tagId: chip.dataset.tag, fromSlot: null, el: chip };
+    } else if (bay && state.assignments[bay.dataset.slot]) {
+      info = {
+        tagId: state.assignments[bay.dataset.slot],
+        fromSlot: bay.dataset.slot,
+        el: bay,
+      };
+    }
+    if (!info) return;
+
+    dragCandidate = {
+      ...info,
+      startX: event.clientX,
+      startY: event.clientY,
+    };
+  });
+
+  window.addEventListener('pointermove', (event) => {
+    if (!dragCandidate) return;
+    const dx = event.clientX - dragCandidate.startX;
+    const dy = event.clientY - dragCandidate.startY;
+
+    if (!activeDrag && Math.hypot(dx, dy) > 7) {
+      if (state.selected) cancelSelection(true);
+      activeDrag = dragCandidate;
+      activeDrag.el.classList.add('dragging');
+      dragGhost = makeGhost(activeDrag.tagId);
+    }
+
+    if (!activeDrag) return;
+    if (event.cancelable) event.preventDefault();
+
+    dragGhost.style.left = `${event.clientX}px`;
+    dragGhost.style.top = `${event.clientY}px`;
+
+    clearDragHover();
+    const under = document.elementFromPoint(event.clientX, event.clientY);
+    const bay = under && under.closest ? under.closest('.bay') : null;
+    if (bay) {
+      bay.classList.add('drop-hover');
+      lastHoverBay = bay;
+    }
+  }, { passive: false });
+
+  window.addEventListener('pointerup', (event) => {
+    if (!dragCandidate) return;
+    const candidate = dragCandidate;
+    const wasDragging = Boolean(activeDrag);
+
+    if (wasDragging) {
+      const under = document.elementFromPoint(event.clientX, event.clientY);
+      const bay = under && under.closest ? under.closest('.bay') : null;
+      if (bay) {
+        dropTag(candidate.tagId, candidate.fromSlot, bay.dataset.slot);
+      } else {
+        setNotice('Drop a tag into one of the blueprint bays.', '');
+      }
+      suppressClickUntil = performance.now() + 90;
+    }
+
+    cleanupDrag();
+  });
+
+  window.addEventListener('pointercancel', () => {
+    cleanupDrag();
+  });
+
+  window.addEventListener('blur', () => {
+    cleanupDrag();
+  });
+
+  /* ---------- inspection ---------- */
+  function focusFirstProblem() {
+    const wrong = state.slots.find((slot) => state.wrong[slot.id]);
+    const missing = state.slots.find((slot) => state.missing[slot.id]);
+    const target = wrong || missing;
+    if (!target) return;
+    const bay = slotEls.get(target.id);
+    if (!bay) return;
+    try {
+      bay.focus({ preventScroll: true });
+    } catch (err) {
+      bay.focus();
+    }
+  }
+
+  function inspectStructure() {
+    if (state.selected) cancelSelection(true);
+
+    const empty = [];
+    const wrong = [];
+    state.slots.forEach((slot) => {
+      const tagId = state.assignments[slot.id];
+      if (!tagId) empty.push(slot);
+      else if (tagId !== slot.answer) wrong.push({ slot, tagId });
+    });
+
+    state.attempts += 1;
+    state.wrong = {};
+    state.missing = {};
+
+    if (empty.length || wrong.length) {
+      state.failed += 1;
+      wrong.forEach(({ slot }) => { state.wrong[slot.id] = true; });
+      empty.forEach((slot) => { state.missing[slot.id] = true; });
+      syncBoard();
+
+      let message;
+      if (wrong.length) {
+        const first = wrong[0];
+        const expected = `<${first.slot.answer}>`;
+        message = `<b>${escapeHtml(first.slot.name)}</b> needs ${escapeHtml(expected)}. ${escapeHtml(first.slot.why)}`;
+        const more = wrong.length + empty.length - 1;
+        if (more > 0) {
+          message += ` ${more} more bay${more === 1 ? '' : 's'} need${more === 1 ? 's' : ''} attention.`;
+        }
+      } else {
+        message = `Inspection paused: ${empty.length} bay${empty.length === 1 ? ' is' : 's are'} still empty. Fill every bay before inspection.`;
+      }
+      setNotice(message, 'bad');
+      focusFirstProblem();
+      return;
+    }
+
+    syncBoard();
+    if (state.stage === 'base') {
+      state.score += BASE_POINTS;
+      state.jobEarned = BASE_POINTS;
+      updateHud(true);
+      setNotice(`Inspection passed: all six bays are valid. <b>+${BASE_POINTS}</b> points.`, 'good');
+      showRevisionOverlay();
+    } else {
+      state.score += REVISION_POINTS;
+      state.jobEarned += REVISION_POINTS;
+      updateHud(true);
+      setNotice(`Revision approved: every tag fits its content. <b>+${REVISION_POINTS}</b> points.`, 'good');
+      showJobSummary();
+    }
+  }
+
+  /* ---------- overlays ---------- */
+  let overlayAction = null;
+
+  function closeOverlay() {
+    overlayEl.hidden = true;
+    ui.removeAttribute('inert');
+    overlayAction = null;
+    state.mode = 'build';
+  }
+
+  function openOverlay(options) {
+    const metrics = options.metrics || [];
+    ovKickerEl.textContent = options.kicker || '';
+    ovTitleEl.textContent = options.title || '';
+    ovLeadEl.textContent = options.lead || '';
+    ovFineEl.textContent = options.fine || '';
+    ovBtn.textContent = options.button || 'Continue';
+
+    ovQuoteEl.hidden = !options.quote;
+    ovQuoteEl.textContent = options.quote || '';
+
+    ovStepsEl.innerHTML = '';
+    ovStepsEl.hidden = !(options.steps && options.steps.length);
+    (options.steps || []).forEach((step) => {
+      const li = document.createElement('li');
+      li.textContent = step;
+      ovStepsEl.appendChild(li);
+    });
+
+    ovMetricsEl.hidden = metrics.length === 0;
+    ovMetricsEl.innerHTML = metrics.map((metric) => (
+      `<div class="metric"><span>${escapeHtml(metric.label)}</span><strong>${escapeHtml(metric.value)}</strong></div>`
+    )).join('');
+
+    ovScoreEl.hidden = !options.result;
+    if (options.result) {
+      ovScoreValueEl.textContent = pad4(options.result);
+      ovBestEl.textContent = `BEST ${pad4(options.best || state.best)}`;
+    }
+
+    overlayAction = options.onAction || null;
+    ovBtn.onclick = () => {
+      const action = overlayAction;
+      overlayAction = null;
+      if (action) action();
+    };
+
+    ui.setAttribute('inert', '');
+    overlayEl.hidden = false;
+    state.mode = 'overlay';
+    try {
+      ovBtn.focus({ preventScroll: true });
+    } catch (err) {
+      ovBtn.focus();
+    }
+  }
+
+  function focusFirstAvailableChip() {
+    const chip = TAGS.map((tag) => chipEls.get(tag.id)).find((el) => el && !el.disabled);
+    if (!chip) return;
+    try {
+      chip.focus({ preventScroll: true });
+    } catch (err) {
+      chip.focus();
+    }
+  }
+
+  function showBrief() {
+    const job = currentJob();
+    state.stage = 'base';
+    state.jobEarned = 0;
+    loadStage(false);
+    state.mode = 'overlay';
+
+    openOverlay({
+      kicker: `CLIENT JOB ${String(state.job + 1).padStart(2, '0')} · ${job.trade.toUpperCase()}`,
+      title: job.company,
+      lead: `${job.lead} Fill each bay with the tag that gives its content the right meaning.`,
+      quote: job.quote,
+      steps: [
+        'Drag a tag into a bay, or pick a tag and use the arrows plus Enter.',
+        'Pass inspection, then make the client’s revision.',
+      ],
+      metrics: [
+        { label: 'Bays', value: '6' },
+        { label: 'Base pass', value: '+800' },
+        { label: 'Timer', value: 'None' },
+      ],
+      button: 'Open blueprint',
+      fine: 'No timer · no speed bonus · semantic choices only',
+      onAction: () => {
+        closeOverlay();
+        defaultNotice();
+        focusFirstAvailableChip();
+      },
+    });
+  }
+
+  function showRevisionOverlay() {
+    const job = currentJob();
+    const revision = job.revision;
+    state.mode = 'overlay';
+
+    openOverlay({
+      kicker: 'CLIENT CALL · REVISION',
+      title: job.company,
+      lead: revision.lead,
+      quote: revision.quote,
+      steps: revision.steps,
+      metrics: [
+        { label: 'Base', value: '+800' },
+        { label: 'Revision', value: '+400' },
+        { label: 'Bays', value: '7 total' },
+      ],
+      button: 'Start revision',
+      fine: 'Earlier tags can be moved between bays',
+      onAction: () => {
+        closeOverlay();
+        state.stage = 'revision';
+        loadStage(true);
+        const changed = state.slots.find((slot) => slot.changed || slot.added);
+        const changedName = changed ? changed.name : 'the new bay';
+        setNotice(
+          `Revision in progress. Check the highlighted bays, starting with <b>${escapeHtml(changedName)}</b>.`,
+          ''
+        );
+        const firstNew = state.slots.find((slot) => slot.added || slot.changed);
+        const bay = firstNew ? slotEls.get(firstNew.id) : null;
+        if (bay) {
+          try {
+            bay.focus({ preventScroll: true });
+          } catch (err) {
+            bay.focus();
+          }
+        }
+      },
+    });
+  }
+
+  function showJobSummary() {
+    const job = currentJob();
+    const isLast = state.job >= JOBS.length - 1;
+    state.mode = 'overlay';
+
+    openOverlay({
+      kicker: 'INSPECTION PASSED',
+      title: `${job.company} is framed`,
+      lead: `Every bay now has the right semantic material, including ${job.client}’s revision. The page is ready to ship.`,
+      metrics: [
+        { label: 'Base', value: '+800' },
+        { label: 'Revision', value: '+400' },
+        { label: 'Job total', value: `+${state.jobEarned}` },
+      ],
+      button: isLast ? 'See final report' : 'Next client job',
+      fine: `${state.attempts} inspection${state.attempts === 1 ? '' : 's'} so far · no timer`,
+      onAction: () => {
+        closeOverlay();
+        if (isLast) {
+          showFinal();
+        } else {
+          state.job += 1;
+          showBrief();
+        }
+      },
+    });
+  }
+
+  function showFinal() {
+    if (state.score > state.best) {
+      state.best = state.score;
+      writeBest(state.best);
+    }
+    updateHud(false);
+
+    let rank = 'Master builder';
+    if (state.failed === 1) rank = 'Lead carpenter';
+    else if (state.failed > 1) rank = 'Framing apprentice';
+
+    state.mode = 'overlay';
+    openOverlay({
+      kicker: 'SITE COMPLETE · THREE PAGES APPROVED',
+      title: rank,
+      lead: 'All three clients have semantic, well-structured pages. Every base build and every revision passed inspection.',
+      result: state.score,
+      best: state.best,
+      metrics: [
+        { label: 'Jobs', value: '3 / 3' },
+        { label: 'Checks', value: String(state.attempts) },
+        { label: 'Clean pass', value: state.failed === 0 ? 'Yes' : 'No' },
+      ],
+      button: 'Build another site',
+      fine: 'Best score saved on this device · no timer',
+      onAction: () => {
+        closeOverlay();
+        startRun();
+      },
+    });
+  }
+
+  /* ---------- run flow ---------- */
+  function startRun() {
+    state.job = 0;
+    state.stage = 'base';
+    state.assignments = {};
+    state.wrong = {};
+    state.missing = {};
+    state.selected = null;
+    state.selectedFrom = null;
+    state.score = 0;
+    state.best = readBest();
+    state.attempts = 0;
+    state.failed = 0;
+    state.jobEarned = 0;
+    updateHud(false);
+    showBrief();
+  }
+
+  updateHud(false);
+  startRun();
+
+  // Small read-only hook used by the local verification harness.
+  window.__TAGYARD__ = {
+    state,
+    jobs: JOBS,
+    tags: TAGS,
+    computeSlots,
+    inspectStructure,
+    selectChip,
+    placeSelected,
+    removeFromSlot,
+  };
+})();
+
+</script>
+</body>
+</html>

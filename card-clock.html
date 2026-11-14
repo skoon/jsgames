@@ -1,0 +1,2343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#091116">
+<title>Card Clock</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --ink: #f1f7f5;
+    --muted: rgba(225, 240, 237, 0.5);
+    --faint: rgba(225, 240, 237, 0.23);
+    --mint: #86e7c5;
+    --mint-deep: #43c9a4;
+    --coral: #ff9d87;
+    --amber: #ffc66e;
+    --blue: #8bc9ff;
+    --violet: #c5aaff;
+    --red: #ff8474;
+    --line: rgba(145, 221, 204, 0.15);
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    background:
+      radial-gradient(110% 82% at 50% 0%, #283943 0%, #0a1317 54%, #03080a 100%);
+    color: var(--ink);
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    -webkit-user-select: none;
+    user-select: none;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+  #stage {
+    position: relative;
+    width: min(100%, calc((100dvh - 55px) * 0.75));
+    aspect-ratio: 3 / 4;
+    border-radius: 20px;
+    overflow: hidden;
+    background: #071014;
+    box-shadow:
+      0 30px 70px -28px rgba(0, 0, 0, 0.96),
+      0 0 0 1px rgba(255, 255, 255, 0.07),
+      inset 0 0 0 1px rgba(134, 231, 197, 0.06);
+    container-type: size;
+  }
+  .hint {
+    margin: 0;
+    color: rgba(239, 248, 245, 0.27);
+    font-size: clamp(6.5px, 1.8vw, 8px);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  button, input { font: inherit; }
+  button:focus-visible, input:focus-visible, summary:focus-visible {
+    outline: 2px solid #caffef;
+    outline-offset: 2px;
+  }
+  [hidden] { display: none !important; }
+
+  #app {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    background:
+      radial-gradient(78% 46% at 50% 0%, rgba(51, 80, 88, 0.24), transparent 76%),
+      linear-gradient(180deg, #0b171c 0%, #071014 72%, #040a0d 100%);
+  }
+
+  /* ---------- top bar ---------- */
+  .topbar {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 8px 8px 0;
+    padding: 6px 8px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: linear-gradient(180deg, rgba(25, 43, 49, 0.97), rgba(6, 15, 19, 0.92));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045);
+  }
+  .brand { display: flex; align-items: center; gap: 7px; min-width: 0; }
+  .brand-mark {
+    width: 23px;
+    height: 23px;
+    flex: none;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(255, 157, 135, 0.48);
+    border-radius: 6px;
+    background: rgba(255, 157, 135, 0.075);
+    color: var(--coral);
+    font-size: 13px;
+    font-weight: 800;
+    line-height: 1;
+  }
+  .brand b {
+    display: block;
+    color: var(--ink);
+    font-size: clamp(9px, 2.1cqw, 12px);
+    letter-spacing: 0.11em;
+    line-height: 1.05;
+    white-space: nowrap;
+  }
+  .brand small {
+    display: block;
+    margin-top: 2px;
+    color: var(--muted);
+    font-size: clamp(4.8px, 1.1cqw, 6.3px);
+    letter-spacing: 0.12em;
+    white-space: nowrap;
+  }
+  .topstats { display: flex; align-items: center; gap: clamp(7px, 2.2cqw, 13px); flex: none; }
+  .topstat { text-align: right; }
+  .topstat span {
+    display: block;
+    color: var(--muted);
+    font-size: clamp(4.8px, 1.08cqw, 6.2px);
+    letter-spacing: 0.12em;
+  }
+  .topstat strong {
+    display: block;
+    margin-top: 1px;
+    color: var(--mint);
+    font-size: clamp(10px, 2.3cqw, 14px);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .topstat:nth-child(2) strong { color: var(--coral); }
+  .topstat:last-child strong { color: rgba(241, 247, 245, 0.74); }
+
+  /* ---------- board ---------- */
+  .board {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    margin: 6px 8px 8px;
+    overflow: hidden;
+    border: 1px solid rgba(145, 221, 204, 0.15);
+    border-radius: 18px;
+    background: linear-gradient(180deg, rgba(10, 24, 28, 0.98), rgba(5, 13, 16, 0.99));
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.045),
+      0 18px 38px -30px rgba(0, 0, 0, 0.9);
+  }
+  .month-head {
+    position: relative;
+    flex: 0 0 auto;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 8px 9px 0;
+    padding: 8px 9px 8px 10px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 157, 135, 0.19);
+    border-radius: 9px;
+    background:
+      radial-gradient(100% 150% at 100% 0%, rgba(255, 157, 135, 0.105), transparent 61%),
+      rgba(255, 157, 135, 0.028);
+  }
+  .month-head::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    border-radius: 0 2px 2px 0;
+    background: linear-gradient(180deg, var(--coral), rgba(255, 157, 135, 0.12));
+  }
+  .month-copy { min-width: 0; flex: 1; }
+  .eyebrow {
+    margin: 0;
+    color: var(--coral);
+    font-size: clamp(4.9px, 1.06cqw, 6px);
+    letter-spacing: 0.18em;
+    line-height: 1.3;
+    text-transform: uppercase;
+  }
+  .month-copy h1 {
+    margin: 2px 0 0;
+    color: var(--ink);
+    font-size: clamp(13px, 3cqw, 18px);
+    line-height: 1.08;
+    letter-spacing: -0.025em;
+  }
+  .month-copy p:last-child {
+    margin: 3px 0 0;
+    color: rgba(225, 240, 237, 0.55);
+    font-size: clamp(5.65px, 1.2cqw, 7px);
+    line-height: 1.42;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .auto-badge {
+    flex: none;
+    min-width: 61px;
+    padding-left: 7px;
+    border-left: 1px dashed rgba(255, 157, 135, 0.19);
+    text-align: right;
+  }
+  .auto-badge span, .auto-badge small {
+    display: block;
+    color: rgba(255, 188, 173, 0.48);
+    font-size: clamp(4.5px, 0.94cqw, 5.4px);
+    letter-spacing: 0.11em;
+    line-height: 1.3;
+  }
+  .auto-badge strong {
+    display: block;
+    margin: 1px 0;
+    color: var(--coral);
+    font-size: clamp(12px, 2.7cqw, 17px);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .account-strip {
+    flex: 0 0 auto;
+    display: grid;
+    grid-template-columns: 1.12fr 0.88fr 0.92fr;
+    gap: 5px;
+    margin: 5px 9px 0;
+  }
+  .account {
+    min-width: 0;
+    padding: 5px 6px 4px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.021);
+  }
+  .account span {
+    display: block;
+    overflow: hidden;
+    color: var(--muted);
+    font-size: clamp(4.55px, 1cqw, 5.6px);
+    letter-spacing: 0.095em;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .account strong {
+    display: block;
+    margin-top: 2px;
+    overflow: hidden;
+    color: var(--ink);
+    font-size: clamp(8.8px, 2cqw, 12px);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .account small {
+    display: block;
+    margin-top: 2px;
+    overflow: hidden;
+    color: var(--muted);
+    font-size: clamp(4.5px, 0.95cqw, 5.5px);
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .account.balance strong { color: var(--coral); }
+  .account.apr strong { color: var(--amber); }
+  .account.limit strong { color: var(--blue); }
+
+  .scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 8px 9px 11px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(134, 231, 197, 0.2) transparent;
+  }
+  .scroll::-webkit-scrollbar { width: 4px; }
+  .scroll::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: rgba(134, 231, 197, 0.2);
+  }
+
+  .section-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 0 1px;
+  }
+  .section-head h2 {
+    margin: 0;
+    color: var(--ink);
+    font-size: clamp(12px, 2.75cqw, 16px);
+    line-height: 1.1;
+    letter-spacing: -0.035em;
+  }
+  .section-head p {
+    margin: 3px 0 0;
+    color: var(--muted);
+    font-size: clamp(5.4px, 1.12cqw, 6.7px);
+    line-height: 1.4;
+  }
+  .cart-total { flex: none; text-align: right; }
+  .cart-total strong {
+    display: block;
+    color: var(--coral);
+    font-size: clamp(12px, 2.7cqw, 16px);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .cart-total span {
+    display: block;
+    margin-top: 1px;
+    color: var(--muted);
+    font-size: clamp(4.6px, 0.96cqw, 5.5px);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .auto-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 7px;
+    padding: 6px 7px;
+    border: 1px dashed rgba(255, 255, 255, 0.09);
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.018);
+  }
+  .auto-left { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .auto-icon {
+    width: 20px;
+    height: 20px;
+    flex: none;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(255, 198, 110, 0.24);
+    border-radius: 4px;
+    background: rgba(255, 198, 110, 0.05);
+    color: var(--amber);
+    font-size: 9px;
+  }
+  .auto-left b {
+    display: block;
+    overflow: hidden;
+    color: rgba(241, 247, 245, 0.72);
+    font-size: clamp(5.5px, 1.13cqw, 6.5px);
+    font-weight: 600;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .auto-left small {
+    display: block;
+    margin-top: 1px;
+    color: var(--muted);
+    font-size: clamp(4.7px, 0.97cqw, 5.6px);
+    line-height: 1.2;
+  }
+  .auto-right {
+    flex: none;
+    color: var(--coral);
+    font-size: clamp(8px, 1.65cqw, 9.6px);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---------- purchases ---------- */
+  .purchase-list { display: grid; gap: 4px; margin-top: 5px; }
+  .offer {
+    position: relative;
+    display: block;
+    cursor: pointer;
+  }
+  .offer input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+  .offer-box {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+    padding: 6px 7px 6px 8px;
+    border: 1px solid rgba(255, 255, 255, 0.062);
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.02);
+    transition: border-color 110ms ease, background 110ms ease, transform 110ms ease;
+  }
+  .offer:hover .offer-box {
+    border-color: rgba(255, 157, 135, 0.25);
+    background: rgba(255, 157, 135, 0.035);
+  }
+  .offer input:focus-visible + .offer-box {
+    outline: 2px solid #caffef;
+    outline-offset: 2px;
+  }
+  .offer input:checked + .offer-box {
+    border-color: rgba(255, 157, 135, 0.48);
+    background:
+      linear-gradient(90deg, rgba(255, 157, 135, 0.095), rgba(255, 157, 135, 0.025));
+    box-shadow: inset 2px 0 0 var(--coral);
+  }
+  .offer-check {
+    width: 15px;
+    height: 15px;
+    flex: none;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(255, 255, 255, 0.17);
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.02);
+    color: #1a0c09;
+    font-size: 9px;
+    font-weight: 900;
+    line-height: 1;
+  }
+  .offer input:checked + .offer-box .offer-check {
+    border-color: var(--coral);
+    background: var(--coral);
+  }
+  .offer-check::after { content: ""; }
+  .offer input:checked + .offer-box .offer-check::after { content: "✓"; }
+  .offer-copy { min-width: 0; flex: 1; }
+  .offer-top { display: flex; align-items: baseline; gap: 5px; }
+  .offer-tag {
+    flex: none;
+    color: rgba(255, 198, 110, 0.57);
+    font-size: clamp(4.35px, 0.88cqw, 5.1px);
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+  }
+  .offer-tag.needs { color: rgba(139, 201, 255, 0.66); }
+  .offer-tag.social { color: rgba(197, 170, 255, 0.65); }
+  .offer-copy b {
+    display: block;
+    overflow: hidden;
+    color: rgba(241, 247, 245, 0.84);
+    font-size: clamp(6.2px, 1.26cqw, 7.25px);
+    line-height: 1.25;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .offer-copy small {
+    display: block;
+    margin-top: 1px;
+    overflow: hidden;
+    color: rgba(225, 240, 237, 0.37);
+    font-size: clamp(4.85px, 0.99cqw, 5.7px);
+    line-height: 1.28;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .offer-price {
+    flex: none;
+    color: var(--coral);
+    font-size: clamp(7.6px, 1.55cqw, 9px);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .offer-price small {
+    display: block;
+    color: rgba(225, 240, 237, 0.24);
+    font-size: 0.65em;
+    font-weight: 400;
+    letter-spacing: 0.04em;
+    text-align: right;
+  }
+
+  /* ---------- payment ---------- */
+  .payment-section { margin-top: 9px; }
+  .payment-card {
+    margin-top: 4px;
+    padding: 7px;
+    border: 1px solid rgba(134, 231, 197, 0.14);
+    border-radius: 8px;
+    background:
+      radial-gradient(90% 120% at 100% 0%, rgba(134, 231, 197, 0.065), transparent 63%),
+      rgba(134, 231, 197, 0.023);
+  }
+  .payment-top {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 7px;
+  }
+  .payment-input-wrap { flex: 1; min-width: 0; }
+  .payment-input-wrap label {
+    display: block;
+    color: var(--muted);
+    font-size: clamp(4.8px, 0.97cqw, 5.6px);
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+  }
+  .amount-line {
+    display: flex;
+    align-items: baseline;
+    gap: 3px;
+    margin-top: 1px;
+  }
+  .amount-line .dollar {
+    color: var(--mint);
+    font-size: clamp(16px, 3.4cqw, 21px);
+    font-weight: 700;
+    line-height: 1;
+  }
+  .amount-line input {
+    width: 100%;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    border-bottom: 1px solid rgba(134, 231, 197, 0.32);
+    border-radius: 0;
+    background: transparent;
+    color: var(--mint);
+    font-size: clamp(21px, 4.6cqw, 28px);
+    font-weight: 700;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    -webkit-user-select: text;
+    user-select: text;
+  }
+  .amount-line input::-webkit-outer-spin-button,
+  .amount-line input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .amount-line input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+  .due-side { flex: none; text-align: right; }
+  .due-side span {
+    display: block;
+    color: var(--muted);
+    font-size: clamp(4.7px, 0.95cqw, 5.5px);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .due-side strong {
+    display: block;
+    margin-top: 1px;
+    color: var(--amber);
+    font-size: clamp(9px, 1.85cqw, 10.8px);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .due-side small {
+    display: block;
+    margin-top: 2px;
+    color: rgba(225, 240, 237, 0.3);
+    font-size: clamp(4.4px, 0.9cqw, 5.2px);
+    letter-spacing: 0.04em;
+  }
+  .quick-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 3px;
+    margin-top: 6px;
+  }
+  .quick-btn {
+    min-width: 0;
+    padding: 4px 3px;
+    border: 1px solid rgba(255, 255, 255, 0.075);
+    border-radius: 5px;
+    background: rgba(255, 255, 255, 0.022);
+    color: rgba(225, 240, 237, 0.5);
+    font-size: clamp(4.55px, 0.92cqw, 5.3px);
+    letter-spacing: 0.02em;
+    line-height: 1.25;
+    cursor: pointer;
+  }
+  .quick-btn:hover:not(:disabled) { border-color: rgba(134, 231, 197, 0.32); color: var(--ink); }
+  .quick-btn:disabled { opacity: 0.34; cursor: not-allowed; }
+  .quick-btn span {
+    display: block;
+    margin-top: 1px;
+    color: var(--mint);
+    font-size: clamp(5.7px, 1.15cqw, 6.6px);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .quick-btn:first-child span { color: var(--amber); }
+  .quick-btn:last-child span { color: var(--blue); }
+  .payment-warning {
+    margin: 5px 0 0;
+    min-height: 8px;
+    color: rgba(134, 231, 197, 0.62);
+    font-size: clamp(5px, 1.02cqw, 5.9px);
+    line-height: 1.35;
+  }
+  .payment-warning.warn { color: #ffb5a9; }
+
+  /* ---------- math ---------- */
+  .math-panel {
+    display: grid;
+    gap: 2px;
+    margin-top: 6px;
+    padding: 5px 7px;
+    border: 1px solid rgba(255, 255, 255, 0.055);
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.017);
+  }
+  .math-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 1px 0;
+    border-bottom: 1px dashed rgba(255, 255, 255, 0.043);
+    color: rgba(225, 240, 237, 0.49);
+    font-size: clamp(5.15px, 1.03cqw, 6px);
+    line-height: 1.4;
+  }
+  .math-row:last-child { border-bottom: 0; }
+  .math-row b {
+    flex: none;
+    color: rgba(241, 247, 245, 0.82);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .math-row.statement {
+    margin-top: 1px;
+    padding-top: 3px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    color: rgba(225, 240, 237, 0.7);
+  }
+  .math-row.statement b { color: var(--amber); }
+  .math-row.payment-row b { color: var(--mint); }
+  .math-row.new-balance {
+    margin-top: 1px;
+    padding-top: 3px;
+    border-top: 1px dashed rgba(255, 255, 255, 0.09);
+    color: rgba(225, 240, 237, 0.66);
+  }
+  .math-row.new-balance b { color: var(--coral); }
+  .math-row.fee b { color: var(--red); }
+  .formula-line {
+    margin: 4px 0 0;
+    color: rgba(225, 240, 237, 0.28);
+    font-size: clamp(4.6px, 0.92cqw, 5.3px);
+    line-height: 1.38;
+  }
+
+  /* ---------- payoff clock ---------- */
+  .clock-section { margin-top: 9px; }
+  .clock-panel {
+    margin-top: 4px;
+    padding: 6px 7px;
+    border: 1px solid rgba(139, 201, 255, 0.13);
+    border-radius: 8px;
+    background: rgba(139, 201, 255, 0.02);
+  }
+  .clock-block + .clock-block {
+    margin-top: 6px;
+    padding-top: 5px;
+    border-top: 1px dashed rgba(255, 255, 255, 0.075);
+  }
+  .clock-label {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 6px;
+    margin-bottom: 3px;
+    color: rgba(139, 201, 255, 0.68);
+    font-size: clamp(4.65px, 0.93cqw, 5.4px);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .clock-label b {
+    color: rgba(241, 247, 245, 0.66);
+    font-size: 0.95em;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+  }
+  .clock-row {
+    display: grid;
+    grid-template-columns: 55px minmax(0, 1fr) 42px;
+    align-items: center;
+    gap: 5px;
+    margin-top: 3px;
+    color: rgba(225, 240, 237, 0.50);
+    font-size: clamp(4.8px, 0.96cqw, 5.6px);
+  }
+  .clock-row.current { color: rgba(241, 247, 245, 0.78); }
+  .clock-track {
+    height: 4px;
+    overflow: hidden;
+    border-radius: 99px;
+    background: rgba(255, 255, 255, 0.055);
+  }
+  .clock-track i {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: rgba(139, 201, 255, 0.52);
+  }
+  .clock-row.current .clock-track i { background: var(--coral); }
+  .clock-result {
+    text-align: right;
+    color: rgba(241, 247, 245, 0.72);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .clock-result b { color: var(--ink); }
+  .clock-result small {
+    display: block;
+    color: rgba(225, 240, 237, 0.32);
+    font-size: 0.8em;
+  }
+  .clock-delta {
+    margin: 6px 0 0;
+    padding: 5px 6px;
+    border-left: 2px solid rgba(255, 157, 135, 0.55);
+    border-radius: 0 5px 5px 0;
+    background: rgba(255, 157, 135, 0.04);
+    color: rgba(255, 199, 188, 0.7);
+    font-size: clamp(5.2px, 1.03cqw, 6px);
+    line-height: 1.4;
+    text-align: left;
+  }
+  .clock-delta.neutral {
+    border-left-color: rgba(139, 201, 255, 0.4);
+    background: rgba(139, 201, 255, 0.03);
+    color: rgba(194, 226, 255, 0.6);
+  }
+  .clock-delta b { color: rgba(255, 226, 219, 0.9); font-weight: 700; }
+
+  /* ---------- rules ---------- */
+  .rules-details {
+    margin-top: 7px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.014);
+  }
+  .rules-details summary {
+    padding: 5px 7px;
+    color: rgba(225, 240, 237, 0.44);
+    font-size: clamp(5.1px, 1.01cqw, 5.85px);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    cursor: pointer;
+    list-style: none;
+  }
+  .rules-details summary::-webkit-details-marker { display: none; }
+  .rules-details summary::after {
+    content: "+";
+    float: right;
+    color: var(--mint);
+  }
+  .rules-details[open] summary::after { content: "−"; }
+  .rules-copy {
+    padding: 0 7px 6px;
+    border-top: 1px dashed rgba(255, 255, 255, 0.06);
+  }
+  .rules-copy ol {
+    margin: 5px 0 0;
+    padding-left: 14px;
+    color: rgba(225, 240, 237, 0.45);
+    font-size: clamp(5px, 1.01cqw, 5.9px);
+    line-height: 1.45;
+    text-align: left;
+  }
+  .rules-copy li { margin-bottom: 2px; }
+  .rules-copy b { color: rgba(241, 247, 245, 0.74); font-weight: 600; }
+  .rules-copy p {
+    margin: 4px 0 0;
+    color: rgba(225, 240, 237, 0.35);
+    font-size: clamp(4.9px, 0.98cqw, 5.7px);
+    line-height: 1.42;
+    text-align: left;
+  }
+
+  /* ---------- action bar ---------- */
+  .actionbar {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-height: 29px;
+    padding: 0 9px 8px;
+  }
+  .notice {
+    min-width: 0;
+    flex: 1;
+    color: rgba(225, 240, 237, 0.35);
+    font-size: clamp(5px, 1.01cqw, 5.9px);
+    line-height: 1.38;
+  }
+  .notice.good { color: rgba(134, 231, 197, 0.7); }
+  .notice.warn { color: #ffb0a3; }
+  .commit-btn {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 8px 11px;
+    border: 0;
+    border-radius: 7px;
+    background: linear-gradient(180deg, #8cedcb, #43c7a3);
+    box-shadow: 0 8px 18px -10px rgba(94, 231, 199, 0.9), inset 0 -2px 0 rgba(0, 0, 0, 0.16);
+    color: #04221b;
+    font-size: clamp(6px, 1.23cqw, 7.1px);
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .commit-btn:hover:not(:disabled) { filter: brightness(1.06); }
+  .commit-btn:active:not(:disabled) { transform: translateY(1px); }
+  .commit-btn:disabled { opacity: 0.42; cursor: default; }
+
+  /* ---------- overlays ---------- */
+  .overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 8;
+    display: grid;
+    place-items: center;
+    padding: 13px;
+    background: rgba(3, 7, 9, 0.87);
+    -webkit-backdrop-filter: blur(5px);
+    backdrop-filter: blur(5px);
+    animation: fade-in 160ms ease-out;
+  }
+  @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+  .panel {
+    width: 100%;
+    max-width: 385px;
+    max-height: 100%;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 15px 15px 13px;
+    border: 1px solid rgba(145, 221, 204, 0.18);
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(18, 37, 42, 0.998), rgba(4, 12, 15, 0.998));
+    box-shadow:
+      0 25px 60px -24px rgba(0, 0, 0, 0.97),
+      inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    text-align: center;
+    scrollbar-width: thin;
+  }
+  .panel .eyebrow { color: var(--coral); }
+  .title {
+    margin: 3px 0 7px;
+    color: var(--ink);
+    font-size: clamp(26px, 7cqw, 35px);
+    line-height: 1.01;
+    letter-spacing: -0.015em;
+    text-shadow: 0 0 30px rgba(255, 157, 135, 0.1);
+  }
+  .title .accent { color: var(--coral); }
+  .title .slash { color: rgba(255, 198, 110, 0.55); font-weight: 400; }
+  .lead {
+    margin: 0;
+    color: rgba(225, 240, 237, 0.62);
+    font-size: clamp(7.5px, 1.53cqw, 8.7px);
+    line-height: 1.48;
+    letter-spacing: 0.004em;
+  }
+  .lead b { color: rgba(255, 198, 110, 0.92); font-weight: 700; }
+  .rules { display: grid; gap: 4px; margin: 9px 0 0; text-align: left; }
+  .rule {
+    position: relative;
+    padding-left: 12px;
+    color: rgba(225, 240, 237, 0.57);
+    font-size: clamp(6.35px, 1.29cqw, 7.35px);
+    line-height: 1.4;
+  }
+  .rule::before {
+    content: "▸";
+    position: absolute;
+    left: 1px;
+    color: var(--coral);
+  }
+  .rule b { color: rgba(241, 247, 245, 0.9); font-weight: 700; }
+  .score-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 3px;
+    margin-top: 9px;
+  }
+  .score-cell {
+    padding: 5px 3px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 5px;
+    background: rgba(255, 255, 255, 0.022);
+  }
+  .score-cell span {
+    display: block;
+    color: var(--muted);
+    font-size: clamp(4.5px, 0.9cqw, 5.25px);
+    letter-spacing: 0.04em;
+    line-height: 1.2;
+    text-transform: uppercase;
+  }
+  .score-cell strong {
+    display: block;
+    margin-top: 2px;
+    color: var(--mint);
+    font-size: clamp(8px, 1.6cqw, 9.2px);
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+  }
+  .score-cell:nth-child(2) strong { color: var(--amber); }
+  .score-cell:nth-child(3) strong { color: var(--coral); }
+  .btn {
+    margin-top: 12px;
+    padding: 9px 20px;
+    border: 0;
+    border-radius: 999px;
+    background: linear-gradient(180deg, #8cedcb, #43c7a3);
+    box-shadow: 0 14px 30px -14px rgba(94, 231, 199, 0.9), inset 0 -2px 0 rgba(0, 0, 0, 0.16);
+    color: #04221b;
+    font-size: clamp(7.2px, 1.45cqw, 8.4px);
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+  .btn:hover { filter: brightness(1.06); }
+  .btn:active { transform: translateY(1px) scale(0.99); }
+  .fine {
+    margin: 7px 0 0;
+    color: rgba(225, 240, 237, 0.27);
+    font-size: clamp(5.1px, 1cqw, 5.8px);
+    letter-spacing: 0.065em;
+    text-transform: uppercase;
+  }
+
+  /* ---------- statement overlay ---------- */
+  .statement-seal {
+    width: 38px;
+    height: 38px;
+    margin: 1px auto 7px;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(134, 231, 197, 0.34);
+    border-radius: 50%;
+    background: rgba(134, 231, 197, 0.065);
+    color: var(--mint);
+    font-size: 18px;
+    line-height: 1;
+  }
+  .statement-seal.late {
+    border-color: rgba(255, 132, 116, 0.4);
+    background: rgba(255, 132, 116, 0.07);
+    color: var(--red);
+  }
+  .statement-title {
+    margin: 0 0 4px;
+    color: var(--ink);
+    font-size: clamp(18px, 4cqw, 24px);
+    line-height: 1.07;
+    letter-spacing: -0.03em;
+  }
+  .statement-copy {
+    margin: 0;
+    color: rgba(225, 240, 237, 0.55);
+    font-size: clamp(6.55px, 1.3cqw, 7.5px);
+    line-height: 1.47;
+  }
+  .receipt {
+    display: grid;
+    gap: 2px;
+    margin-top: 8px;
+    padding: 6px 7px;
+    border: 1px solid rgba(255, 255, 255, 0.065);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.018);
+  }
+  .receipt-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    color: rgba(225, 240, 237, 0.47);
+    font-size: clamp(5.35px, 1.06cqw, 6.15px);
+    line-height: 1.4;
+  }
+  .receipt-row b {
+    color: rgba(241, 247, 245, 0.82);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .receipt-row.total {
+    margin-top: 2px;
+    padding-top: 3px;
+    border-top: 1px dashed rgba(255, 255, 255, 0.1);
+    color: rgba(241, 247, 245, 0.72);
+  }
+  .receipt-row.total b { color: var(--coral); font-size: 1.16em; }
+  .receipt-row.fee b { color: var(--red); }
+  .statement-strip {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 3px;
+    margin-top: 7px;
+  }
+  .statement-cell {
+    padding: 5px 3px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 5px;
+    background: rgba(255, 255, 255, 0.02);
+  }
+  .statement-cell span {
+    display: block;
+    color: var(--muted);
+    font-size: clamp(4.4px, 0.9cqw, 5.1px);
+    letter-spacing: 0.08em;
+    line-height: 1.2;
+    text-transform: uppercase;
+  }
+  .statement-cell strong {
+    display: block;
+    margin-top: 2px;
+    color: var(--ink);
+    font-size: clamp(7.5px, 1.52cqw, 8.8px);
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+  }
+  .statement-cell:nth-child(1) strong { color: var(--mint); }
+  .statement-cell:nth-child(2) strong { color: var(--amber); }
+  .statement-cell:nth-child(3) strong { color: var(--coral); }
+  .statement-gain {
+    margin: 6px 0 0;
+    color: var(--mint);
+    font-size: clamp(5.55px, 1.1cqw, 6.35px);
+    line-height: 1.4;
+  }
+  .statement-gain.late { color: #ffb3a7; }
+  .bought-line {
+    margin: 5px 0 0;
+    color: rgba(225, 240, 237, 0.36);
+    font-size: clamp(5px, 0.98cqw, 5.7px);
+    line-height: 1.4;
+    text-align: left;
+  }
+  .next-line {
+    margin: 7px 0 0;
+    color: var(--muted);
+    font-size: clamp(5.05px, 0.98cqw, 5.7px);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+  .next-line b { color: var(--amber); }
+
+  /* ---------- final report ---------- */
+  .rank {
+    margin: 6px 0 0;
+    color: var(--coral);
+    font-size: clamp(6px, 1.23cqw, 7.1px);
+    font-weight: 700;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+  }
+  .final-score {
+    margin-top: 7px;
+    padding: 7px;
+    border: 1px solid rgba(134, 231, 197, 0.15);
+    border-radius: 8px;
+    background: rgba(134, 231, 197, 0.038);
+  }
+  .final-score span {
+    display: block;
+    color: var(--muted);
+    font-size: clamp(4.8px, 0.96cqw, 5.5px);
+    letter-spacing: 0.17em;
+  }
+  .final-score strong {
+    display: block;
+    margin-top: 1px;
+    color: var(--mint);
+    font-size: clamp(29px, 6.3cqw, 38px);
+    line-height: 0.98;
+    letter-spacing: 0.01em;
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 26px rgba(134, 231, 197, 0.24);
+  }
+  .final-score small {
+    display: block;
+    margin-top: 3px;
+    color: var(--muted);
+    font-size: clamp(4.7px, 0.94cqw, 5.4px);
+    letter-spacing: 0.075em;
+  }
+  .report-grid {
+    display: grid;
+    grid-template-columns: 0.85fr 1.05fr 1.05fr 1.05fr;
+    gap: 3px;
+    margin-top: 6px;
+  }
+  .report-stat {
+    min-width: 0;
+    padding: 4px 3px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 5px;
+    background: rgba(255, 255, 255, 0.02);
+  }
+  .report-stat span {
+    display: block;
+    overflow: hidden;
+    color: var(--muted);
+    font-size: clamp(4.1px, 0.82cqw, 4.8px);
+    letter-spacing: 0.035em;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .report-stat strong {
+    display: block;
+    margin-top: 2px;
+    overflow: hidden;
+    color: var(--ink);
+    font-size: clamp(6.8px, 1.38cqw, 8px);
+    line-height: 1.12;
+    font-variant-numeric: tabular-nums;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .report-stat:nth-child(1) strong { color: var(--mint); }
+  .report-stat:nth-child(2) strong { color: var(--amber); }
+  .report-stat:nth-child(3) strong { color: var(--coral); }
+  .report-stat:nth-child(4) strong { color: var(--blue); }
+  .balance-chart {
+    display: flex;
+    align-items: flex-end;
+    gap: 3px;
+    height: 49px;
+    margin-top: 7px;
+    padding: 4px 5px 0;
+    border: 1px solid rgba(255, 255, 255, 0.055);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.015);
+  }
+  .chart-col {
+    flex: 1;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    align-items: stretch;
+    gap: 2px;
+    min-width: 0;
+  }
+  .chart-col i {
+    display: block;
+    width: 100%;
+    min-height: 2px;
+    border-radius: 2px 2px 0 0;
+    background: linear-gradient(180deg, var(--coral), rgba(255, 157, 135, 0.22));
+  }
+  .chart-col:last-child i { background: linear-gradient(180deg, var(--mint), rgba(134, 231, 197, 0.22)); }
+  .chart-col em {
+    display: block;
+    overflow: hidden;
+    color: rgba(225, 240, 237, 0.25);
+    font-size: clamp(3.9px, 0.76cqw, 4.5px);
+    font-style: normal;
+    line-height: 1;
+    text-align: center;
+    text-overflow: clip;
+    white-space: nowrap;
+  }
+  .breakdown {
+    display: grid;
+    gap: 2px;
+    margin-top: 6px;
+    padding: 5px 7px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.017);
+  }
+  .break-line {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 7px;
+    color: rgba(225, 240, 237, 0.5);
+    font-size: clamp(5.3px, 1.04cqw, 6.1px);
+    line-height: 1.4;
+  }
+  .break-line b {
+    flex: none;
+    color: var(--ink);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .break-line.total {
+    margin-top: 2px;
+    padding-top: 3px;
+    border-top: 1px dashed rgba(255, 255, 255, 0.09);
+    color: rgba(225, 240, 237, 0.7);
+  }
+  .break-line.total b { color: var(--mint); }
+  .outro {
+    margin: 7px 0 0;
+    color: rgba(225, 240, 237, 0.55);
+    font-size: clamp(5.9px, 1.14cqw, 6.7px);
+    line-height: 1.45;
+    text-align: left;
+  }
+  .outro + .outro { margin-top: 5px; }
+
+  /* ---------- compact heights ---------- */
+  @container (max-height: 635px) {
+    .topbar { margin-top: 6px; padding: 5px 7px; }
+    .board { margin-top: 5px; margin-bottom: 6px; }
+    .month-head { margin-top: 6px; padding: 6px 8px 6px 9px; }
+    .month-copy p:last-child { -webkit-line-clamp: 1; }
+    .account-strip { margin-top: 4px; }
+    .account { padding-top: 4px; padding-bottom: 3px; }
+    .scroll { padding-top: 6px; padding-bottom: 8px; }
+    .auto-row { margin-bottom: 6px; padding-top: 5px; padding-bottom: 5px; }
+    .purchase-list { gap: 3px; }
+    .offer-box { padding-top: 5px; padding-bottom: 5px; }
+    .payment-section { margin-top: 7px; }
+    .math-panel { margin-top: 5px; }
+    .clock-section { margin-top: 7px; }
+    .rules-details { margin-top: 5px; }
+    .actionbar { min-height: 27px; padding-bottom: 6px; }
+    .panel { padding: 12px 12px 10px; }
+  }
+  @container (max-height: 550px) {
+    .brand small { display: none; }
+    .month-copy p:last-child { display: none; }
+    .account small { display: none; }
+    .offer-copy small { display: none; }
+    .offer-tag { display: none; }
+    .quick-row { margin-top: 4px; }
+    .payment-warning { margin-top: 3px; }
+    .formula-line { display: none; }
+    .clock-block + .clock-block { margin-top: 4px; padding-top: 4px; }
+    .rules-details summary { padding-top: 4px; padding-bottom: 4px; }
+    .title { font-size: clamp(24px, 6.4cqw, 31px); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.001ms !important;
+      transition-duration: 0.001ms !important;
+    }
+  }
+</style>
+</head>
+<body>
+<p class="hint">Ten statements &middot; pay the card &middot; watch the clock</p>
+<main id="stage">
+  <div id="app">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">↻</div>
+        <div>
+          <b>CARD CLOCK</b>
+          <small>PURCHASES / INTEREST / PAYOFF</small>
+        </div>
+      </div>
+      <div class="topstats" aria-label="Game status">
+        <div class="topstat"><span>STATEMENT</span><strong id="hudMonth">1/10</strong></div>
+        <div class="topstat"><span>BALANCE</span><strong id="hudBalance">$1,180</strong></div>
+        <div class="topstat"><span>SCORE</span><strong id="hudScore">000</strong></div>
+      </div>
+    </header>
+
+    <section class="board" aria-labelledby="monthTitle">
+      <div class="month-head">
+        <div class="month-copy">
+          <p class="eyebrow" id="monthEyebrow">STATEMENT 01 · JANUARY</p>
+          <h1 id="monthTitle">The balance came with the keys.</h1>
+          <p id="monthCopy">The deposit and first-month shuffle left a card balance behind. Ten statements to make it smaller.</p>
+        </div>
+        <div class="auto-badge" aria-label="Automatic charge this month">
+          <span>AUTO CHARGE</span>
+          <strong id="autoAmount">$62</strong>
+          <small>ON THE CARD</small>
+        </div>
+      </div>
+
+      <div class="account-strip">
+        <div class="account balance">
+          <span>CARD BALANCE</span>
+          <strong id="balanceValue">$1,180</strong>
+          <small id="balanceNote">before this statement</small>
+        </div>
+        <div class="account apr">
+          <span>APR</span>
+          <strong>24.9%</strong>
+          <small>2.075% monthly</small>
+        </div>
+        <div class="account limit">
+          <span>LIMIT</span>
+          <strong>$4,000</strong>
+          <small id="limitNote">30% used</small>
+        </div>
+      </div>
+
+      <div class="scroll" id="planScroll">
+        <div class="auto-row">
+          <div class="auto-left">
+            <div class="auto-icon" aria-hidden="true">›</div>
+            <div>
+              <b id="autoName">Groceries, transit, phone</b>
+              <small>Already on this month's card</small>
+            </div>
+          </div>
+          <div class="auto-right" id="autoRowAmount">+$62</div>
+        </div>
+
+        <section class="shop-section" aria-labelledby="shopTitle">
+          <div class="section-head">
+            <div>
+              <h2 id="shopTitle">What else goes on the card?</h2>
+              <p>Optional. Every charge joins the balance and the clock.</p>
+            </div>
+            <div class="cart-total">
+              <strong id="cartTotal">$0</strong>
+              <span>EXTRAS</span>
+            </div>
+          </div>
+          <div class="purchase-list" id="purchaseList"></div>
+        </section>
+
+        <section class="payment-section" aria-labelledby="paymentTitle">
+          <div class="section-head">
+            <div>
+              <h2 id="paymentTitle">Pay the card.</h2>
+              <p>Send as much as this paycheck allows—up to $175.</p>
+            </div>
+          </div>
+          <div class="payment-card">
+            <div class="payment-top">
+              <div class="payment-input-wrap">
+                <label for="paymentInput">PAYMENT AMOUNT</label>
+                <div class="amount-line">
+                  <span class="dollar" aria-hidden="true">$</span>
+                  <input id="paymentInput" type="number" min="0" step="1" inputmode="numeric" value="64" aria-describedby="paymentWarning">
+                </div>
+              </div>
+              <div class="due-side">
+                <span>MINIMUM DUE</span>
+                <strong id="minimumDue">$64</strong>
+                <small id="minimumRule">5% or $30</small>
+              </div>
+            </div>
+            <div class="quick-row">
+              <button class="quick-btn" type="button" data-pay="minimum">Minimum <span id="quickMin">$64</span></button>
+              <button class="quick-btn" type="button" data-pay="cap">Pay cap <span id="quickCap">$175</span></button>
+              <button class="quick-btn" type="button" data-pay="statement">Statement <span id="quickStatement">$1,268</span></button>
+            </div>
+            <p class="payment-warning" id="paymentWarning">On-time if you close the month now.</p>
+          </div>
+
+          <div class="math-panel" id="mathPanel" aria-label="This month's statement math"></div>
+          <p class="formula-line" id="formulaLine"></p>
+        </section>
+
+        <section class="clock-section" aria-labelledby="clockTitle">
+          <div class="section-head">
+            <div>
+              <h2 id="clockTitle">The payoff clock.</h2>
+              <p>Same payment, no future charges. Watch what the extras do.</p>
+            </div>
+          </div>
+          <div class="clock-panel" id="clockPanel"></div>
+          <p class="clock-delta" id="clockDelta"></p>
+        </section>
+
+        <details class="rules-details">
+          <summary>Card rules &amp; scoring</summary>
+          <div class="rules-copy">
+            <ol>
+              <li><b>Interest:</b> 24.9% APR = 2.075% per month. Interest is 2.075% × (opening balance + this month's charges), rounded to the nearest dollar.</li>
+              <li><b>Statement:</b> opening balance + automatic charge + selected purchases + interest.</li>
+              <li><b>Minimum due:</b> the greater of $30 or 5% of the statement, rounded up to the next dollar and capped at the statement.</li>
+              <li><b>Payment:</b> up to $175 per paycheck, capped at the statement. Payment posts after interest.</li>
+              <li><b>Late:</b> a payment below the minimum is late. A $35 fee is added after payment, and that month earns no on-time points.</li>
+              <li><b>Limit:</b> a purchase is blocked if it would push the projected statement above $4,000.</li>
+            </ol>
+            <p>Score: 350 for on-time payments (35 × 10), 350 for interest efficiency (full at $180 total interest or less), and 300 for a manageable final balance (full at $300 or less). Projections repeat the entered payment or the 5% minimum, with no future purchases.</p>
+          </div>
+        </details>
+      </div>
+
+      <footer class="actionbar">
+        <div class="notice" id="notice" role="status" aria-live="polite">Choose any extras, then enter a payment.</div>
+        <button class="commit-btn" id="commitBtn" type="button">Close the month <span aria-hidden="true">→</span></button>
+      </footer>
+    </section>
+  </div>
+
+  <div class="overlay" id="overlay" role="dialog" aria-modal="true" aria-labelledby="ovTitle" hidden>
+    <div class="panel" id="panel"></div>
+  </div>
+</main>
+
+<script>
+'use strict';
+
+const CARD = {
+  startBalance: 1180,
+  apr: 0.249,
+  monthlyRate: 0.02075,
+  limit: 4000,
+  paymentCap: 175,
+  minimumRate: 0.05,
+  minimumFloor: 30,
+  lateFee: 35
+};
+const MONTH_TOTAL = 10;
+const MAX_SCORE = 1000;
+
+const MONTHS = [
+  {
+    n: 1,
+    label: 'JANUARY',
+    kicker: 'THE FIRST FULL STATEMENT',
+    title: 'The balance came with the keys.',
+    copy: 'The deposit and first-month shuffle left a card balance behind. Ten statements to make it smaller.',
+    autoCharge: { label: 'Groceries, transit, phone', amount: 62 },
+    offers: [
+      { id: 'coffee', name: 'Coffee-shop mornings', tag: 'FOOD', copy: 'Four mornings where the café is easier than the kitchen.', cost: 18 },
+      { id: 'boots', name: 'Waterproof winter boots', tag: 'NEED', copy: 'The soles on your old pair are separating.', cost: 74 },
+      { id: 'concert', name: 'Concert ticket with friends', tag: 'SOCIAL', copy: 'One night out, split across the group.', cost: 58 }
+    ]
+  },
+  {
+    n: 2,
+    label: 'FEBRUARY',
+    kicker: 'A SHORT MONTH, FULL PRICE',
+    title: 'A quiet month, if you let it be.',
+    copy: 'February is short, but the statement cycle is not. Small plans are easier to say yes to when the balance is already there.',
+    autoCharge: { label: 'Groceries, utilities, bus pass', amount: 58 },
+    offers: [
+      { id: 'streaming', name: 'Streaming upgrade', tag: 'FUN', copy: 'One more screen for the coldest nights.', cost: 16 },
+      { id: 'dinner', name: 'Dinner out for two', tag: 'SOCIAL', copy: 'A proper table instead of the kitchen counter.', cost: 63 },
+      { id: 'lamp', name: 'Desk lamp', tag: 'HOME', copy: 'The overhead light makes late reading miserable.', cost: 29 }
+    ]
+  },
+  {
+    n: 3,
+    label: 'MARCH',
+    kicker: 'THE SMALL THINGS BLUR',
+    title: 'The small stuff starts to blur.',
+    copy: 'A jacket, a few convenience dinners, a train ticket. None of them feels like a decision worth a whole statement.',
+    autoCharge: { label: 'Groceries, transit, phone', amount: 66 },
+    offers: [
+      { id: 'jacket', name: 'Light spring jacket', tag: 'NEED', copy: 'The zipper on yours finally gives up.', cost: 48 },
+      { id: 'takeout', name: 'Convenience dinners', tag: 'FOOD', copy: 'Three nights when work runs too late to cook.', cost: 37 },
+      { id: 'train', name: 'Weekend train ticket', tag: 'TRAVEL', copy: 'A visit home that would cost more if booked later.', cost: 89 }
+    ]
+  },
+  {
+    n: 4,
+    label: 'APRIL',
+    kicker: 'SPRING PLANS, NEW BALANCE',
+    title: 'Spring plans meet a statement.',
+    copy: 'The days get longer, the invitations multiply, and the card is still the easiest way to say yes.',
+    autoCharge: { label: 'Groceries, utilities, phone', amount: 60 },
+    offers: [
+      { id: 'cable', name: 'Phone case and cable', tag: 'TECH', copy: 'The cable only charges at one angle now.', cost: 22 },
+      { id: 'festival', name: 'Local festival day pass', tag: 'SOCIAL', copy: 'The one weekend everyone is going.', cost: 72 },
+      { id: 'scale', name: 'Kitchen scale', tag: 'HOME', copy: 'A small upgrade for the cooking habit.', cost: 26 }
+    ]
+  },
+  {
+    n: 5,
+    label: 'MAY',
+    kicker: 'CELEBRATION SEASON',
+    title: 'A birthday, a festival, a choice.',
+    copy: 'May arrives with a gift to buy and a plan that sounds better in the group chat than on a statement.',
+    autoCharge: { label: 'Groceries, transit, utilities', amount: 71 },
+    offers: [
+      { id: 'gift', name: 'Birthday gift for a friend', tag: 'SOCIAL', copy: 'Something thoughtful, not a last-minute card.', cost: 35 },
+      { id: 'weekend', name: 'Music festival weekend', tag: 'TRAVEL', copy: 'Ticket share, train fare, and one shared room.', cost: 94 },
+      { id: 'sheets', name: 'New sheets', tag: 'HOME', copy: 'The old set has one more rip than you want to admit.', cost: 44 }
+    ]
+  },
+  {
+    n: 6,
+    label: 'JUNE',
+    kicker: 'HEAT AND TAKEAWAY',
+    title: 'Heat, takeout, and good intentions.',
+    copy: 'The apartment gets warm. The schedule gets crowded. The delivery app is right there, and so is the fan.',
+    autoCharge: { label: 'Groceries, transit, phone', amount: 64 },
+    offers: [
+      { id: 'fan', name: 'Secondhand floor fan', tag: 'HOME', copy: 'A cheap fix for a bedroom with one window.', cost: 52 },
+      { id: 'delivery', name: 'A week of delivery dinners', tag: 'FOOD', copy: 'The week you stop pretending there is time to cook.', cost: 41 },
+      { id: 'shoes', name: 'Running shoes', tag: 'NEED', copy: 'The everyday pair has lost its tread.', cost: 86 }
+    ]
+  },
+  {
+    n: 7,
+    label: 'JULY',
+    kicker: 'THE TRIP-SHAPED TEMPTATION',
+    title: 'A trip-shaped temptation.',
+    copy: 'A beach weekend appears in the chat. You can afford the memory on the card, but the clock keeps moving after you get home.',
+    autoCharge: { label: 'Groceries, utilities, bus pass', amount: 76 },
+    offers: [
+      { id: 'beach', name: 'Beach weekend share', tag: 'TRAVEL', copy: 'Two nights, one train, and a very convincing group plan.', cost: 128 },
+      { id: 'books', name: 'Bookstore haul', tag: 'FUN', copy: 'Four paperbacks for the slow evenings.', cost: 31 },
+      { id: 'bike', name: 'Bike tune-up', tag: 'NEED', copy: 'Brakes, chain, and a safer commute.', cost: 45 }
+    ]
+  },
+  {
+    n: 8,
+    label: 'AUGUST',
+    kicker: 'BACK TO THE ROUTINE',
+    title: 'Back-to-work spending.',
+    copy: 'New hours mean a new schedule and a few things that make it work. The smallest line on the receipt is still a line.',
+    autoCharge: { label: 'Groceries, transit, phone', amount: 69 },
+    offers: [
+      { id: 'workwear', name: 'Work clothes', tag: 'NEED', copy: 'Two basic pieces that fit the new shift.', cost: 67 },
+      { id: 'upgrade', name: 'Streaming upgrade', tag: 'FUN', copy: 'A tiny subscription change you will forget by Friday.', cost: 14 },
+      { id: 'gift', name: 'Housewarming gift', tag: 'SOCIAL', copy: 'A plant and a card for a friend’s new place.', cost: 28 }
+    ]
+  },
+  {
+    n: 9,
+    label: 'SEPTEMBER',
+    kicker: 'THE SEMESTER ASKS',
+    title: 'The semester asks for software.',
+    copy: 'Course software, a concert, and a coffee subscription all look like part of the plan. Only one is required.',
+    autoCharge: { label: 'Groceries, utilities, phone', amount: 74 },
+    offers: [
+      { id: 'software', name: 'Course software', tag: 'NEED', copy: 'The licence is required for the first assignment.', cost: 39 },
+      { id: 'concert', name: 'Concert ticket', tag: 'SOCIAL', copy: 'A friend has a spare seat in the good section.', cost: 82 },
+      { id: 'coffee', name: 'Coffee subscription', tag: 'FOOD', copy: 'A bag of beans every two weeks.', cost: 24 }
+    ]
+  },
+  {
+    n: 10,
+    label: 'OCTOBER',
+    kicker: 'THE LAST STATEMENT',
+    title: 'Last statement before winter.',
+    copy: 'This is the final month of the challenge. Whatever remains after October is the balance you carry into winter.',
+    autoCharge: { label: 'Groceries, transit, utilities', amount: 63 },
+    offers: [
+      { id: 'party', name: 'Halloween party supplies', tag: 'SOCIAL', copy: 'Decorations and a shared snack table.', cost: 36 },
+      { id: 'coat', name: 'Winter coat', tag: 'NEED', copy: 'The old one no longer keeps out the wind.', cost: 112 },
+      { id: 'chair', name: 'Desk chair', tag: 'HOME', copy: 'The kitchen chair is not a long-term study plan.', cost: 79 }
+    ]
+  }
+];
+
+const els = {
+  app: document.getElementById('app'),
+  overlay: document.getElementById('overlay'),
+  panel: document.getElementById('panel'),
+  hudMonth: document.getElementById('hudMonth'),
+  hudBalance: document.getElementById('hudBalance'),
+  hudScore: document.getElementById('hudScore'),
+  monthEyebrow: document.getElementById('monthEyebrow'),
+  monthTitle: document.getElementById('monthTitle'),
+  monthCopy: document.getElementById('monthCopy'),
+  autoAmount: document.getElementById('autoAmount'),
+  balanceValue: document.getElementById('balanceValue'),
+  balanceNote: document.getElementById('balanceNote'),
+  limitNote: document.getElementById('limitNote'),
+  planScroll: document.getElementById('planScroll'),
+  autoName: document.getElementById('autoName'),
+  autoRowAmount: document.getElementById('autoRowAmount'),
+  cartTotal: document.getElementById('cartTotal'),
+  purchaseList: document.getElementById('purchaseList'),
+  paymentInput: document.getElementById('paymentInput'),
+  minimumDue: document.getElementById('minimumDue'),
+  minimumRule: document.getElementById('minimumRule'),
+  quickMin: document.getElementById('quickMin'),
+  quickCap: document.getElementById('quickCap'),
+  quickStatement: document.getElementById('quickStatement'),
+  paymentWarning: document.getElementById('paymentWarning'),
+  mathPanel: document.getElementById('mathPanel'),
+  formulaLine: document.getElementById('formulaLine'),
+  clockPanel: document.getElementById('clockPanel'),
+  clockDelta: document.getElementById('clockDelta'),
+  notice: document.getElementById('notice'),
+  commitBtn: document.getElementById('commitBtn')
+};
+
+function money(value) {
+  const number = Math.round(Number(value) || 0);
+  const sign = number < 0 ? '-' : '';
+  return sign + '$' + Math.abs(number).toLocaleString('en-US');
+}
+
+function padScore(value) {
+  return String(Math.max(0, Math.round(value))).padStart(3, '0');
+}
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function currentMonth() {
+  return MONTHS[state.monthIndex];
+}
+
+function selectedOffers() {
+  return currentMonth().offers.filter((offer) => state.selected.includes(offer.id));
+}
+
+function selectedTotal() {
+  return selectedOffers().reduce((sum, offer) => sum + offer.cost, 0);
+}
+
+function minimumDue(statement) {
+  if (statement <= 0) return 0;
+  return Math.min(statement, Math.max(CARD.minimumFloor, Math.ceil(statement * CARD.minimumRate)));
+}
+
+function monthMath(extraOverride) {
+  const month = currentMonth();
+  const extras = extraOverride === undefined ? selectedTotal() : extraOverride;
+  const charges = month.autoCharge.amount + extras;
+  const interestBase = state.balance + charges;
+  const interest = Math.round(interestBase * CARD.monthlyRate);
+  const statement = state.balance + charges + interest;
+  const minimum = minimumDue(statement);
+  return {
+    month,
+    auto: month.autoCharge.amount,
+    extras,
+    charges,
+    interestBase,
+    interest,
+    statement,
+    minimum,
+    maxPayment: Math.min(CARD.paymentCap, statement)
+  };
+}
+
+function paymentApplied() {
+  const math = monthMath();
+  return Math.min(Math.max(0, Math.round(state.payment || 0)), CARD.paymentCap, math.statement);
+}
+
+function freshState() {
+  return {
+    phase: 'title',
+    monthIndex: 0,
+    balance: CARD.startBalance,
+    selected: [],
+    payment: 64,
+    history: [],
+    lastStatement: null,
+    onTimeCount: 0,
+    totalInterest: 0,
+    totalLateFees: 0,
+    totalPaid: 0,
+    notice: 'Choose any extras, then enter a payment.',
+    noticeKind: ''
+  };
+}
+
+let state = freshState();
+
+function setNotice(text, kind) {
+  state.notice = text || '';
+  state.noticeKind = kind || '';
+}
+
+function prepareMonth(index) {
+  state.monthIndex = index;
+  state.selected = [];
+  const math = monthMath(0);
+  state.payment = math.minimum;
+  state.phase = 'plan';
+}
+
+function computeScore() {
+  const onTime = state.onTimeCount * 35;
+  const interestRatio = clamp((500 - state.totalInterest) / 320, 0, 1);
+  const interest = Math.round(interestRatio * 350);
+  const balanceRatio = clamp((1400 - state.balance) / 1100, 0, 1);
+  const balance = Math.round(balanceRatio * 300);
+  return {
+    onTime,
+    interest,
+    balance,
+    total: onTime + interest + balance
+  };
+}
+
+function rankFor(score) {
+  if (score >= 900) return 'In control';
+  if (score >= 780) return 'Steady payoff';
+  if (score >= 650) return 'Getting there';
+  if (score >= 500) return 'Minimum-payment loop';
+  return 'The card is steering';
+}
+
+function formatMonths(months) {
+  if (months === null) return 'never';
+  if (months <= 0) return 'now';
+  if (months < 24) return months + ' mo';
+  const years = Math.floor(months / 12);
+  const rest = months % 12;
+  return years + 'y' + (rest ? ' ' + rest + 'm' : '');
+}
+
+function formatMonthLong(months) {
+  if (months === null) return 'never';
+  if (months <= 0) return 'paid now';
+  if (months === 1) return '1 month';
+  if (months < 24) return months + ' months';
+  const years = Math.floor(months / 12);
+  const rest = months % 12;
+  return years + ' years' + (rest ? ' ' + rest + ' months' : '');
+}
+
+function payoffFixed(startBalance, payment) {
+  if (startBalance <= 0) return { months: 0, interest: 0 };
+  if (payment <= 0) return { months: null, interest: null };
+  let balance = startBalance;
+  let months = 0;
+  let interestTotal = 0;
+  while (balance > 0 && months < 600) {
+    const interest = Math.round(balance * CARD.monthlyRate);
+    balance += interest;
+    interestTotal += interest;
+    balance -= Math.min(payment, balance);
+    months += 1;
+  }
+  return balance > 0
+    ? { months: null, interest: interestTotal }
+    : { months, interest: interestTotal };
+}
+
+function payoffMinimum(startBalance) {
+  if (startBalance <= 0) return { months: 0, interest: 0 };
+  let balance = startBalance;
+  let months = 0;
+  let interestTotal = 0;
+  while (balance > 0 && months < 600) {
+    const interest = Math.round(balance * CARD.monthlyRate);
+    balance += interest;
+    interestTotal += interest;
+    const payment = minimumDue(balance);
+    balance -= Math.min(payment, balance);
+    months += 1;
+  }
+  return balance > 0
+    ? { months: null, interest: interestTotal }
+    : { months, interest: interestTotal };
+}
+
+function timelineData() {
+  const cart = monthMath();
+  const base = monthMath(0);
+  const applied = paymentApplied();
+  const fixedCart = payoffFixed(cart.statement, Math.min(applied, cart.statement));
+  const fixedBase = payoffFixed(base.statement, Math.min(applied, base.statement));
+  const minCart = payoffMinimum(cart.statement);
+  const minBase = payoffMinimum(base.statement);
+  return {
+    cart,
+    base,
+    applied,
+    fixedCart,
+    fixedBase,
+    minCart,
+    minBase,
+    extras: cart.extras,
+    fixedMonthDelta: fixedCart.months !== null && fixedBase.months !== null
+      ? fixedCart.months - fixedBase.months
+      : null,
+    fixedInterestDelta: fixedCart.interest !== null && fixedBase.interest !== null
+      ? fixedCart.interest - fixedBase.interest
+      : null,
+    minMonthDelta: minCart.months !== null && minBase.months !== null
+      ? minCart.months - minBase.months
+      : null,
+    minInterestDelta: minCart.interest !== null && minBase.interest !== null
+      ? minCart.interest - minBase.interest
+      : null
+  };
+}
+
+function renderHud() {
+  const score = computeScore();
+  els.hudMonth.textContent = (state.monthIndex + 1) + '/' + MONTH_TOTAL;
+  els.hudBalance.textContent = money(state.balance);
+  els.hudScore.textContent = padScore(score.total);
+}
+
+function renderHeader() {
+  const month = currentMonth();
+  const utilization = Math.round((state.balance / CARD.limit) * 100);
+  els.monthEyebrow.textContent = 'STATEMENT ' + String(month.n).padStart(2, '0') + ' · ' + month.label;
+  els.monthTitle.textContent = month.title;
+  els.monthCopy.textContent = month.copy;
+  els.autoAmount.textContent = money(month.autoCharge.amount);
+  els.autoName.textContent = month.autoCharge.label;
+  els.autoRowAmount.textContent = '+' + money(month.autoCharge.amount);
+  els.balanceValue.textContent = money(state.balance);
+  els.balanceNote.textContent = 'before this statement';
+  els.limitNote.textContent = utilization + '% used';
+}
+
+function renderPurchaseList() {
+  const month = currentMonth();
+  els.purchaseList.innerHTML = month.offers.map((offer) => {
+    const tagClass = offer.tag === 'NEED' ? ' needs' : offer.tag === 'SOCIAL' || offer.tag === 'TRAVEL' ? ' social' : '';
+    return '<label class="offer" data-offer-card="' + offer.id + '">' +
+      '<input type="checkbox" data-offer="' + offer.id + '" id="offer-' + month.n + '-' + offer.id + '"' +
+        (state.selected.includes(offer.id) ? ' checked' : '') + '>' +
+      '<span class="offer-box">' +
+        '<span class="offer-check" aria-hidden="true"></span>' +
+        '<span class="offer-copy">' +
+          '<span class="offer-top"><span class="offer-tag' + tagClass + '">' + offer.tag + '</span></span>' +
+          '<b>' + offer.name + '</b>' +
+          '<small>' + offer.copy + '</small>' +
+        '</span>' +
+        '<span class="offer-price">+$' + offer.cost + '<small>ON CARD</small></span>' +
+      '</span>' +
+    '</label>';
+  }).join('');
+}
+
+function renderOfferStates() {
+  const selected = new Set(state.selected);
+  els.purchaseList.querySelectorAll('[data-offer-card]').forEach((card) => {
+    const id = card.dataset.offerCard;
+    const input = card.querySelector('input[data-offer]');
+    if (input) input.checked = selected.has(id);
+    card.classList.toggle('selected', selected.has(id));
+  });
+  els.cartTotal.textContent = money(selectedTotal());
+}
+
+function paymentWarningText() {
+  const math = monthMath();
+  const applied = paymentApplied();
+  const raw = Math.round(state.payment || 0);
+  if (raw > CARD.paymentCap) {
+    return { text: 'The paycheck allows $175. Payment is capped at ' + money(CARD.paymentCap) + '.', warn: true };
+  }
+  if (raw > math.statement) {
+    return { text: 'Payment is capped at the ' + money(math.statement) + ' statement balance.', warn: false };
+  }
+  if (applied < math.minimum) {
+    return { text: 'Below the ' + money(math.minimum) + ' minimum by ' + money(math.minimum - applied) + '. A $35 late fee will post.', warn: true };
+  }
+  if (applied === math.statement) {
+    return { text: 'On time. This payment clears the statement in full.', warn: false };
+  }
+  return { text: 'On-time payment. You are ' + money(applied - math.minimum) + ' above the minimum.', warn: false };
+}
+
+function renderPaymentUI(syncInput) {
+  const math = monthMath();
+  const maxPayment = Math.min(CARD.paymentCap, math.statement);
+  els.paymentInput.max = String(maxPayment);
+  els.minimumDue.textContent = money(math.minimum);
+  els.minimumRule.textContent = money(math.minimum) === money(CARD.minimumFloor)
+    ? '$30 floor applied'
+    : '5% of statement';
+  els.quickMin.textContent = money(math.minimum);
+  els.quickCap.textContent = money(maxPayment);
+  els.quickStatement.textContent = money(math.statement);
+  const statementButton = els.quickStatement.closest('button');
+  if (statementButton) {
+    statementButton.disabled = math.statement > CARD.paymentCap;
+    statementButton.title = statementButton.disabled
+      ? 'The full statement is above the $175 payment cap.'
+      : 'Pay the full statement balance.';
+  }
+
+  if (syncInput) {
+    if (state.payment > maxPayment) state.payment = maxPayment;
+    els.paymentInput.value = String(state.payment);
+  }
+  const warning = paymentWarningText();
+  els.paymentWarning.textContent = warning.text;
+  els.paymentWarning.className = 'payment-warning' + (warning.warn ? ' warn' : '');
+}
+
+function renderFinance() {
+  const math = monthMath();
+  const applied = paymentApplied();
+  const late = applied < math.minimum;
+  const fee = late ? CARD.lateFee : 0;
+  const newBalance = math.statement - applied + fee;
+  const extrasLabel = math.extras > 0 ? ' + ' + money(math.extras) + ' extras' : '';
+  const rows = [
+    '<div class="math-row"><span>Opening balance</span><b>' + money(state.balance) + '</b></div>',
+    '<div class="math-row"><span>New charges <small>(' + money(math.auto) + ' auto' + extrasLabel + ')</small></span><b>+' + money(math.charges) + '</b></div>',
+    '<div class="math-row"><span>Interest <small>2.075% monthly</small></span><b>+' + money(math.interest) + '</b></div>',
+    '<div class="math-row statement"><span>Statement balance</span><b>' + money(math.statement) + '</b></div>',
+    '<div class="math-row"><span>Minimum due</span><b>' + money(math.minimum) + '</b></div>',
+    '<div class="math-row payment-row"><span>Payment</span><b>−' + money(applied) + '</b></div>'
+  ];
+  if (fee > 0) {
+    rows.push('<div class="math-row fee"><span>Late fee</span><b>+' + money(fee) + '</b></div>');
+  }
+  rows.push('<div class="math-row new-balance"><span>New balance</span><b>' + money(newBalance) + '</b></div>');
+  els.mathPanel.innerHTML = rows.join('');
+  els.formulaLine.innerHTML = 'Interest = 2.075% × (' + money(state.balance) + ' opening + ' + money(math.charges) +
+    ' charges) = <b>' + money(math.interest) + '</b>. Minimum = the greater of $30 or 5% of the ' +
+    money(math.statement) + ' statement.';
+  const warning = paymentWarningText();
+  els.paymentWarning.textContent = warning.text;
+  els.paymentWarning.className = 'payment-warning' + (warning.warn ? ' warn' : '');
+}
+
+function clockRow(label, schedule, maxMonths, current) {
+  const width = schedule.months === null
+    ? 100
+    : Math.max(5, Math.min(100, (schedule.months / Math.max(1, maxMonths)) * 100));
+  return '<div class="clock-row' + (current ? ' current' : '') + '">' +
+    '<span>' + label + '</span>' +
+    '<span class="clock-track"><i style="width:' + width.toFixed(1) + '%"></i></span>' +
+    '<span class="clock-result"><b>' + formatMonths(schedule.months) + '</b><small>' +
+      (schedule.interest === null ? '—' : money(schedule.interest) + ' int.') + '</small></span>' +
+  '</div>';
+}
+
+function renderTimeline() {
+  const data = timelineData();
+  const baseMonths = data.fixedBase.months === null ? 600 : Math.max(1, data.fixedBase.months);
+  const cartMonths = data.fixedCart.months === null ? 600 : Math.max(1, data.fixedCart.months);
+  const fixedMax = Math.max(baseMonths, cartMonths);
+  const minBaseMonths = data.minBase.months === null ? 600 : Math.max(1, data.minBase.months);
+  const minCartMonths = data.minCart.months === null ? 600 : Math.max(1, data.minCart.months);
+  const minMax = Math.max(minBaseMonths, minCartMonths);
+
+  els.clockPanel.innerHTML =
+    '<div class="clock-block">' +
+      '<div class="clock-label"><span>AT YOUR ' + money(data.applied) + ' PAYMENT</span><b>no future charges</b></div>' +
+      clockRow('No extras', data.fixedBase, fixedMax, false) +
+      clockRow('Your cart', data.fixedCart, fixedMax, true) +
+    '</div>' +
+    '<div class="clock-block">' +
+      '<div class="clock-label"><span>AT THE 5% MINIMUM</span><b>the trap</b></div>' +
+      clockRow('No extras', data.minBase, minMax, false) +
+      clockRow('Your cart', data.minCart, minMax, true) +
+    '</div>';
+
+  if (data.extras === 0) {
+    els.clockDelta.className = 'clock-delta neutral';
+    els.clockDelta.innerHTML = 'No extras are on the card. Add one above to watch the clock move.';
+    return;
+  }
+
+  let text;
+  if (data.fixedMonthDelta === null) {
+    text = 'At your entered payment, the balance does not clear. ';
+  } else if (data.fixedMonthDelta > 0) {
+    text = 'Your ' + money(data.extras) + ' of extras add <b>' +
+      (data.fixedMonthDelta === 1 ? '1 month' : data.fixedMonthDelta + ' months') +
+      '</b> at your entered payment. ';
+  } else {
+    text = 'At your entered payment, the ' + money(data.extras) + ' of extras add no full month. ';
+  }
+  if (data.minMonthDelta !== null && data.minMonthDelta > 0) {
+    text += 'At the 5% minimum, they add <b>' + (data.minMonthDelta === 1 ? '1 month' : data.minMonthDelta + ' months') +
+      '</b> and ' + money(Math.max(0, data.minInterestDelta || 0)) + ' in interest.';
+  } else {
+    text += 'At the 5% minimum, they add ' + money(Math.max(0, data.minInterestDelta || 0)) + ' in interest.';
+  }
+  els.clockDelta.className = 'clock-delta';
+  els.clockDelta.innerHTML = text;
+}
+
+function renderNotice() {
+  els.notice.textContent = state.notice || '';
+  els.notice.className = 'notice' + (state.noticeKind ? ' ' + state.noticeKind : '');
+}
+
+function renderAll() {
+  if (!currentMonth()) return;
+  renderHud();
+  renderHeader();
+  renderOfferStates();
+  renderPaymentUI(true);
+  renderFinance();
+  renderTimeline();
+  renderNotice();
+  els.commitBtn.disabled = state.phase !== 'plan';
+  els.commitBtn.innerHTML = state.phase === 'final'
+    ? 'Challenge complete'
+    : 'Close the month <span aria-hidden="true">→</span>';
+}
+
+function renderMonth() {
+  renderHeader();
+  renderPurchaseList();
+  renderAll();
+  els.planScroll.scrollTop = 0;
+}
+
+/* ---------- interactions ---------- */
+function toggleOffer(id, shouldSelect) {
+  if (state.phase !== 'plan') return false;
+  const offer = currentMonth().offers.find((entry) => entry.id === id);
+  if (!offer) return false;
+  const selected = new Set(state.selected);
+
+  if (shouldSelect) {
+    if (selected.has(id)) return true;
+    const projected = monthMath(selectedTotal() + offer.cost);
+    if (projected.statement > CARD.limit) {
+      setNotice('That purchase would push the statement past the $4,000 limit.', 'warn');
+      renderOfferStates();
+      renderNotice();
+      return false;
+    }
+    selected.add(id);
+    setNotice('Added ' + offer.name + ' to the card. Check the payoff clock.', '');
+  } else {
+    selected.delete(id);
+    setNotice('Removed ' + offer.name + ' from this statement.', '');
+  }
+
+  state.selected = [...selected];
+  const math = monthMath();
+  if (state.payment > Math.min(CARD.paymentCap, math.statement)) {
+    state.payment = Math.min(CARD.paymentCap, math.statement);
+  }
+  renderHud();
+  renderOfferStates();
+  renderPaymentUI(true);
+  renderFinance();
+  renderTimeline();
+  renderNotice();
+  return true;
+}
+
+function setPayment(value) {
+  if (state.phase !== 'plan') return false;
+  const math = monthMath();
+  const maxPayment = Math.min(CARD.paymentCap, math.statement);
+  const parsed = Number(value);
+  state.payment = clamp(Number.isFinite(parsed) ? Math.round(parsed) : 0, 0, maxPayment);
+  els.paymentInput.value = String(state.payment);
+  renderHud();
+  renderPaymentUI(false);
+  renderFinance();
+  renderTimeline();
+  return true;
+}
+
+function commitMonth() {
+  if (state.phase !== 'plan') return null;
+  const math = monthMath();
+  const payment = paymentApplied();
+  const late = payment < math.minimum;
+  const lateFee = late ? CARD.lateFee : 0;
+  const newBalance = math.statement - payment + lateFee;
+  const bought = selectedOffers().map((offer) => ({ name: offer.name, cost: offer.cost }));
+  const record = {
+    month: currentMonth().n,
+    label: currentMonth().label,
+    opening: state.balance,
+    auto: math.auto,
+    purchases: bought,
+    extras: math.extras,
+    charges: math.charges,
+    interest: math.interest,
+    statement: math.statement,
+    minimum: math.minimum,
+    payment,
+    late,
+    lateFee,
+    newBalance,
+    onTime: !late
+  };
+
+  state.balance = newBalance;
+  state.history.push(record);
+  state.lastStatement = record;
+  state.onTimeCount += late ? 0 : 1;
+  state.totalInterest += math.interest;
+  state.totalLateFees += lateFee;
+  state.totalPaid += payment;
+  state.phase = 'statement';
+  setNotice(late
+    ? 'Statement posted late. The fee is on the next balance.'
+    : 'Statement posted on time. Review the receipt.', late ? 'warn' : 'good');
+  renderAll();
+  showStatement(record);
+  return record;
+}
+
+function continueMonth() {
+  if (state.phase !== 'statement') return false;
+  if (state.monthIndex >= MONTHS.length - 1) {
+    showFinal();
+    return true;
+  }
+  closeOverlay();
+  prepareMonth(state.monthIndex + 1);
+  setNotice('New statement. The last balance carries forward.', '');
+  renderMonth();
+  return true;
+}
+
+/* ---------- overlays ---------- */
+function showStatement(record) {
+  const purchaseText = record.purchases.length
+    ? record.purchases.map((item) => item.name + ' ' + money(item.cost)).join(' · ')
+    : 'No optional purchases.';
+  const nextMonth = MONTHS[state.monthIndex + 1];
+  const nextLabel = nextMonth ? 'Open ' + nextMonth.label.toLowerCase() + ' →' : 'See the final report →';
+  const points = record.onTime ? '+35 on-time points' : '+0 on-time points';
+
+  showOverlay(
+    '<p class="eyebrow">STATEMENT ' + String(record.month).padStart(2, '0') + ' · ' + record.label + '</p>' +
+    '<div class="statement-seal' + (record.late ? ' late' : '') + '" aria-hidden="true">' + (record.late ? '!' : '✓') + '</div>' +
+    '<h2 class="statement-title" id="ovTitle">' + (record.late ? 'The minimum was missed.' : 'Posted on time.') + '</h2>' +
+    '<p class="statement-copy">' + (record.late
+      ? 'Your payment was ' + money(record.minimum - record.payment) + ' below the minimum. A $35 late fee was added after payment.'
+      : 'The payment cleared the ' + money(record.minimum) + ' minimum. The balance below is what carries into next month.') + '</p>' +
+    '<div class="receipt">' +
+      '<div class="receipt-row"><span>Opening balance</span><b>' + money(record.opening) + '</b></div>' +
+      '<div class="receipt-row"><span>Automatic charge</span><b>+' + money(record.auto) + '</b></div>' +
+      '<div class="receipt-row"><span>Optional purchases</span><b>+' + money(record.extras) + '</b></div>' +
+      '<div class="receipt-row"><span>Interest</span><b>+' + money(record.interest) + '</b></div>' +
+      '<div class="receipt-row"><span>Statement</span><b>' + money(record.statement) + '</b></div>' +
+      '<div class="receipt-row"><span>Payment</span><b>−' + money(record.payment) + '</b></div>' +
+      (record.lateFee > 0 ? '<div class="receipt-row fee"><span>Late fee</span><b>+' + money(record.lateFee) + '</b></div>' : '') +
+      '<div class="receipt-row total"><span>New balance</span><b>' + money(record.newBalance) + '</b></div>' +
+    '</div>' +
+    '<div class="statement-strip">' +
+      '<div class="statement-cell"><span>ON-TIME</span><strong>' + (record.onTime ? 'YES' : 'NO') + '</strong></div>' +
+      '<div class="statement-cell"><span>MINIMUM</span><strong>' + money(record.minimum) + '</strong></div>' +
+      '<div class="statement-cell"><span>PAID</span><strong>' + money(record.payment) + '</strong></div>' +
+    '</div>' +
+    '<p class="statement-gain' + (record.late ? ' late' : '') + '">' + points + '</p>' +
+    '<p class="bought-line">This month on the card: ' + purchaseText + '</p>' +
+    '<p class="next-line">NEXT · <b>' + (nextMonth ? nextMonth.label : 'FINAL REPORT') + '</b> · BALANCE ' + money(record.newBalance) + '</p>' +
+    '<button class="btn" type="button" data-action="continue">' + nextLabel + '</button>' +
+    '<p class="fine">' + (nextMonth ? 'The clock keeps moving after the receipt' : 'Ten statements are complete') + '</p>'
+  );
+}
+
+function finalNarrative(score, purchaseTotal) {
+  const allOnTime = state.onTimeCount === MONTHS.length;
+  const lowBalance = state.balance <= 300;
+  if (score >= 900 && allOnTime && lowBalance) {
+    return 'You paid every statement on time, kept the optional charges restrained, and carried a balance small enough to clear quickly. A small purchase would have changed the clock; you made it change less often.';
+  }
+  if (allOnTime && lowBalance) {
+    return 'Every payment landed and the final balance is manageable. The remaining gap is interest: paying more earlier would have shortened the clock even when each month looked fine.';
+  }
+  if (allOnTime) {
+    return 'Every payment arrived on time, but the balance is still large. On-time minimum payments are a floor, not a payoff plan. The interest kept buying time you did not have.';
+  }
+  if (purchaseTotal >= 300) {
+    return 'The late months and the optional purchases compounded in the same direction. The card balance stayed, and the payoff clock kept borrowing from future paychecks.';
+  }
+  return 'A late month cost more than the fee: it reset the balance higher and pushed the payoff date out. The rule sheet shows exactly where the next payment needs to go.';
+}
+
+function showFinal() {
+  state.phase = 'final';
+  renderAll();
+  const score = computeScore();
+  const purchaseTotal = state.history.reduce((sum, record) => sum + record.extras, 0);
+  const rank = rankFor(score.total);
+  const allOnTime = state.onTimeCount === MONTHS.length;
+  const headline = score.total >= 900 && state.balance <= 300
+    ? ['A shorter clock.', 'A steadier year.']
+    : allOnTime
+      ? ['Every payment landed.', 'The balance stayed.']
+      : ['The due date', 'got away from you.'];
+  const maxBalance = Math.max(1, ...state.history.map((record) => record.newBalance));
+  const chart = state.history.map((record) => {
+    const height = Math.max(2, Math.round(record.newBalance / maxBalance * 100));
+    return '<span class="chart-col" title="' + record.label + ': ' + money(record.newBalance) + '">' +
+      '<i style="height:' + height + '%"></i><em>' + record.label.slice(0, 1) + '</em>' +
+    '</span>';
+  }).join('');
+  const finalPayoff = payoffFixed(state.balance, CARD.paymentCap);
+
+  showOverlay(
+    '<p class="eyebrow">TEN STATEMENTS LATER · OCTOBER</p>' +
+    '<h1 class="title" id="ovTitle">' + headline[0] + '<br><span class="accent">' + headline[1] + '</span></h1>' +
+    '<p class="rank">' + rank + ' · ' + score.total + ' / ' + MAX_SCORE + '</p>' +
+    '<div class="final-score"><span>FINAL SCORE</span><strong>' + score.total + '</strong><small>OUT OF ' + MAX_SCORE + ' POSSIBLE</small></div>' +
+    '<div class="report-grid">' +
+      '<div class="report-stat"><span>ON-TIME</span><strong>' + state.onTimeCount + ' / 10</strong></div>' +
+      '<div class="report-stat"><span>INTEREST</span><strong>' + money(state.totalInterest) + '</strong></div>' +
+      '<div class="report-stat"><span>EXTRAS</span><strong>' + money(purchaseTotal) + '</strong></div>' +
+      '<div class="report-stat"><span>BALANCE</span><strong>' + money(state.balance) + '</strong></div>' +
+    '</div>' +
+    '<div class="balance-chart" aria-label="Balance after each statement">' + chart + '</div>' +
+    '<div class="breakdown">' +
+      '<div class="break-line"><span>On-time payments</span><b>' + score.onTime + ' / 350</b></div>' +
+      '<div class="break-line"><span>Lower interest</span><b>' + score.interest + ' / 350</b></div>' +
+      '<div class="break-line"><span>Manageable balance</span><b>' + score.balance + ' / 300</b></div>' +
+      '<div class="break-line total"><span>Total</span><b>' + score.total + ' / ' + MAX_SCORE + '</b></div>' +
+    '</div>' +
+    '<p class="outro">' + finalNarrative(score.total, purchaseTotal) + '</p>' +
+    '<p class="outro">Interest paid: ' + money(state.totalInterest) + ' · late fees: ' + money(state.totalLateFees) +
+      ' · payments sent: ' + money(state.totalPaid) + ' · payoff at the $175 cap from here: ' +
+      formatMonthLong(finalPayoff.months) + '.</p>' +
+    '<button class="btn" type="button" data-action="restart">Run another year</button>' +
+    '<p class="fine">10 statements · 24.9% APR · optional purchases, visible cost</p>'
+  );
+}
+
+function showTitle() {
+  showOverlay(
+    '<p class="eyebrow">A TURN-BASED CREDIT-CARD GAME</p>' +
+    '<h1 class="title" id="ovTitle">Card <span class="slash">/</span> <span class="accent">Clock</span></h1>' +
+    '<p class="lead">You are 24, three months into a lease, and carrying a <b>$1,180</b> card balance. You can send <b>$175</b> each month without missing rent. Ten statements. Every optional purchase nudges the payoff date.</p>' +
+    '<div class="rules">' +
+      '<div class="rule"><b>Choose what goes on the card.</b> Prices are explicit. The automatic monthly charge is already listed.</div>' +
+      '<div class="rule"><b>Enter a payment.</b> Pay the minimum, the $175 monthly cap, the full statement, or type any amount. A payment below the minimum is late and adds $35.</div>' +
+      '<div class="rule"><b>Know the math.</b> Interest is 2.075% of opening balance plus new charges, rounded to the nearest dollar. The minimum is $30 or 5% of the statement, whichever is greater.</div>' +
+      '<div class="rule"><b>Watch the clock.</b> The payoff projection compares no extras with your cart at your payment and at the minimum. A $14 extra is never just $14.</div>' +
+    '</div>' +
+    '<div class="score-grid">' +
+      '<div class="score-cell"><span>ON-TIME</span><strong>350</strong></div>' +
+      '<div class="score-cell"><span>LOW INTEREST</span><strong>350</strong></div>' +
+      '<div class="score-cell"><span>BALANCE</span><strong>300</strong></div>' +
+    '</div>' +
+    '<button class="btn" type="button" data-action="start">Open the statement →</button>' +
+    '<p class="fine">10 months · $1,180 start · 24.9% APR · no timer</p>'
+  );
+}
+
+function showOverlay(html) {
+  els.panel.innerHTML = html;
+  els.overlay.hidden = false;
+  els.app.inert = true;
+  const focusTarget = els.panel.querySelector('[data-action], .btn');
+  if (focusTarget) {
+    window.setTimeout(() => focusTarget.focus({ preventScroll: true }), 30);
+  }
+}
+
+function closeOverlay() {
+  els.overlay.hidden = true;
+  els.panel.innerHTML = '';
+  els.app.inert = false;
+}
+
+function startGame() {
+  closeOverlay();
+  state = freshState();
+  prepareMonth(0);
+  state.phase = 'plan';
+  setNotice('Choose any extras, then enter a payment.', '');
+  renderMonth();
+}
+
+function boot() {
+  state = freshState();
+  prepareMonth(0);
+  state.phase = 'title';
+  renderMonth();
+  showTitle();
+}
+
+/* ---------- event listeners ---------- */
+els.purchaseList.addEventListener('change', (event) => {
+  const input = event.target.closest('[data-offer]');
+  if (!input) return;
+  toggleOffer(input.dataset.offer, input.checked);
+});
+
+els.paymentInput.addEventListener('input', () => {
+  if (state.phase !== 'plan') return;
+  const raw = Number(els.paymentInput.value);
+  state.payment = clamp(Number.isFinite(raw) ? Math.round(raw) : 0, 0, 9999);
+  renderHud();
+  renderPaymentUI(false);
+  renderFinance();
+  renderTimeline();
+});
+
+document.querySelectorAll('[data-pay]').forEach((button) => {
+  button.addEventListener('click', () => {
+    if (state.phase !== 'plan') return;
+    const math = monthMath();
+    if (button.dataset.pay === 'minimum') setPayment(math.minimum);
+    else if (button.dataset.pay === 'cap') setPayment(Math.min(CARD.paymentCap, math.statement));
+    else if (button.dataset.pay === 'statement') setPayment(math.statement);
+  });
+});
+
+els.commitBtn.addEventListener('click', commitMonth);
+
+els.overlay.addEventListener('click', (event) => {
+  const action = event.target.closest('[data-action]');
+  if (!action) return;
+  if (action.dataset.action === 'start' || action.dataset.action === 'restart') {
+    startGame();
+  } else if (action.dataset.action === 'continue') {
+    continueMonth();
+  }
+});
+
+/* ---------- boot ---------- */
+boot();
+
+window.__CARDCLOCK__ = {
+  getState: () => JSON.parse(JSON.stringify(state)),
+  months: MONTHS,
+  card: CARD,
+  maxScore: MAX_SCORE,
+  start: startGame,
+  restart: startGame,
+  prepareMonth,
+  toggleOffer,
+  setPayment,
+  monthMath,
+  paymentApplied,
+  timeline: timelineData,
+  payoffFixed,
+  payoffMinimum,
+  minimumDue,
+  commitMonth,
+  continueMonth,
+  showFinal,
+  score: computeScore,
+  rankFor
+};
+</script>
+</body>
+</html>

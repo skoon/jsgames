@@ -1,0 +1,1664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d1518">
+<title>Smart Cart &middot; School Event Shopping Puzzle</title>
+<style>
+  :root {
+    --bg: #0c1417;
+    --bg-2: #132025;
+    --panel: #162328;
+    --panel-border: rgba(255, 255, 255, 0.09);
+    --paper: #f6f1e4;
+    --paper-2: #ebe3d0;
+    --paper-ink: #1b2224;
+    --paper-muted: #5d6463;
+    --ink: #f4f1e8;
+    --muted: rgba(244, 241, 232, 0.66);
+    --faint: rgba(244, 241, 232, 0.28);
+    --mint: #56e39f;
+    --mint-dark: #147a4d;
+    --amber: #ffc857;
+    --amber-dark: #8c5a00;
+    --coral: #ff7b6b;
+    --coral-dark: #9e2a1c;
+    --sky: #74c7ff;
+    --sky-dark: #155c8a;
+    --shadow: 0 18px 44px -18px rgba(0, 0, 0, 0.72);
+    --radius: 16px;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background:
+      radial-gradient(120% 80% at 20% 0%, #1d3238 0%, #0d1619 52%, #070c0e 100%);
+    color: var(--ink);
+    font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    line-height: 1.4;
+    padding: 14px;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    overflow-y: auto;
+  }
+
+  .mono {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .app {
+    width: min(1160px, 100%);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  /* Top HUD */
+  .hud {
+    background: rgba(22, 35, 40, 0.9);
+    border: 1px solid var(--panel-border);
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    box-shadow: var(--shadow);
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .avatar {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #ffc857, #ff8c61);
+    display: grid;
+    place-items: center;
+    color: #1b2224;
+    font-weight: 800;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+
+  .brand-text h1 {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+
+  .brand-text p {
+    margin: 2px 0 0;
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+
+  .hud-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .stat-pill {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 6px 12px;
+    display: flex;
+    flex-direction: column;
+    min-width: 92px;
+  }
+
+  .stat-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+  }
+
+  .stat-val {
+    font-size: 15px;
+    font-weight: 800;
+  }
+
+  .stat-val.mint { color: var(--mint); }
+  .stat-val.amber { color: var(--amber); }
+  .stat-val.sky { color: var(--sky); }
+
+  /* Event Brief Banner */
+  .brief {
+    background: linear-gradient(135deg, rgba(255, 200, 87, 0.12), rgba(86, 227, 159, 0.08));
+    border: 1px solid rgba(255, 200, 87, 0.26);
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .brief-left {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .brief-tag {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--amber);
+  }
+
+  .brief-title {
+    font-size: 18px;
+    font-weight: 800;
+    margin: 0;
+  }
+
+  .brief-desc {
+    font-size: 13px;
+    color: var(--muted);
+    margin: 0;
+  }
+
+  .brief-targets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .target-box {
+    background: rgba(12, 20, 23, 0.65);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 12px;
+    padding: 8px 14px;
+    text-align: center;
+  }
+
+  .target-box .t-lbl {
+    display: block;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+  }
+
+  .target-box .t-num {
+    font-size: 17px;
+    font-weight: 800;
+    color: var(--ink);
+  }
+
+  .target-box.budget .t-num { color: var(--mint); }
+  .target-box.need .t-num { color: var(--amber); }
+
+  /* Main 2-column workspace */
+  .workspace {
+    display: grid;
+    grid-template-columns: 1fr 330px;
+    gap: 14px;
+    align-items: start;
+  }
+
+  @media (max-width: 920px) {
+    .workspace {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  /* Product Cards Area */
+  .cards-section {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .cards-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+
+  @media (max-width: 720px) {
+    .cards-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .product-card {
+    background: var(--paper);
+    color: var(--paper-ink);
+    border-radius: 16px;
+    padding: 14px;
+    border: 3px solid transparent;
+    box-shadow: var(--shadow);
+    cursor: pointer;
+    transition: transform 0.14s ease, border-color 0.14s ease, box-shadow 0.14s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    position: relative;
+  }
+
+  .product-card:hover {
+    transform: translateY(-2px);
+  }
+
+  .product-card.selected {
+    border-color: var(--sky);
+    box-shadow: 0 0 0 4px rgba(116, 199, 255, 0.25), var(--shadow);
+  }
+
+  .card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .vendor-name {
+    font-size: 11.5px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--paper-muted);
+  }
+
+  .badge {
+    font-size: 11px;
+    font-weight: 800;
+    padding: 3px 8px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+
+  .badge-discount {
+    background: #ffd9d4;
+    color: var(--coral-dark);
+  }
+
+  .badge-none {
+    background: #e2dcd0;
+    color: var(--paper-muted);
+  }
+
+  .card-item-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .item-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: var(--paper-2);
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+  }
+
+  .item-title {
+    font-size: 15px;
+    font-weight: 800;
+    margin: 0;
+    line-height: 1.2;
+  }
+
+  .item-pack {
+    font-size: 12.5px;
+    color: var(--paper-muted);
+    font-weight: 600;
+  }
+
+  .price-rows {
+    background: var(--paper-2);
+    border-radius: 12px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 13px;
+  }
+
+  .p-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .p-row .lbl { color: var(--paper-muted); font-weight: 600; }
+  .p-row .val { font-weight: 800; }
+
+  .chip-btn {
+    background: #ffffff;
+    border: 1px solid rgba(27, 34, 36, 0.16);
+    border-radius: 7px;
+    padding: 2px 7px;
+    font-size: 12.5px;
+    font-weight: 800;
+    color: var(--paper-ink);
+    cursor: pointer;
+    transition: background 0.12s ease, border-color 0.12s ease;
+  }
+
+  .chip-btn:hover {
+    background: #dff1ff;
+    border-color: var(--sky-dark);
+  }
+
+  .pack-stepper {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #ffffff;
+    border: 1px solid rgba(27, 34, 36, 0.14);
+    border-radius: 10px;
+    padding: 6px 10px;
+    font-size: 12.5px;
+    font-weight: 700;
+  }
+
+  .stepper-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .step-btn {
+    width: 24px;
+    height: 24px;
+    border-radius: 7px;
+    border: 1px solid rgba(27, 34, 36, 0.2);
+    background: var(--paper);
+    color: var(--paper-ink);
+    font-weight: 800;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+  }
+
+  .step-btn:hover { background: #e5decb; }
+
+  .card-footer-hint {
+    font-size: 11.5px;
+    color: var(--paper-muted);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .selected-tag {
+    color: var(--sky-dark);
+    font-weight: 800;
+  }
+
+  /* Comparison & Checkout Panel */
+  .checkout-bar {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px;
+    box-shadow: var(--shadow);
+  }
+
+  .verify-inputs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: flex-end;
+  }
+
+  .input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .input-group label {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .input-group input {
+    width: 138px;
+    background: rgba(12, 20, 23, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 10px;
+    padding: 8px 10px;
+    color: var(--ink);
+    font-size: 15px;
+    font-weight: 700;
+    outline: none;
+  }
+
+  .input-group input:focus {
+    border-color: var(--sky);
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, #56e39f, #2cc57c);
+    color: #092116;
+    border: none;
+    border-radius: 12px;
+    padding: 11px 18px;
+    font-size: 14.5px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: transform 0.12s ease, opacity 0.12s ease;
+  }
+
+  .btn-primary:hover:not(:disabled) { transform: translateY(-1px); }
+  .btn-primary:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .btn-secondary {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--ink);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 10px;
+    padding: 8px 12px;
+    font-size: 12.5px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .btn-secondary:hover { background: rgba(255, 255, 255, 0.14); }
+
+  /* On-Screen Calculator */
+  .calc-panel {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: var(--radius);
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    box-shadow: var(--shadow);
+  }
+
+  .calc-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .calc-header h2 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+  }
+
+  .formula-hint {
+    font-size: 11px;
+    color: var(--muted);
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 8px;
+    padding: 6px 8px;
+    border: 1px dashed rgba(255, 255, 255, 0.12);
+  }
+
+  .calc-screen {
+    background: #0a1114;
+    border: 1px solid rgba(116, 199, 255, 0.25);
+    border-radius: 12px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-height: 82px;
+  }
+
+  .calc-tape {
+    font-size: 11px;
+    color: var(--muted);
+    min-height: 16px;
+    text-align: right;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .calc-expr {
+    font-size: 13px;
+    color: var(--sky);
+    text-align: right;
+    min-height: 18px;
+    word-break: break-all;
+  }
+
+  .calc-val {
+    font-size: 26px;
+    font-weight: 800;
+    text-align: right;
+    color: var(--ink);
+  }
+
+  .calc-slot-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .slot-btn {
+    background: rgba(116, 199, 255, 0.14);
+    border: 1px solid rgba(116, 199, 255, 0.35);
+    color: var(--sky);
+    border-radius: 9px;
+    padding: 7px 6px;
+    font-size: 12px;
+    font-weight: 800;
+    cursor: pointer;
+  }
+
+  .slot-btn:hover { background: rgba(116, 199, 255, 0.24); }
+
+  .calc-keys {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 7px;
+  }
+
+  .key {
+    background: rgba(255, 255, 255, 0.07);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: var(--ink);
+    border-radius: 10px;
+    padding: 11px 0;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.1s ease, transform 0.08s ease;
+  }
+
+  .key:hover { background: rgba(255, 255, 255, 0.13); }
+  .key:active { transform: scale(0.96); }
+  .key.op { color: var(--amber); background: rgba(255, 200, 87, 0.1); }
+  .key.clear { color: var(--coral); background: rgba(255, 123, 107, 0.1); }
+  .key.eq {
+    background: linear-gradient(135deg, #74c7ff, #3e9de0);
+    color: #081824;
+    font-weight: 900;
+  }
+
+  /* Modal */
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(5, 10, 12, 0.8);
+    backdrop-filter: blur(4px);
+    display: none;
+    place-items: center;
+    padding: 16px;
+    z-index: 50;
+  }
+
+  .modal-backdrop.open { display: grid; }
+
+  .modal {
+    width: min(640px, 100%);
+    max-height: 90dvh;
+    overflow-y: auto;
+    background: #142025;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 20px;
+    padding: 20px;
+    box-shadow: 0 30px 70px rgba(0, 0, 0, 0.8);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .modal h2 { margin: 0; font-size: 20px; }
+
+  .receipt-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .receipt-row {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 10px 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+  }
+
+  .receipt-row.winner {
+    border-color: var(--mint);
+    background: rgba(86, 227, 159, 0.1);
+  }
+
+  .receipt-row.picked-wrong {
+    border-color: var(--coral);
+    background: rgba(255, 123, 107, 0.1);
+  }
+
+  .trap-note {
+    background: rgba(255, 200, 87, 0.1);
+    border-left: 3px solid var(--amber);
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    color: var(--ink);
+  }
+
+  .score-breakdown {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .sb-item {
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 10px;
+    padding: 8px 10px;
+    font-size: 12.5px;
+    display: flex;
+    justify-content: space-between;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- Top HUD -->
+  <header class="hud">
+    <div class="brand">
+      <div class="avatar">M</div>
+      <div class="brand-text">
+        <h1>Smart Cart &middot; Event Prep</h1>
+        <p>Maya's School Event Planner &mdash; Compare unit prices, fees &amp; discounts</p>
+      </div>
+    </div>
+    <div class="hud-stats">
+      <div class="stat-pill">
+        <span class="stat-label">Event</span>
+        <span class="stat-val mono" id="hud-round">1 / 5</span>
+      </div>
+      <div class="stat-pill">
+        <span class="stat-label">Score</span>
+        <span class="stat-val amber mono" id="hud-score">0</span>
+      </div>
+      <div class="stat-pill">
+        <span class="stat-label">Accuracy</span>
+        <span class="stat-val sky mono" id="hud-accuracy">0%</span>
+      </div>
+      <div class="stat-pill">
+        <span class="stat-label">Saved</span>
+        <span class="stat-val mint mono" id="hud-saved">$0.00</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Event Brief -->
+  <section class="brief">
+    <div class="brief-left">
+      <span class="brief-tag" id="brief-tag">Event 1 &middot; Science Fair Booth</span>
+      <h2 class="brief-title" id="brief-title">Poster Boards</h2>
+      <p class="brief-desc" id="brief-desc">Pick the lowest total cost option that meets the quantity needed and stays within budget. Watch out for hidden fees and small packs!</p>
+    </div>
+    <div class="brief-targets">
+      <div class="target-box need">
+        <span class="t-lbl">Need At Least</span>
+        <span class="t-num mono" id="brief-need">12 units</span>
+      </div>
+      <div class="target-box budget">
+        <span class="t-lbl">Round Budget</span>
+        <span class="t-num mono" id="brief-budget">$26.00</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Workspace: Product Cards + Calculator -->
+  <main class="workspace">
+    <div class="cards-section">
+      <div class="cards-grid" id="cards-grid"></div>
+
+      <div class="checkout-bar">
+        <div class="verify-inputs">
+          <div class="input-group">
+            <label for="input-total">Calc Total ($) <span style="opacity:.7">+150 pts</span></label>
+            <input id="input-total" class="mono" type="text" placeholder="e.g. 23.80" inputmode="decimal">
+          </div>
+          <div class="input-group">
+            <label for="input-unit">Calc Unit ($/ea) <span style="opacity:.7">+150 pts</span></label>
+            <input id="input-unit" class="mono" type="text" placeholder="e.g. 1.98" inputmode="decimal">
+          </div>
+        </div>
+        <div style="display:flex; gap:10px; align-items:center;">
+          <button class="btn-secondary" id="btn-reset-packs" type="button">Auto-Fit Packs</button>
+          <button class="btn-primary" id="btn-checkout" type="button" disabled>Select a Card to Checkout</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- On-Screen Calculator -->
+    <aside class="calc-panel" aria-label="On-screen calculator">
+      <div class="calc-header">
+        <h2>On-Screen Calculator</h2>
+        <button class="btn-secondary" id="btn-clear-tape" type="button" style="padding:4px 8px; font-size:11px;">Clear Tape</button>
+      </div>
+      <div class="formula-hint mono">
+        Total = (Sticker &minus; Discount) &times; Packs + Fees<br>
+        Unit = Total &divide; (PackSize &times; Packs)
+      </div>
+      <div class="calc-screen">
+        <div class="calc-tape mono" id="calc-tape">Click any number on a card to insert</div>
+        <div class="calc-expr mono" id="calc-expr"></div>
+        <div class="calc-val mono" id="calc-val">0</div>
+      </div>
+      <div class="calc-slot-row">
+        <button class="slot-btn" id="btn-slot-total" type="button">&rarr; Use as Total</button>
+        <button class="slot-btn" id="btn-slot-unit" type="button">&rarr; Use as Unit</button>
+      </div>
+      <div class="calc-keys" id="calc-keys">
+        <button class="key clear" data-key="C">C</button>
+        <button class="key clear" data-key="BACK">&larr;</button>
+        <button class="key op" data-key="%">%</button>
+        <button class="key op" data-key="/">&divide;</button>
+
+        <button class="key" data-key="7">7</button>
+        <button class="key" data-key="8">8</button>
+        <button class="key" data-key="9">9</button>
+        <button class="key op" data-key="*">&times;</button>
+
+        <button class="key" data-key="4">4</button>
+        <button class="key" data-key="5">5</button>
+        <button class="key" data-key="6">6</button>
+        <button class="key op" data-key="-">&minus;</button>
+
+        <button class="key" data-key="1">1</button>
+        <button class="key" data-key="2">2</button>
+        <button class="key" data-key="3">3</button>
+        <button class="key op" data-key="+">+</button>
+
+        <button class="key" data-key="0" style="grid-column: span 2;">0</button>
+        <button class="key" data-key=".">.</button>
+        <button class="key eq" data-key="=">=</button>
+      </div>
+    </aside>
+  </main>
+</div>
+
+<!-- Round Receipt / End Report Modal -->
+<div class="modal-backdrop" id="modal-backdrop" role="dialog" aria-modal="true">
+  <div class="modal" id="modal-content"></div>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  const ROUNDS = [
+    {
+      id: 1,
+      event: "Science Fair Booth",
+      item: "Tri-Fold Poster Boards",
+      unitName: "board",
+      need: 12,
+      budget: 26.00,
+      icon: "board",
+      trapLesson: "MegaOffice had the biggest discount (50% OFF), but $5.50 shipping pushed it to $29.50. Dollar Bin had the lowest sticker ($6.00), but 4 tiny 3-packs + handling cost $27.60!",
+      cards: [
+        {
+          id: "r1-a",
+          vendor: "MegaOffice Online",
+          sticker: 24.00,
+          packSize: 6,
+          discountType: "pct",
+          discountVal: 50,
+          discountLabel: "50% OFF",
+          fee: 5.50,
+          feeLabel: "Shipping"
+        },
+        {
+          id: "r1-c",
+          vendor: "Campus Supply Co.",
+          sticker: 14.00,
+          packSize: 6,
+          discountType: "pct",
+          discountVal: 15,
+          discountLabel: "15% OFF",
+          fee: 0.00,
+          feeLabel: "Free Pickup"
+        },
+        {
+          id: "r1-b",
+          vendor: "Dollar Bin",
+          sticker: 6.00,
+          packSize: 3,
+          discountType: "none",
+          discountVal: 0,
+          discountLabel: "No Discount",
+          fee: 3.60,
+          feeLabel: "Handling"
+        }
+      ]
+    },
+    {
+      id: 2,
+      event: "Homecoming Bake Sale",
+      item: "Cupcake Bakery Boxes",
+      unitName: "box",
+      need: 24,
+      budget: 22.00,
+      icon: "box",
+      trapLesson: "SweetShip's $4.50 sticker price looked cheap, but 6 packs + service fee totaled $29.00. PartyMart's 40% OFF still cost $22.80 with express fees!",
+      cards: [
+        {
+          id: "r2-c",
+          vendor: "Baker's Co-op",
+          sticker: 11.00,
+          packSize: 12,
+          discountType: "pct",
+          discountVal: 10,
+          discountLabel: "10% OFF",
+          fee: 1.20,
+          feeLabel: "Bag Fee"
+        },
+        {
+          id: "r2-a",
+          vendor: "SweetShip",
+          sticker: 4.50,
+          packSize: 4,
+          discountType: "none",
+          discountVal: 0,
+          discountLabel: "No Discount",
+          fee: 2.00,
+          feeLabel: "Service Fee"
+        },
+        {
+          id: "r2-b",
+          vendor: "PartyMart",
+          sticker: 15.00,
+          packSize: 12,
+          discountType: "pct",
+          discountVal: 40,
+          discountLabel: "40% OFF",
+          fee: 4.80,
+          feeLabel: "Express Fee"
+        }
+      ]
+    },
+    {
+      id: 3,
+      event: "Robotics Club Showcase",
+      item: "AA Alkaline Batteries",
+      unitName: "battery",
+      need: 32,
+      budget: 24.00,
+      icon: "battery",
+      trapLesson: "VoltExpress's 35% OFF had a $4.20 hazmat shipping fee ($25.00 total). Corner Tech's $5.50 sticker needed 4 packs ($23.50), while Club Wholesale's single 32-pack won at $21.60 ($0.68/ea)!",
+      cards: [
+        {
+          id: "r3-a",
+          vendor: "VoltExpress",
+          sticker: 16.00,
+          packSize: 16,
+          discountType: "pct",
+          discountVal: 35,
+          discountLabel: "35% OFF",
+          fee: 4.20,
+          feeLabel: "Hazmat Ship"
+        },
+        {
+          id: "r3-b",
+          vendor: "Corner Tech",
+          sticker: 5.50,
+          packSize: 8,
+          discountType: "none",
+          discountVal: 0,
+          discountLabel: "No Discount",
+          fee: 1.50,
+          feeLabel: "Restock Fee"
+        },
+        {
+          id: "r3-c",
+          vendor: "Club Wholesale",
+          sticker: 25.00,
+          packSize: 32,
+          discountType: "pct",
+          discountVal: 20,
+          discountLabel: "20% OFF",
+          fee: 1.60,
+          feeLabel: "Pickup Fee"
+        }
+      ]
+    },
+    {
+      id: 4,
+      event: "Spring Music Night",
+      item: "LED Glow Bracelets",
+      unitName: "bracelet",
+      need: 50,
+      budget: 18.00,
+      icon: "glow",
+      trapLesson: "NeonDirect's 60% OFF looked huge, but $4.50 delivery pushed it to $20.50. FunDepot's $3.50 sticker needed 5 packs + $1.50 fee ($19.00). Student Union's flat $2.50 OFF won at $16.50!",
+      cards: [
+        {
+          id: "r4-a",
+          vendor: "NeonDirect",
+          sticker: 20.00,
+          packSize: 25,
+          discountType: "pct",
+          discountVal: 60,
+          discountLabel: "60% OFF",
+          fee: 4.50,
+          feeLabel: "Delivery"
+        },
+        {
+          id: "r4-c",
+          vendor: "Student Union Shop",
+          sticker: 18.00,
+          packSize: 50,
+          discountType: "flat",
+          discountVal: 2.50,
+          discountLabel: "$2.50 OFF",
+          fee: 1.00,
+          feeLabel: "Handling"
+        },
+        {
+          id: "r4-b",
+          vendor: "FunDepot",
+          sticker: 3.50,
+          packSize: 10,
+          discountType: "none",
+          discountVal: 0,
+          discountLabel: "No Discount",
+          fee: 1.50,
+          feeLabel: "Order Fee"
+        }
+      ]
+    },
+    {
+      id: 5,
+      event: "Graduation Celebration",
+      item: "Sparkling Cider Bottles",
+      unitName: "bottle",
+      need: 18,
+      budget: 34.00,
+      icon: "bottle",
+      trapLesson: "GalaGoods' 45% OFF had a $3.90 chill fee ($36.90). QuickGrocer's $5.80 sticker needed 6 packs ($34.80). Valley Beverage's 20% OFF 9-packs totaled $32.40 ($1.80/bottle)!",
+      cards: [
+        {
+          id: "r5-c",
+          vendor: "Valley Beverage",
+          sticker: 19.00,
+          packSize: 9,
+          discountType: "pct",
+          discountVal: 20,
+          discountLabel: "20% OFF",
+          fee: 2.00,
+          feeLabel: "Crate Deposit"
+        },
+        {
+          id: "r5-a",
+          vendor: "GalaGoods",
+          sticker: 20.00,
+          packSize: 6,
+          discountType: "pct",
+          discountVal: 45,
+          discountLabel: "45% OFF",
+          fee: 3.90,
+          feeLabel: "Chill Fee"
+        },
+        {
+          id: "r5-b",
+          vendor: "QuickGrocer",
+          sticker: 5.80,
+          packSize: 3,
+          discountType: "none",
+          discountVal: 0,
+          discountLabel: "No Discount",
+          fee: 0.00,
+          feeLabel: "Free Pickup"
+        }
+      ]
+    }
+  ];
+
+  // Pure pricing helpers
+  function discountedPackPrice(card) {
+    if (card.discountType === "pct") {
+      return +(card.sticker * (1 - card.discountVal / 100)).toFixed(4);
+    }
+    if (card.discountType === "flat") {
+      return Math.max(0, +(card.sticker - card.discountVal).toFixed(4));
+    }
+    return card.sticker;
+  }
+
+  function minPacksForNeed(card, need) {
+    return Math.ceil(need / card.packSize);
+  }
+
+  function computeCardTotals(card, packs) {
+    const packPrice = discountedPackPrice(card);
+    const total = +(packPrice * packs + card.fee).toFixed(2);
+    const units = card.packSize * packs;
+    const unitPrice = units > 0 ? +(total / units).toFixed(2) : 0;
+    return { packPrice, total, units, unitPrice };
+  }
+
+  function findBestCard(round) {
+    let best = null;
+    for (const card of round.cards) {
+      const packs = minPacksForNeed(card, round.need);
+      const calc = computeCardTotals(card, packs);
+      if (calc.total <= round.budget) {
+        if (!best || calc.total < best.calc.total) {
+          best = { card, packs, calc };
+        }
+      }
+    }
+    return best;
+  }
+
+  function getIconSvg(kind) {
+    const icons = {
+      board: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1b2224" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M15 4v16"/></svg>`,
+      box: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1b2224" stroke-width="2"><path d="M21 8l-9-4-9 4 9 4 9-4z"/><path d="M3 8v8l9 4 9-4V8"/><path d="M12 12v8"/></svg>`,
+      battery: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1b2224" stroke-width="2"><rect x="6" y="5" width="12" height="16" rx="2"/><path d="M10 2h4M10 11h4M12 9v4"/></svg>`,
+      glow: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1b2224" stroke-width="2"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="3"/></svg>`,
+      bottle: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1b2224" stroke-width="2"><path d="M10 2h4v3l2 4v11a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2V9l2-4V2z"/></svg>`
+    };
+    return icons[kind] || icons.box;
+  }
+
+  // Game State
+  const state = {
+    roundIndex: 0,
+    score: 0,
+    totalSaved: 0,
+    comparisonChecks: 0,
+    comparisonHits: 0,
+    bestDealsPicked: 0,
+    selectedCardId: null,
+    packsByCard: {},
+    history: []
+  };
+
+  // Calculator State
+  const calc = {
+    expr: "",
+    display: "0",
+    tape: [],
+    justEvaluated: false
+  };
+
+  // DOM Refs
+  const elHudRound = document.getElementById("hud-round");
+  const elHudScore = document.getElementById("hud-score");
+  const elHudAccuracy = document.getElementById("hud-accuracy");
+  const elHudSaved = document.getElementById("hud-saved");
+  const elBriefTag = document.getElementById("brief-tag");
+  const elBriefTitle = document.getElementById("brief-title");
+  const elBriefNeed = document.getElementById("brief-need");
+  const elBriefBudget = document.getElementById("brief-budget");
+  const elCardsGrid = document.getElementById("cards-grid");
+  const elInputTotal = document.getElementById("input-total");
+  const elInputUnit = document.getElementById("input-unit");
+  const elBtnCheckout = document.getElementById("btn-checkout");
+  const elBtnResetPacks = document.getElementById("btn-reset-packs");
+  const elCalcTape = document.getElementById("calc-tape");
+  const elCalcExpr = document.getElementById("calc-expr");
+  const elCalcVal = document.getElementById("calc-val");
+  const elModalBackdrop = document.getElementById("modal-backdrop");
+  const elModalContent = document.getElementById("modal-content");
+
+  function fmtMoney(n) {
+    return "$" + Number(n).toFixed(2);
+  }
+
+  function initRound() {
+    const round = ROUNDS[state.roundIndex];
+    state.selectedCardId = null;
+    state.packsByCard = {};
+    for (const c of round.cards) {
+      state.packsByCard[c.id] = minPacksForNeed(c, round.need);
+    }
+    elInputTotal.value = "";
+    elInputUnit.value = "";
+    render();
+  }
+
+  function renderHud() {
+    elHudRound.textContent = `${state.roundIndex + 1} / ${ROUNDS.length}`;
+    elHudScore.textContent = state.score.toLocaleString();
+    const acc = state.comparisonChecks > 0
+      ? Math.round((state.comparisonHits / state.comparisonChecks) * 100)
+      : 0;
+    elHudAccuracy.textContent = `${acc}%`;
+    elHudSaved.textContent = fmtMoney(state.totalSaved);
+  }
+
+  function renderBrief() {
+    const round = ROUNDS[state.roundIndex];
+    elBriefTag.textContent = `Event ${round.id} of ${ROUNDS.length} \u00B7 ${round.event}`;
+    elBriefTitle.textContent = round.item;
+    elBriefNeed.textContent = `${round.need} ${round.unitName}s`;
+    elBriefBudget.textContent = fmtMoney(round.budget);
+  }
+
+  function renderCards() {
+    const round = ROUNDS[state.roundIndex];
+    elCardsGrid.innerHTML = "";
+
+    for (const card of round.cards) {
+      const packs = state.packsByCard[card.id];
+      const units = packs * card.packSize;
+      const isSelected = state.selectedCardId === card.id;
+
+      const el = document.createElement("article");
+      el.className = "product-card" + (isSelected ? " selected" : "");
+      el.dataset.cardId = card.id;
+
+      const badgeClass = card.discountType === "none" ? "badge badge-none" : "badge badge-discount";
+      const discountChipVal = card.discountType === "pct"
+        ? (1 - card.discountVal / 100).toFixed(2)
+        : card.discountVal.toFixed(2);
+      const discountChipTitle = card.discountType === "pct"
+        ? `Click to insert multiplier ${discountChipVal}`
+        : `Click to insert ${discountChipTitleText(card)}`;
+
+      el.innerHTML = `
+        <div class="card-top">
+          <span class="vendor-name">${card.vendor}</span>
+          <span class="${badgeClass}">${card.discountLabel}</span>
+        </div>
+        <div class="card-item-row">
+          <div class="item-icon">${getIconSvg(round.icon)}</div>
+          <div>
+            <h3 class="item-title">${card.packSize}-Pack</h3>
+            <div class="item-pack">${card.packSize} ${round.unitName}s / pack</div>
+          </div>
+        </div>
+        <div class="price-rows">
+          <div class="p-row">
+            <span class="lbl">Sticker Price</span>
+            <button type="button" class="chip-btn mono" data-insert="${card.sticker.toFixed(2)}" title="Insert into calculator">${fmtMoney(card.sticker)}</button>
+          </div>
+          <div class="p-row">
+            <span class="lbl">Discount</span>
+            ${card.discountType === "none"
+              ? `<span class="val muted">&mdash;</span>`
+              : `<button type="button" class="chip-btn mono" data-insert="${card.discountType === "pct" ? (1 - card.discountVal / 100).toFixed(2) : card.discountVal.toFixed(2)}" title="${discountChipTitle}">${card.discountLabel}</button>`
+            }
+          </div>
+          <div class="p-row">
+            <span class="lbl">${card.feeLabel}</span>
+            <button type="button" class="chip-btn mono" data-insert="${card.fee.toFixed(2)}" title="Insert fee into calculator">${card.fee === 0 ? "$0.00" : "+" + fmtMoney(card.fee)}</button>
+          </div>
+        </div>
+        <div class="pack-stepper">
+          <span>Packs: <strong class="mono">${packs}</strong> (${units} ${round.unitName}s)</span>
+          <div class="stepper-controls">
+            <button type="button" class="step-btn" data-step="-1" data-card="${card.id}" aria-label="Decrease packs">&minus;</button>
+            <button type="button" class="step-btn" data-step="1" data-card="${card.id}" aria-label="Increase packs">+</button>
+          </div>
+        </div>
+        <div class="card-footer-hint">
+          <span>${units < round.need ? `<strong style="color:#b82514">Need ${round.need - units} more!</strong>` : `Meets ${round.need}+ need`}</span>
+          ${isSelected ? `<span class="selected-tag">Selected &#10003;</span>` : `<span>Click to select</span>`}
+        </div>
+      `;
+
+      el.addEventListener("click", (e) => {
+        const stepBtn = e.target.closest(".step-btn");
+        if (stepBtn) {
+          e.stopPropagation();
+          const delta = Number(stepBtn.dataset.step);
+          const cid = stepBtn.dataset.card;
+          state.packsByCard[cid] = Math.max(1, Math.min(20, state.packsByCard[cid] + delta));
+          renderCards();
+          return;
+        }
+
+        const chipBtn = e.target.closest(".chip-btn");
+        if (chipBtn) {
+          e.stopPropagation();
+          insertCalcNumber(chipBtn.dataset.insert);
+          if (state.selectedCardId !== card.id) {
+            state.selectedCardId = card.id;
+            renderCards();
+            renderCheckoutBtn();
+          }
+          return;
+        }
+
+        state.selectedCardId = card.id;
+        renderCards();
+        renderCheckoutBtn();
+      });
+
+      elCardsGrid.appendChild(el);
+    }
+  }
+
+  function discountChipTitleText(card) {
+    return card.discountType === "flat" ? `$${card.discountVal.toFixed(2)} off` : "discount";
+  }
+
+  function renderCheckoutBtn() {
+    if (!state.selectedCardId) {
+      elBtnCheckout.disabled = true;
+      elBtnCheckout.textContent = "Select a Card to Checkout";
+      return;
+    }
+    const round = ROUNDS[state.roundIndex];
+    const card = round.cards.find(c => c.id === state.selectedCardId);
+    elBtnCheckout.disabled = false;
+    elBtnCheckout.textContent = `Checkout ${card.vendor}`;
+  }
+
+  function render() {
+    renderHud();
+    renderBrief();
+    renderCards();
+    renderCheckoutBtn();
+    renderCalc();
+  }
+
+  // Calculator Logic (safe recursive-descent parser, no eval)
+  function tokenize(expr) {
+    const tokens = [];
+    let i = 0;
+    while (i < expr.length) {
+      const ch = expr[i];
+      if (ch === " ") { i++; continue; }
+      if ("+-*/()".includes(ch)) {
+        tokens.push(ch);
+        i++;
+      } else if ((ch >= "0" && ch <= "9") || ch === ".") {
+        let num = "";
+        while (i < expr.length && ((expr[i] >= "0" && expr[i] <= "9") || expr[i] === ".")) {
+          num += expr[i++];
+        }
+        if (expr[i] === "%") {
+          tokens.push(String(parseFloat(num) / 100));
+          i++;
+        } else {
+          tokens.push(num);
+        }
+      } else {
+        i++;
+      }
+    }
+    return tokens;
+  }
+
+  function evaluateExpression(expr) {
+    const tokens = tokenize(expr);
+    if (tokens.length === 0) return 0;
+    let pos = 0;
+
+    function parseExpr() {
+      let left = parseTerm();
+      while (pos < tokens.length && (tokens[pos] === "+" || tokens[pos] === "-")) {
+        const op = tokens[pos++];
+        const right = parseTerm();
+        left = op === "+" ? left + right : left - right;
+      }
+      return left;
+    }
+
+    function parseTerm() {
+      let left = parseFactor();
+      while (pos < tokens.length && (tokens[pos] === "*" || tokens[pos] === "/")) {
+        const op = tokens[pos++];
+        const right = parseFactor();
+        if (op === "*") left = left * right;
+        else left = right === 0 ? NaN : left / right;
+      }
+      return left;
+    }
+
+    function parseFactor() {
+      if (tokens[pos] === "-") {
+        pos++;
+        return -parseFactor();
+      }
+      if (tokens[pos] === "(") {
+        pos++;
+        const val = parseExpr();
+        if (tokens[pos] === ")") pos++;
+        return val;
+      }
+      const val = parseFloat(tokens[pos++]);
+      return Number.isNaN(val) ? 0 : val;
+    }
+
+    return parseExpr();
+  }
+
+  function insertCalcNumber(str) {
+    if (calc.justEvaluated) {
+      calc.expr = "";
+      calc.justEvaluated = false;
+    }
+    calc.expr += str;
+    calc.display = str;
+    renderCalc();
+  }
+
+  function handleCalcKey(key) {
+    if (key === "C") {
+      calc.expr = "";
+      calc.display = "0";
+      calc.justEvaluated = false;
+      renderCalc();
+      return;
+    }
+    if (key === "BACK") {
+      calc.expr = calc.expr.slice(0, -1);
+      calc.display = calc.expr || "0";
+      calc.justEvaluated = false;
+      renderCalc();
+      return;
+    }
+    if (key === "=") {
+      if (!calc.expr) return;
+      const res = evaluateExpression(calc.expr);
+      if (Number.isNaN(res) || !Number.isFinite(res)) {
+        calc.display = "Error";
+        calc.expr = "";
+      } else {
+        const rounded = Math.round(res * 10000) / 10000;
+        calc.tape.unshift(`${calc.expr} = ${rounded}`);
+        if (calc.tape.length > 3) calc.tape.pop();
+        calc.display = String(rounded);
+        calc.expr = String(rounded);
+      }
+      calc.justEvaluated = true;
+      renderCalc();
+      return;
+    }
+
+    const isOp = "+-*/%".includes(key);
+    if (calc.justEvaluated && !isOp) {
+      calc.expr = "";
+    }
+    calc.justEvaluated = false;
+    calc.expr += key;
+    calc.display = calc.expr;
+    renderCalc();
+  }
+
+  function renderCalc() {
+    elCalcExpr.textContent = calc.expr;
+    elCalcVal.textContent = calc.display;
+    elCalcTape.textContent = calc.tape.length > 0
+      ? calc.tape[0]
+      : "Click any number on a card to insert";
+  }
+
+  document.getElementById("calc-keys").addEventListener("click", (e) => {
+    const btn = e.target.closest(".key");
+    if (!btn) return;
+    handleCalcKey(btn.dataset.key);
+  });
+
+  document.getElementById("btn-clear-tape").addEventListener("click", () => {
+    calc.tape = [];
+    renderCalc();
+  });
+
+  document.getElementById("btn-slot-total").addEventListener("click", () => {
+    const val = parseFloat(calc.display);
+    if (!Number.isNaN(val)) elInputTotal.value = val.toFixed(2);
+  });
+
+  document.getElementById("btn-slot-unit").addEventListener("click", () => {
+    const val = parseFloat(calc.display);
+    if (!Number.isNaN(val)) elInputUnit.value = val.toFixed(2);
+  });
+
+  elBtnResetPacks.addEventListener("click", () => {
+    const round = ROUNDS[state.roundIndex];
+    for (const c of round.cards) {
+      state.packsByCard[c.id] = minPacksForNeed(c, round.need);
+    }
+    renderCards();
+  });
+
+  // Keyboard support for calculator when not typing in inputs
+  window.addEventListener("keydown", (e) => {
+    if (document.activeElement.tagName === "INPUT") return;
+    if (elModalBackdrop.classList.contains("open")) return;
+    if ("0123456789.+-*/%".includes(e.key)) {
+      e.preventDefault();
+      handleCalcKey(e.key);
+    } else if (e.key === "Enter" || e.key === "=") {
+      e.preventDefault();
+      handleCalcKey("=");
+    } else if (e.key === "Backspace") {
+      e.preventDefault();
+      handleCalcKey("BACK");
+    } else if (e.key === "Escape") {
+      handleCalcKey("C");
+    }
+  });
+
+  // Checkout & Scoring
+  elBtnCheckout.addEventListener("click", () => {
+    const round = ROUNDS[state.roundIndex];
+    const pickedCard = round.cards.find(c => c.id === state.selectedCardId);
+    if (!pickedCard) return;
+
+    const pickedPacks = state.packsByCard[pickedCard.id];
+    const pickedCalc = computeCardTotals(pickedCard, pickedPacks);
+    const best = findBestCard(round);
+
+    const meetsNeed = pickedCalc.units >= round.need;
+    const withinBudget = pickedCalc.total <= round.budget;
+    const isBestDeal = best && pickedCard.id === best.card.id && meetsNeed;
+
+    let roundPoints = 0;
+    let dealPts = 0;
+    let budgetPts = 0;
+    let totalCheckPts = 0;
+    let unitCheckPts = 0;
+
+    if (meetsNeed && withinBudget) {
+      dealPts = isBestDeal ? 300 : 120;
+      const saved = +(round.budget - pickedCalc.total).toFixed(2);
+      budgetPts = 100 + Math.round(saved * 15);
+      state.totalSaved = +(state.totalSaved + saved).toFixed(2);
+      if (isBestDeal) state.bestDealsPicked++;
+    }
+
+    const enteredTotal = parseFloat(elInputTotal.value.replace(/[^0-9.]/g, ""));
+    if (!Number.isNaN(enteredTotal)) {
+      state.comparisonChecks++;
+      if (Math.abs(enteredTotal - pickedCalc.total) <= 0.02) {
+        totalCheckPts = 150;
+        state.comparisonHits++;
+      }
+    }
+
+    const enteredUnit = parseFloat(elInputUnit.value.replace(/[^0-9.]/g, ""));
+    if (!Number.isNaN(enteredUnit)) {
+      state.comparisonChecks++;
+      if (Math.abs(enteredUnit - pickedCalc.unitPrice) <= 0.02) {
+        unitCheckPts = 150;
+        state.comparisonHits++;
+      }
+    }
+
+    roundPoints = dealPts + budgetPts + totalCheckPts + unitCheckPts;
+    state.score += roundPoints;
+    state.history.push({
+      event: round.event,
+      picked: pickedCard.vendor,
+      pickedTotal: pickedCalc.total,
+      bestVendor: best.card.vendor,
+      bestTotal: best.calc.total,
+      isBestDeal,
+      withinBudget,
+      meetsNeed,
+      roundPoints
+    });
+
+    renderHud();
+    showRoundModal(round, pickedCard, pickedCalc, best, {
+      meetsNeed,
+      withinBudget,
+      isBestDeal,
+      dealPts,
+      budgetPts,
+      totalCheckPts,
+      unitCheckPts,
+      roundPoints
+    });
+  });
+
+  function showRoundModal(round, pickedCard, pickedCalc, best, pts) {
+    let headline = "";
+    let color = "var(--mint)";
+    if (!pts.meetsNeed) {
+      headline = `Not Enough ${round.item}!`;
+      color = "var(--coral)";
+    } else if (!pts.withinBudget) {
+      headline = "Over Budget!";
+      color = "var(--coral)";
+    } else if (pts.isBestDeal) {
+      headline = "Smartest Deal Secured!";
+      color = "var(--mint)";
+    } else {
+      headline = "Within Budget, But Not Cheapest";
+      color = "var(--amber)";
+    }
+
+    const rowsHtml = round.cards.map(c => {
+      const p = c.id === pickedCard.id ? state.packsByCard[c.id] : minPacksForNeed(c, round.need);
+      const calcRes = computeCardTotals(c, p);
+      const isWinner = best && c.id === best.card.id;
+      const isPickedWrong = c.id === pickedCard.id && !isWinner;
+      const cls = isWinner ? "receipt-row winner" : (isPickedWrong ? "receipt-row picked-wrong" : "receipt-row");
+      const tag = isWinner ? "BEST DEAL" : (c.id === pickedCard.id ? "YOUR PICK" : (calcRes.total > round.budget ? "OVER BUDGET" : ""));
+      return `
+        <div class="${cls}">
+          <div>
+            <strong>${c.vendor}</strong> (${c.discountLabel})<br>
+            <span style="color:var(--muted); font-size:12px;">${p} &times; ${c.packSize}-pack = ${calcRes.units} ${round.unitName}s &middot; ${fmtMoney(calcRes.unitPrice)}/${round.unitName}</span>
+          </div>
+          <div class="mono" style="text-align:right;">
+            <strong>${fmtMoney(calcRes.total)}</strong><br>
+            <span style="font-size:11px; color:${isWinner ? "var(--mint)" : "var(--coral)"}">${tag}</span>
+          </div>
+        </div>
+      `;
+    }).join("");
+
+    const isLast = state.roundIndex === ROUNDS.length - 1;
+    elModalContent.innerHTML = `
+      <h2 style="color:${color}">${headline}</h2>
+      <div class="receipt-list">${rowsHtml}</div>
+      <div class="trap-note"><strong>Price Trap Insight:</strong> ${round.trapLesson}</div>
+      <div class="score-breakdown">
+        <div class="sb-item"><span>Deal Choice</span><strong class="mono">+${pts.dealPts}</strong></div>
+        <div class="sb-item"><span>Budget Bonus</span><strong class="mono">+${pts.budgetPts}</strong></div>
+        <div class="sb-item"><span>Total Calc Check</span><strong class="mono">+${pts.totalCheckPts}</strong></div>
+        <div class="sb-item"><span>Unit Calc Check</span><strong class="mono">+${pts.unitCheckPts}</strong></div>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px;">
+        <span class="mono" style="font-size:16px; font-weight:800;">Round Total: +${pts.roundPoints} pts</span>
+        <button class="btn-primary" id="btn-next-round" type="button">${isLast ? "View Final Report" : "Next Event \u2192"}</button>
+      </div>
+    `;
+
+    elModalBackdrop.classList.add("open");
+    document.getElementById("btn-next-round").addEventListener("click", () => {
+      if (isLast) {
+        showFinalModal();
+      } else {
+        elModalBackdrop.classList.remove("open");
+        state.roundIndex++;
+        initRound();
+      }
+    });
+  }
+
+  function showFinalModal() {
+    const acc = state.comparisonChecks > 0
+      ? Math.round((state.comparisonHits / state.comparisonChecks) * 100)
+      : 0;
+    let grade = "C";
+    if (state.score >= 2800 && state.bestDealsPicked >= 4) grade = "S";
+    else if (state.score >= 2100) grade = "A";
+    else if (state.score >= 1400) grade = "B";
+
+    const historyHtml = state.history.map(h => `
+      <div class="receipt-row ${h.isBestDeal ? "winner" : ""}">
+        <div>
+          <strong>${h.event}</strong><br>
+          <span style="color:var(--muted); font-size:12px;">Picked: ${h.picked} (${fmtMoney(h.pickedTotal)}) &middot; Best: ${h.bestVendor} (${fmtMoney(h.bestTotal)})</span>
+        </div>
+        <div class="mono"><strong>+${h.roundPoints}</strong></div>
+      </div>
+    `).join("");
+
+    elModalContent.innerHTML = `
+      <h2>Event Prep Complete &mdash; Grade <span style="color:var(--amber)">${grade}</span></h2>
+      <div class="score-breakdown">
+        <div class="sb-item"><span>Final Score</span><strong class="mono">${state.score.toLocaleString()}</strong></div>
+        <div class="sb-item"><span>Best Deals Found</span><strong class="mono">${state.bestDealsPicked} / ${ROUNDS.length}</strong></div>
+        <div class="sb-item"><span>Total Saved</span><strong class="mono">${fmtMoney(state.totalSaved)}</strong></div>
+        <div class="sb-item"><span>Calc Accuracy</span><strong class="mono">${acc}% (${state.comparisonHits}/${state.comparisonChecks})</strong></div>
+      </div>
+      <div class="receipt-list">${historyHtml}</div>
+      <div style="display:flex; justify-content:flex-end;">
+        <button class="btn-primary" id="btn-play-again" type="button">Play Again</button>
+      </div>
+    `;
+
+    document.getElementById("btn-play-again").addEventListener("click", () => {
+      elModalBackdrop.classList.remove("open");
+      state.roundIndex = 0;
+      state.score = 0;
+      state.totalSaved = 0;
+      state.comparisonChecks = 0;
+      state.comparisonHits = 0;
+      state.bestDealsPicked = 0;
+      state.history = [];
+      calc.expr = "";
+      calc.display = "0";
+      calc.tape = [];
+      initRound();
+    });
+  }
+
+  initRound();
+})();
+</script>
+</body>
+</html>

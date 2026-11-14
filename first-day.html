@@ -1,0 +1,1916 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#080b12">
+<title>First Day</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    background: radial-gradient(120% 85% at 50% 0%, #1c2a2c 0%, #0a1012 58%, #06090a 100%);
+    color: #eafcff;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    -webkit-user-select: none;
+    user-select: none;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+  #stage {
+    position: relative;
+    width: min(100%, calc((100dvh - 58px) * 0.75));
+    aspect-ratio: 3 / 4;
+    border-radius: 20px;
+    overflow: hidden;
+    background: #081017;
+    box-shadow:
+      0 30px 70px -28px rgba(0, 0, 0, 0.95),
+      0 0 0 1px rgba(255, 255, 255, 0.07),
+      inset 0 0 0 1px rgba(94, 231, 199, 0.08);
+    touch-action: none;
+  }
+  canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+  .hint {
+    margin: 0;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: rgba(234, 252, 255, 0.3);
+    white-space: nowrap;
+  }
+  .overlay {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: 20px;
+    background: rgba(4, 10, 12, 0.86);
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+    animation: fade-in 160ms ease-out;
+  }
+  .overlay[hidden] { display: none; }
+  @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+  .panel {
+    width: 100%;
+    max-width: 330px;
+    max-height: 100%;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    text-align: center;
+    padding: 2px;
+    scrollbar-width: thin;
+  }
+  .eyebrow {
+    margin: 0 0 5px;
+    font-size: 9px;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: rgba(234, 252, 255, 0.4);
+  }
+  .title {
+    margin: 0 0 10px;
+    font-size: clamp(24px, 6.6vw, 32px);
+    line-height: 1.12;
+    color: #8fffdc;
+    text-shadow: 0 0 26px rgba(94, 231, 199, 0.32);
+  }
+  .sub {
+    margin: 0;
+    font-size: 11px;
+    line-height: 1.65;
+    letter-spacing: 0.01em;
+    color: rgba(234, 252, 255, 0.62);
+  }
+  .metrics {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 6px;
+    margin: 16px 0 0;
+  }
+  .metric {
+    padding: 9px 4px 8px;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.03);
+  }
+  .metric span {
+    display: block;
+    font-size: 7px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: rgba(234, 252, 255, 0.38);
+  }
+  .metric strong {
+    display: block;
+    margin-top: 4px;
+    font-size: 14px;
+    font-weight: 700;
+    color: #eafcff;
+  }
+  .choices {
+    display: grid;
+    gap: 8px;
+    margin-top: 15px;
+    text-align: left;
+  }
+  .choice {
+    width: 100%;
+    padding: 12px 13px;
+    border: 1px solid rgba(178, 247, 255, 0.16);
+    border-radius: 11px;
+    background: rgba(255, 255, 255, 0.035);
+    color: #eafcff;
+    cursor: pointer;
+    font: inherit;
+    font-size: 10.5px;
+    line-height: 1.5;
+    letter-spacing: 0.01em;
+    text-align: left;
+    transition: background 120ms ease, border-color 120ms ease, transform 100ms ease;
+  }
+  .choice:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(178, 247, 255, 0.34);
+  }
+  .choice:active:not(:disabled) { transform: translateY(1px); }
+  .choice:disabled { cursor: default; }
+  .choice:disabled:not(.right):not(.wrong) { opacity: 0.45; }
+  .choice.right {
+    border-color: rgba(94, 231, 199, 0.72);
+    background: rgba(94, 231, 199, 0.13);
+    color: #c9fff2;
+  }
+  .choice.wrong {
+    border-color: rgba(255, 159, 110, 0.72);
+    background: rgba(255, 159, 110, 0.12);
+    color: #ffd9c6;
+  }
+  .explain {
+    margin: 14px 0 0;
+    padding: 10px 12px;
+    border-left: 2px solid rgba(94, 231, 199, 0.6);
+    border-radius: 0 8px 8px 0;
+    background: rgba(255, 255, 255, 0.03);
+    font-size: 10px;
+    line-height: 1.6;
+    color: rgba(234, 252, 255, 0.7);
+    text-align: left;
+  }
+  .explain.bad { border-left-color: rgba(255, 159, 110, 0.7); }
+  .btn {
+    margin-top: 18px;
+    padding: 13px 28px;
+    border: 0;
+    border-radius: 999px;
+    cursor: pointer;
+    font: inherit;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: #06211c;
+    background: linear-gradient(180deg, #7ff0d4, #46c8a9);
+    box-shadow:
+      0 14px 30px -14px rgba(94, 231, 199, 0.95),
+      inset 0 -2px 0 rgba(0, 0, 0, 0.16);
+    transition: transform 100ms ease, filter 150ms ease;
+  }
+  .btn:hover { filter: brightness(1.06); }
+  .btn:active { transform: translateY(1px) scale(0.99); }
+  .btn:focus-visible, .choice:focus-visible { outline: 2px solid #bff9ec; outline-offset: 3px; }
+  [hidden] { display: none !important; }
+  @media (prefers-reduced-motion: reduce) { .overlay { animation: none; } }
+</style>
+</head>
+<body>
+  <div id="stage">
+    <canvas id="game" width="480" height="640" aria-label="First Day. A hidden-object safety game. Find workplace hazards and choose the safest response."></canvas>
+    <div id="overlay" class="overlay" hidden>
+      <div class="panel">
+        <p class="eyebrow" id="ovEyebrow">DAY ONE</p>
+        <h1 class="title" id="ovTitle">First Day</h1>
+        <p class="sub" id="ovSub"></p>
+        <div class="metrics" id="ovMetrics">
+          <div class="metric"><span id="mLabel1">Hazards</span><strong id="mValue1">4</strong></div>
+          <div class="metric"><span id="mLabel2">Safe calls</span><strong id="mValue2">0/4</strong></div>
+          <div class="metric"><span id="mLabel3">Score</span><strong id="mValue3">0</strong></div>
+        </div>
+        <div class="choices" id="ovChoices" hidden></div>
+        <p class="explain" id="ovExplain" hidden></p>
+        <button type="button" id="ovBtn" class="btn">Clock in</button>
+      </div>
+    </div>
+  </div>
+  <p class="hint">spot the hazards &middot; choose the safest response &middot; no timer</p>
+
+<script>
+(() => {
+  'use strict';
+
+  const W = 480;
+  const H = 640;
+  const TAU = Math.PI * 2;
+  const ROUNDS = 5;
+  const HAZARDS_PER_ROUND = 4;
+  const POINTS_SPOT = 100;
+  const POINTS_RESPONSE = 100;
+  const BEST_KEY = 'firstday.best.v1';
+
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d', { alpha: false });
+  const overlay = document.getElementById('overlay');
+  const ovEyebrow = document.getElementById('ovEyebrow');
+  const ovTitle = document.getElementById('ovTitle');
+  const ovSub = document.getElementById('ovSub');
+  const ovMetrics = document.getElementById('ovMetrics');
+  const ovChoices = document.getElementById('ovChoices');
+  const ovExplain = document.getElementById('ovExplain');
+  const ovBtn = document.getElementById('ovBtn');
+  const mLabels = [
+    document.getElementById('mLabel1'),
+    document.getElementById('mLabel2'),
+    document.getElementById('mLabel3'),
+  ];
+  const mValues = [
+    document.getElementById('mValue1'),
+    document.getElementById('mValue2'),
+    document.getElementById('mValue3'),
+  ];
+
+  const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
+
+  function rr(x, y, w, h, radius) {
+    const r = Math.min(radius, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function drawText(str, x, y, opts) {
+    const o = opts || {};
+    const size = o.size || 10;
+    const weight = o.weight || 400;
+    const color = o.color || '#eafcff';
+    const track = o.track || 0;
+    const align = o.align || 'left';
+    ctx.save();
+    ctx.font = weight + ' ' + size + 'px ui-monospace, "SF Mono", Menlo, Consolas, monospace';
+    ctx.fillStyle = color;
+    ctx.textBaseline = 'alphabetic';
+    if (track) {
+      const chars = Array.from(str);
+      const widths = chars.map((ch) => ctx.measureText(ch).width);
+      const total = widths.reduce((sum, w) => sum + w, 0) + track * (chars.length - 1);
+      let cx = align === 'right' ? x - total : align === 'center' ? x - total / 2 : x;
+      chars.forEach((ch, i) => {
+        ctx.fillText(ch, cx, y);
+        cx += widths[i] + track;
+      });
+    } else {
+      ctx.textAlign = align;
+      ctx.fillText(str, x, y);
+    }
+    ctx.restore();
+  }
+
+  function line(x1, y1, x2, y2) {
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+  }
+
+  function sizeCanvas() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+  }
+
+  sizeCanvas();
+  window.addEventListener('resize', sizeCanvas);
+
+  const state = {
+    mode: 'brief',
+    round: 0,
+    order: [],
+    workplace: null,
+    hazards: [],
+    found: 0,
+    roundCorrect: 0,
+    roundScore: 0,
+    answeredTotal: 0,
+    correctTotal: 0,
+    score: 0,
+    displayScore: 0,
+    best: 0,
+    scorePulse: 0,
+    current: null,
+    currentOptions: null,
+    rng: Math.random,
+    variant: 0,
+    t: 0,
+    ripples: [],
+  };
+
+  const O = (text, ok) => ({ text, ok: ok === true });
+  const HZ = (id, type, name, prompt, why, spots, options, radius) => ({
+    id, type, name, prompt, why, spots, options, radius: radius || 30,
+  });
+
+  const RESTAURANT = {
+    id: 'restaurant',
+    name: 'Corner Grill',
+    kind: 'RESTAURANT',
+    hazards: [
+      HZ(
+        'wet', 'puddle', 'Wet floor',
+        'Water is spreading across the service aisle.',
+        'Wet floors cause slips. A sign warns everyone while the area is kept clear and properly mopped.',
+        [[120, 470], [255, 500], [360, 455]],
+        [
+          O('Put up a wet-floor sign, tell the shift lead, and mop it.', true),
+          O('Wipe it with a rag and keep serving.'),
+          O('Tell customers to walk around it.'),
+        ]
+      ),
+      HZ(
+        'cord', 'cord', 'Frayed cord',
+        'The power cord under the counter has exposed wires.',
+        'Damaged cords can shock someone or start a fire. Stop using it, unplug it if safe, and report it.',
+        [[95, 390], [300, 395], [420, 400]],
+        [
+          O('Unplug it if it is safe and report it to the manager.', true),
+          O('Wrap tape around the bare wire.'),
+          O('Leave it; it is hidden under the counter.'),
+        ]
+      ),
+      HZ(
+        'exit', 'exitBoxes', 'Blocked exit',
+        'Boxes are stacked in front of the staff exit.',
+        'Exits must stay clear in an emergency. Move the boxes to storage right away.',
+        [[420, 282], [48, 278]],
+        [
+          O('Move the boxes to storage and keep the exit clear.', true),
+          O('Prop the door open so people can squeeze past.'),
+          O('Leave them; the front door still works.'),
+        ]
+      ),
+      HZ(
+        'knife', 'knife', 'Knife on the edge',
+        'A knife is hanging over the edge of the prep counter.',
+        'A falling knife can cut feet or legs. Move it back and store it in a rack or sheath.',
+        [[135, 246], [255, 254]],
+        [
+          O('Move it back from the edge and store it safely.', true),
+          O('Catch it if it starts to fall.'),
+          O('Leave it for the next cook.'),
+        ]
+      ),
+      HZ(
+        'pan', 'pan', 'Hot pan handle',
+        'A pan handle sticks out over the stove edge.',
+        'A handle over the edge can be bumped and spill hot food. Turn it inward and use a dry mitt.',
+        [[365, 246], [400, 246]],
+        [
+          O('Turn the handle inward and use a dry mitt.', true),
+          O('Grab it with a wet towel.'),
+          O('Wait until the rush is over.'),
+        ]
+      ),
+      HZ(
+        'bottle', 'bottle', 'Unlabeled bottle',
+        'A spray bottle has no label.',
+        'Unknown chemicals can be dangerous. Stop using it and ask the manager to label or discard it.',
+        [[75, 242], [225, 254]],
+        [
+          O('Stop using it and ask the manager to label or discard it.', true),
+          O('Smell it to work out what it is.'),
+          O('Use a little on a rag.'),
+        ]
+      ),
+      HZ(
+        'shelf', 'shelfBox', 'Box on shelf edge',
+        'A heavy box hangs over the edge of the top shelf.',
+        'It can fall on someone. Ask a coworker for help and use a step stool to push it back.',
+        [[95, 160], [155, 160]],
+        [
+          O('Get help and use a step stool to move it back.', true),
+          O('Stand on a chair to reach it.'),
+          O('Leave it; it is above head height.'),
+        ]
+      ),
+      HZ(
+        'mop', 'mop', 'Mop in the walkway',
+        'A mop and bucket are blocking the walkway.',
+        'It is a trip hazard and leaves the floor wet. Move it to the cleaning closet and dry the floor.',
+        [[65, 435], [320, 435], [430, 470]],
+        [
+          O('Move it to the cleaning closet and dry the floor.', true),
+          O('Step over it while service is busy.'),
+          O('Lean the mop against the counter.'),
+        ]
+      ),
+    ],
+  };
+
+  const STORE = {
+    id: 'store',
+    name: 'Corner Store',
+    kind: 'STORE',
+    hazards: [
+      HZ(
+        'spill', 'puddle', 'Spill in the aisle',
+        'Juice has spilled across the aisle.',
+        'Spills cause slips. Put up a wet-floor sign, block the aisle, and clean it up.',
+        [[140, 460], [280, 465], [390, 490]],
+        [
+          O('Put up a wet-floor sign, block the aisle, and clean it up.', true),
+          O('Send shoppers around the spill.'),
+          O('Leave it for the closing crew.'),
+        ]
+      ),
+      HZ(
+        'exit', 'exitBoxes', 'Blocked fire exit',
+        'Sale stock is piled in front of the fire exit.',
+        'Fire exits must never be blocked. Clear the exit immediately and tell the manager.',
+        [[70, 238], [225, 238]],
+        [
+          O('Clear the exit immediately and tell the manager.', true),
+          O('Move it only if the alarm goes off.'),
+          O('Stack it higher so people can walk under.'),
+        ]
+      ),
+      HZ(
+        'cord', 'cord', 'Frayed extension cord',
+        'An extension cord across the aisle has exposed wires.',
+        'Damaged cords can shock someone or start a fire. Take it out of use and report it.',
+        [[340, 405], [90, 410], [430, 420]],
+        [
+          O('Stop using it, unplug it if safe, and report it.', true),
+          O('Put a mat over the bare spot.'),
+          O('Keep using it until closing.'),
+        ]
+      ),
+      HZ(
+        'shelf', 'shelfBox', 'Overhanging box',
+        'A box is balanced over the edge of the top shelf.',
+        'It can fall on a shopper. Use the right ladder, get help, and move it back.',
+        [[100, 188], [300, 188]],
+        [
+          O('Ask for help and use a step ladder to move it back.', true),
+          O('Climb the shelf to reach it.'),
+          O('Ignore it; it has been there all week.'),
+        ]
+      ),
+      HZ(
+        'ladder', 'ladder', 'Ladder in the aisle',
+        'A step ladder has been left open in the aisle.',
+        'It blocks the aisle and invites falls. Close it and put it back in the stockroom.',
+        [[215, 420], [60, 405]],
+        [
+          O('Close it and put it back in the stockroom.', true),
+          O('Walk around it; it is only for a minute.'),
+          O('Use it, then leave it open.'),
+        ]
+      ),
+      HZ(
+        'bottle', 'bottle', 'Unlabeled cleaner',
+        'A cleaning bottle has lost its label.',
+        'Without a label you cannot know the risks. Never guess with chemicals.',
+        [[80, 300], [365, 347]],
+        [
+          O('Stop using it and ask the manager to identify and label it.', true),
+          O('Sniff it to see what it is.'),
+          O('Mix it with another cleaner.'),
+        ]
+      ),
+      HZ(
+        'cutter', 'boxCutter', 'Open box cutter',
+        'A box cutter is lying open on the checkout counter.',
+        'An open blade can cut a hand or a child. Retract it and store it properly.',
+        [[385, 347], [425, 347]],
+        [
+          O('Close the blade and store the cutter out of reach.', true),
+          O('Leave it open for the next cashier.'),
+          O('Put it in your pocket.'),
+        ]
+      ),
+      HZ(
+        'stack', 'crate', 'Leaning stack',
+        'A stack of boxes is leaning into the aisle.',
+        'It could topple onto someone. Rebuild the stack low and stable.',
+        [[180, 395], [300, 400]],
+        [
+          O('Take the top boxes down and restack them safely.', true),
+          O('Push the stack upright.'),
+          O('Put a warning sign on it.'),
+        ]
+      ),
+    ],
+  };
+
+  const WORKSHOP = {
+    id: 'workshop',
+    name: 'Maker Workshop',
+    kind: 'WORKSHOP',
+    hazards: [
+      HZ(
+        'sawdust', 'sawdust', 'Sawdust pile',
+        'Sawdust is building up beside the saw.',
+        'Sawdust can catch fire and makes the floor slippery. Clean it up and keep it away from sparks.',
+        [[350, 440], [210, 480], [300, 510]],
+        [
+          O('Sweep it up and keep dust away from sparks.', true),
+          O('Blow it into the corner.'),
+          O('Leave it; it is only a little.'),
+        ]
+      ),
+      HZ(
+        'cord', 'cord', 'Damaged cord',
+        'The power cord on the saw is frayed.',
+        'A damaged cord can shock you or start a fire. Take the tool out of service and report it.',
+        [[330, 405], [120, 430], [410, 445]],
+        [
+          O('Stop, unplug it if safe, and report it.', true),
+          O('Tape it up and finish the cut.'),
+          O('Keep going; the cable is on the floor.'),
+        ]
+      ),
+      HZ(
+        'blade', 'blade', 'Unguarded blade',
+        'The saw blade is running without its guard.',
+        'Guards prevent serious injuries. Never use a machine with a missing guard.',
+        [[375, 324], [352, 324]],
+        [
+          O('Switch it off, tag it out of service, and tell the supervisor.', true),
+          O('Use it quickly before anyone notices.'),
+          O('Hold a piece of wood over the blade.'),
+        ]
+      ),
+      HZ(
+        'solvent', 'bottle', 'Unlabeled solvent',
+        'A solvent bottle has no label.',
+        'Unlabeled chemicals are dangerous. Only use containers with a clear label.',
+        [[120, 280], [352, 192]],
+        [
+          O('Do not use it; ask the supervisor to identify and label it.', true),
+          O('Smell it to identify it.'),
+          O('Pour it into an unmarked cup.'),
+        ]
+      ),
+      HZ(
+        'scrap', 'scrap', 'Scrap in the walkway',
+        'A piece of scrap wood is lying across the walkway.',
+        'Scrap in a walkway is a trip hazard. Pick it up and put it in the scrap bin.',
+        [[170, 455], [250, 490], [90, 480]],
+        [
+          O('Pick it up and put it in the scrap bin.', true),
+          O('Kick it under the bench.'),
+          O('Leave it; someone else will move it.'),
+        ]
+      ),
+      HZ(
+        'exit', 'exitBoxes', 'Blocked exit',
+        'Boxes are stacked in front of the fire exit.',
+        'A blocked exit can trap people in a fire. Keep it clear at all times.',
+        [[52, 262], [430, 262]],
+        [
+          O('Clear the exit now and tell the supervisor.', true),
+          O('Leave a narrow path.'),
+          O('Wait for the end of the shift.'),
+        ]
+      ),
+      HZ(
+        'tool', 'toolEdge', 'Tool on the edge',
+        'A chisel is hanging over the edge of the workbench.',
+        'A falling tool can injure feet. Store tools back from the edge.',
+        [[110, 279], [220, 279]],
+        [
+          O('Move it back and store it in the tool rack.', true),
+          O('Catch it if it falls.'),
+          O('Leave it; the bench is crowded.'),
+        ]
+      ),
+      HZ(
+        'hose', 'hose', 'Hose across walkway',
+        'An air hose is stretched across the walkway.',
+        'A hose across the floor is a trip hazard. Coil it up when it is not in use.',
+        [[300, 470], [150, 500]],
+        [
+          O('Coil it and hang it on the wall.', true),
+          O('Step over it carefully.'),
+          O('Put a box on top of it.'),
+        ]
+      ),
+    ],
+  };
+
+  const WORKPLACES = [RESTAURANT, STORE, WORKSHOP];
+
+  function mulberry32(a) {
+    return function () {
+      a |= 0;
+      a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  function randomSeed() {
+    return ((Date.now() & 0xffffffff) ^ Math.floor(Math.random() * 0xffffffff)) >>> 0;
+  }
+
+  function rnd() {
+    return state.rng();
+  }
+
+  function shuffle(list, rngFn) {
+    const r = rngFn || rnd;
+    const arr = list.slice();
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(r() * (i + 1));
+      const tmp = arr[i];
+      arr[i] = arr[j];
+      arr[j] = tmp;
+    }
+    return arr;
+  }
+
+  function readBest() {
+    try {
+      const v = Number(window.localStorage.getItem(BEST_KEY));
+      return Number.isFinite(v) && v > 0 ? Math.floor(v) : 0;
+    } catch (err) {
+      return 0;
+    }
+  }
+
+  function writeBest(value) {
+    try {
+      window.localStorage.setItem(BEST_KEY, String(value));
+    } catch (err) {
+      /* storage can be unavailable on file:// or in private mode */
+    }
+  }
+
+  function updateCursor() {
+    canvas.style.cursor = state.mode === 'find' ? 'crosshair' : 'default';
+  }
+
+  function makeHazard(def, x, y) {
+    return { def, x, y, found: false, answered: false, correct: false };
+  }
+
+  function placeHazards(workplace, rngFn) {
+    const rng = rngFn || state.rng;
+    for (let pass = 0; pass < 3; pass++) {
+      const minDist = pass === 0 ? 56 : pass === 1 ? 44 : 30;
+      for (let attempt = 0; attempt < 40; attempt++) {
+        const pool = shuffle(workplace.hazards, rng);
+        const placed = [];
+        const used = [];
+        for (const def of pool) {
+          if (placed.length >= HAZARDS_PER_ROUND) break;
+          const spots = shuffle(def.spots, rng);
+          for (const spot of spots) {
+            const free = used.every(
+              (u) => Math.hypot(u[0] - spot[0], u[1] - spot[1]) >= minDist
+            );
+            if (free) {
+              placed.push(makeHazard(def, spot[0], spot[1]));
+              used.push(spot);
+              break;
+            }
+          }
+        }
+        if (placed.length === HAZARDS_PER_ROUND) return placed;
+      }
+    }
+    const placed = [];
+    const used = [];
+    for (const def of workplace.hazards) {
+      if (placed.length >= HAZARDS_PER_ROUND) break;
+      for (const spot of def.spots) {
+        if (used.every((u) => Math.hypot(u[0] - spot[0], u[1] - spot[1]) >= 18)) {
+          placed.push(makeHazard(def, spot[0], spot[1]));
+          used.push(spot);
+          break;
+        }
+      }
+    }
+    while (placed.length < HAZARDS_PER_ROUND) {
+      const def = workplace.hazards[placed.length % workplace.hazards.length];
+      const spot = def.spots[0];
+      placed.push(makeHazard(def, spot[0], spot[1]));
+    }
+    return placed;
+  }
+
+  function newRun(seed) {
+    state.rng = mulberry32(seed === undefined ? randomSeed() : seed);
+    state.score = 0;
+    state.displayScore = 0;
+    state.correctTotal = 0;
+    state.answeredTotal = 0;
+    state.scorePulse = 0;
+    state.best = readBest();
+    state.order = [];
+    let prev = -1;
+    for (let i = 0; i < ROUNDS; i++) {
+      let next;
+      do {
+        next = Math.floor(rnd() * WORKPLACES.length);
+      } while (WORKPLACES.length > 1 && next === prev);
+      state.order.push(next);
+      prev = next;
+    }
+    beginRound(0);
+  }
+
+  function beginRound(index) {
+    state.round = index;
+    state.workplace = WORKPLACES[state.order[index]];
+    state.hazards = placeHazards(state.workplace, state.rng);
+    state.variant = Math.floor(rnd() * 997);
+    state.found = 0;
+    state.roundCorrect = 0;
+    state.roundScore = 0;
+    state.current = null;
+    state.currentOptions = null;
+    state.mode = 'brief';
+    state.ripples = [];
+    showBrief();
+    updateCursor();
+  }
+
+  function resetPanel() {
+    overlay.className = 'overlay';
+    ovChoices.innerHTML = '';
+    ovChoices.hidden = true;
+    ovExplain.hidden = true;
+    ovExplain.className = 'explain';
+    ovExplain.textContent = '';
+    ovBtn.hidden = false;
+    ovMetrics.hidden = false;
+    overlay.hidden = false;
+  }
+
+  function setMetrics(labels, values) {
+    for (let i = 0; i < 3; i++) {
+      mLabels[i].textContent = labels[i];
+      mValues[i].textContent = values[i];
+    }
+  }
+
+  function showBrief() {
+    resetPanel();
+    const n = state.hazards.length;
+    const wp = state.workplace;
+    ovEyebrow.textContent = 'DAY ONE - SHIFT ' + (state.round + 1) + ' OF ' + ROUNDS;
+    ovTitle.textContent = wp.name;
+    ovSub.textContent = state.round === 0
+      ? 'Maya is on her first day. Find ' + n + ' hazards in the ' + wp.kind.toLowerCase() +
+        ', then choose the safest response for each. No timer and no speed bonus: just careful eyes and good judgment.'
+      : 'New workplace, new layout. Find ' + n + ' hazards here, then choose the safest response for each.';
+    setMetrics(['Hazards', 'Safe calls', 'Score'], [String(n), '0/' + n, String(state.score)]);
+    ovBtn.textContent = state.round === 0 ? 'Clock in' : 'Start shift';
+  }
+
+  function showQuestion(h) {
+    resetPanel();
+    ovEyebrow.textContent = 'HAZARD SPOTTED - +' + POINTS_SPOT;
+    ovTitle.textContent = h.def.name;
+    ovSub.textContent = h.def.prompt + ' What is the safest response?';
+    ovMetrics.hidden = true;
+    ovChoices.innerHTML = '';
+    state.currentOptions.forEach((opt, i) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'choice';
+      btn.textContent = opt.text;
+      btn.addEventListener('click', () => chooseOption(i));
+      ovChoices.appendChild(btn);
+    });
+    ovChoices.hidden = false;
+    ovBtn.hidden = true;
+  }
+
+  function chooseOption(index) {
+    if (state.mode !== 'question' || !state.current || state.current.answered) return;
+    const h = state.current;
+    const opt = state.currentOptions[index];
+    if (!opt) return;
+    h.answered = true;
+    h.correct = opt.ok === true;
+    state.answeredTotal++;
+
+    if (h.correct) {
+      state.roundCorrect++;
+      state.correctTotal++;
+      state.roundScore += POINTS_RESPONSE;
+      state.score += POINTS_RESPONSE;
+      state.scorePulse = 1;
+    }
+
+    Array.from(ovChoices.children).forEach((btn, i) => {
+      btn.disabled = true;
+      if (state.currentOptions[i].ok) btn.className = 'choice right';
+      else if (i === index) btn.className = 'choice wrong';
+    });
+
+    const rightOpt = state.currentOptions.find((o) => o.ok);
+    ovEyebrow.textContent = h.correct ? 'RIGHT CALL - +' + POINTS_RESPONSE : 'NOT THE SAFEST CHOICE';
+    ovExplain.textContent = h.correct
+      ? h.def.why
+      : 'The safest move: ' + rightOpt.text + ' ' + h.def.why;
+    ovExplain.className = 'explain' + (h.correct ? '' : ' bad');
+    ovExplain.hidden = false;
+    ovBtn.textContent = state.found === state.hazards.length ? 'Finish shift' : 'Keep looking';
+    ovBtn.hidden = false;
+    ovBtn.focus();
+  }
+
+  function closeQuestion() {
+    if (state.mode !== 'question' || !state.current || !state.current.answered) return;
+    if (state.found === state.hazards.length) {
+      endShift();
+      return;
+    }
+    state.current = null;
+    state.currentOptions = null;
+    state.mode = 'find';
+    overlay.hidden = true;
+    updateCursor();
+  }
+
+  function endShift() {
+    state.mode = 'summary';
+    state.current = null;
+    state.currentOptions = null;
+    showSummary();
+    updateCursor();
+  }
+
+  function showSummary() {
+    resetPanel();
+    const n = state.hazards.length;
+    const wp = state.workplace;
+    const phrase = state.roundCorrect === n
+      ? 'Clean sweep.'
+      : state.roundCorrect >= Math.ceil(n / 2) ? 'Good eye.' : 'Close call.';
+    ovEyebrow.textContent = 'SHIFT ' + (state.round + 1) + ' COMPLETE';
+    ovTitle.textContent = phrase;
+    ovSub.textContent = wp.name + ' - ' + state.found + ' of ' + n + ' hazards found. ' +
+      state.roundCorrect + ' of ' + n + ' responses were the safest choice.';
+    setMetrics(
+      ['Found', 'Safe calls', 'Shift score'],
+      [state.found + '/' + n, state.roundCorrect + '/' + n, '+' + state.roundScore]
+    );
+    ovBtn.textContent = state.round >= ROUNDS - 1 ? 'See results' : 'Next shift';
+  }
+
+  function showFinal() {
+    const expected = ROUNDS * HAZARDS_PER_ROUND;
+    const rate = state.correctTotal / expected;
+    const rank = rate >= 1 ? 'Safety Star' : rate >= 0.8 ? 'Sharp Eye' : rate >= 0.55 ? 'Steady Hands' : 'First-Day Scramble';
+    state.best = Math.max(state.best, state.score);
+    writeBest(state.best);
+    state.mode = 'final';
+    resetPanel();
+    ovEyebrow.textContent = 'DAY ONE COMPLETE';
+    ovTitle.textContent = rank;
+    ovSub.textContent = state.correctTotal + ' of ' + expected +
+      ' hazards matched with the safest response. No speed bonus - accuracy is the whole score. Best ' +
+      state.best + '.';
+    setMetrics(
+      ['Hazards cleared', 'Safe calls', 'Final score'],
+      [state.answeredTotal + '/' + expected, state.correctTotal + '/' + expected, String(state.score)]
+    );
+    ovBtn.textContent = 'Work another day';
+  }
+
+  function openHazard(h) {
+    if (state.mode !== 'find' || h.found) return;
+    h.found = true;
+    state.found++;
+    state.score += POINTS_SPOT;
+    state.roundScore += POINTS_SPOT;
+    state.scorePulse = 1;
+    state.mode = 'question';
+    state.current = h;
+    state.currentOptions = shuffle(h.def.options, state.rng);
+    showQuestion(h);
+    updateCursor();
+  }
+
+  function advance() {
+    if (state.mode === 'brief') {
+      overlay.hidden = true;
+      state.mode = 'find';
+      updateCursor();
+    } else if (state.mode === 'question') {
+      closeQuestion();
+    } else if (state.mode === 'summary') {
+      if (state.round >= ROUNDS - 1) showFinal();
+      else beginRound(state.round + 1);
+    } else if (state.mode === 'final') {
+      newRun();
+    }
+  }
+
+  ovBtn.addEventListener('click', advance);
+
+  function drawBackground() {
+    const grad = ctx.createRadialGradient(W / 2, 20, 20, W / 2, 180, 760);
+    grad.addColorStop(0, '#17282b');
+    grad.addColorStop(0.55, '#0a1316');
+    grad.addColorStop(1, '#060b0d');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = 'rgba(140,240,220,0.06)';
+    for (let i = 0; i < 28; i++) {
+      const x = (i * 97 + 31) % W;
+      const y = (i * 53 + 17) % H;
+      ctx.fillRect(x, y, 1, 1);
+    }
+  }
+
+  function drawRoom(wallTop, wallBottom, floorColor, split) {
+    const grad = ctx.createLinearGradient(0, 88, 0, split);
+    grad.addColorStop(0, wallTop);
+    grad.addColorStop(1, wallBottom);
+    ctx.fillStyle = grad;
+    ctx.fillRect(20, 88, 440, split - 88);
+
+    ctx.fillStyle = floorColor;
+    ctx.fillRect(20, split, 440, 558 - split);
+
+    ctx.strokeStyle = 'rgba(190,245,235,0.055)';
+    ctx.lineWidth = 1;
+    for (let x = 20; x <= 460; x += 44) line(x, split, x, 558);
+    for (let y = split; y <= 558; y += 34) line(20, y, 460, y);
+
+    ctx.fillStyle = 'rgba(255,255,255,0.07)';
+    ctx.fillRect(20, split - 3, 440, 3);
+  }
+
+  function drawDoor(x, y, w, h, sign) {
+    ctx.fillStyle = '#1a2427';
+    rr(x - 4, y - 4, w + 8, h + 8, 5);
+    ctx.fill();
+    ctx.fillStyle = '#24343a';
+    rr(x, y, w, h, 3);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(170,235,230,0.16)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(170,235,230,0.12)';
+    line(x + 8, y + 14, x + w - 8, y + 14);
+    ctx.fillStyle = 'rgba(220,250,240,0.5)';
+    ctx.beginPath();
+    ctx.arc(x + w - 9, y + h / 2, 2, 0, TAU);
+    ctx.fill();
+    if (sign) {
+      ctx.fillStyle = '#4a1618';
+      rr(x + w / 2 - 18, y - 27, 36, 14, 3);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,120,110,0.7)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      drawText('EXIT', x + w / 2, y - 16, {
+        size: 7, weight: 700, color: '#ffb3aa', align: 'center', track: 1.6,
+      });
+    }
+  }
+
+  function drawPoster(x, y, w, h, accent) {
+    ctx.fillStyle = 'rgba(230,245,240,0.1)';
+    rr(x, y, w, h, 3);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(230,245,240,0.2)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.fillStyle = accent;
+    ctx.globalAlpha = 0.75;
+    ctx.fillRect(x + 6, y + 7, w - 12, 4);
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = 'rgba(230,245,240,0.25)';
+    for (let i = 0; i < 4; i++) ctx.fillRect(x + 6, y + 18 + i * 8, w - 12 - (i % 2) * 8, 2);
+  }
+
+  function drawCounter(x, y, w, h, panel, top) {
+    ctx.fillStyle = panel;
+    rr(x, y + 8, w, h - 8, 4);
+    ctx.fill();
+    ctx.fillStyle = top;
+    rr(x - 3, y, w + 6, 10, 3);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.08)';
+    ctx.fillRect(x + 4, y + 14, w - 8, 2);
+    ctx.strokeStyle = 'rgba(255,240,220,0.09)';
+    ctx.lineWidth = 1;
+    for (let i = 1; i < 3; i++) line(x + (w / 3) * i, y + 18, x + (w / 3) * i, y + h - 4);
+  }
+
+  function drawStove(x, y, w, h) {
+    ctx.fillStyle = '#202b2e';
+    rr(x, y + 8, w, h - 8, 5);
+    ctx.fill();
+    ctx.fillStyle = '#2e3c40';
+    rr(x - 2, y, w + 4, 12, 4);
+    ctx.fill();
+    for (let i = 0; i < 2; i++) {
+      const cx = x + 34 + i * 56;
+      ctx.strokeStyle = 'rgba(180,225,225,0.22)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(cx, y + 5, 12, 0, TAU);
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,160,80,0.25)';
+      ctx.beginPath();
+      ctx.arc(cx, y + 5, 7, 0, TAU);
+      ctx.stroke();
+    }
+    ctx.fillStyle = 'rgba(220,245,240,0.24)';
+    for (let i = 0; i < 3; i++) {
+      ctx.beginPath();
+      ctx.arc(x + 22 + i * 20, y + 36, 3, 0, TAU);
+      ctx.fill();
+    }
+    ctx.strokeStyle = 'rgba(255,190,120,0.16)';
+    line(x + 14, y + 30, x + w - 14, y + 30);
+  }
+
+  function drawLamp(x) {
+    ctx.strokeStyle = 'rgba(200,240,235,0.25)';
+    ctx.lineWidth = 1;
+    line(x, 88, x, 111);
+    ctx.fillStyle = '#26383b';
+    ctx.beginPath();
+    ctx.moveTo(x - 13, 111);
+    ctx.lineTo(x + 13, 111);
+    ctx.lineTo(x + 8, 122);
+    ctx.lineTo(x - 8, 122);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,214,140,0.22)';
+    ctx.beginPath();
+    ctx.arc(x, 124, 5, 0, TAU);
+    ctx.fill();
+  }
+
+  function drawShelfUnit(x, y, w, h) {
+    ctx.fillStyle = '#1a292e';
+    rr(x, y, w, h, 4);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(150,225,225,0.18)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    const colors = ['#c96b4a', '#d7a23c', '#4f9e91', '#6b7fc9', '#b85c74'];
+    for (let row = 0; row < 3; row++) {
+      const sy = y + 34 + row * 40;
+      ctx.fillStyle = '#2b3d43';
+      ctx.fillRect(x + 4, sy, w - 8, 5);
+      for (let i = 0; i < 6; i++) {
+        const px = x + 9 + i * ((w - 18) / 6);
+        const ph = 12 + ((i * 7 + row * 5 + state.variant) % 12);
+        const pw = 12 + ((i + row) % 3);
+        ctx.fillStyle = colors[(i + row + state.variant) % colors.length];
+        ctx.globalAlpha = 0.72;
+        rr(px, sy - ph, pw, ph, 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+    }
+  }
+
+  function drawRegister(x, y) {
+    ctx.fillStyle = '#26343a';
+    rr(x, y, 42, 26, 4);
+    ctx.fill();
+    ctx.fillStyle = '#5ee7c7';
+    ctx.globalAlpha = 0.55;
+    rr(x + 6, y + 5, 22, 8, 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = 'rgba(230,250,245,0.2)';
+    for (let i = 0; i < 3; i++) ctx.fillRect(x + 6 + i * 9, y + 17, 5, 3);
+  }
+
+  function drawPegboard(x, y, w, h) {
+    ctx.fillStyle = '#1b2a27';
+    rr(x, y, w, h, 4);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(160,220,200,0.16)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(160,220,200,0.1)';
+    for (let py = y + 12; py < y + h; py += 14) {
+      for (let px = x + 12; px < x + w; px += 16) ctx.fillRect(px, py, 2, 2);
+    }
+    ctx.strokeStyle = 'rgba(200,235,225,0.42)';
+    ctx.lineWidth = 2;
+    line(x + 22, y + 26, x + 22, y + 62);
+    ctx.strokeRect(x + 16, y + 62, 12, 22);
+    ctx.beginPath();
+    ctx.arc(x + 64, y + 38, 12, 0, TAU);
+    ctx.stroke();
+    line(x + 64, y + 50, x + 64, y + 76);
+    ctx.strokeRect(x + 98, y + 22, 30, 12);
+    ctx.beginPath();
+    ctx.moveTo(x + 144, y + 22);
+    ctx.lineTo(x + 164, y + 64);
+    ctx.lineTo(x + 152, y + 72);
+    ctx.stroke();
+  }
+
+  function drawTableSaw(x, y, w, h) {
+    ctx.fillStyle = '#233033';
+    rr(x, y, w, h, 4);
+    ctx.fill();
+    ctx.fillStyle = '#314246';
+    rr(x - 2, y - 6, w + 4, 10, 3);
+    ctx.fill();
+    ctx.fillStyle = '#0f1719';
+    rr(x + 48, y - 2, 46, 6, 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(180,225,225,0.28)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(x + 71, y + 2, 22, Math.PI, TAU);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(220,245,240,0.3)';
+    ctx.fillRect(x + 10, y + 18, 60, 4);
+    ctx.fillRect(x + 84, y + 18, 44, 4);
+    ctx.strokeStyle = 'rgba(255,190,120,0.2)';
+    line(x + 8, y + h - 12, x + w - 8, y + h - 12);
+  }
+
+  function drawRestaurant() {
+    drawRoom('#2c1e1d', '#1c1415', '#141013', 346);
+    ctx.strokeStyle = 'rgba(255,210,160,0.05)';
+    ctx.lineWidth = 1;
+    for (let y = 108; y < 346; y += 28) line(20, y, 460, y);
+    for (let x = 24; x < 460; x += 34) line(x, 88, x, 346);
+
+    drawDoor(392, 204, 54, 142, true);
+    drawDoor(22, 210, 46, 124, true);
+
+    ctx.fillStyle = '#4a342b';
+    rr(48, 172, 150, 7, 2);
+    ctx.fill();
+    ctx.fillStyle = '#3b2a22';
+    ctx.fillRect(70, 179, 4, 18);
+    ctx.fillRect(172, 179, 4, 18);
+    for (const px of [62, 108, 178]) {
+      ctx.strokeStyle = 'rgba(255,244,220,0.3)';
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.arc(px, 164, 8, 0, TAU);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(px, 164, 4, 0, TAU);
+      ctx.stroke();
+    }
+    ctx.strokeStyle = 'rgba(220,230,220,0.2)';
+    line(50, 194, 196, 194);
+    ctx.fillStyle = 'rgba(240,245,230,0.35)';
+    for (let i = 0; i < 4; i++) ctx.fillRect(58 + i * 20, 196, 10, 7);
+
+    drawCounter(38, 252, 178, 96, '#2f2320', '#45342c');
+    drawCounter(226, 262, 78, 86, '#2b2420', '#41372f');
+    drawStove(322, 252, 124, 84);
+
+    ctx.fillStyle = '#222d31';
+    rr(312, 112, 146, 20, 5);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(190,230,225,0.16)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(255,190,120,0.18)';
+    for (let i = 0; i < 4; i++) ctx.fillRect(330 + i * 28, 132, 16, 3);
+
+    drawLamp(120);
+    drawLamp(240);
+    drawLamp(360);
+    drawPoster(292, 144, 44, 56, '#ffb703');
+    ctx.fillStyle = 'rgba(255,183,3,0.12)';
+    ctx.fillRect(20, 346, 440, 6);
+  }
+
+  function drawStore() {
+    drawRoom('#17262c', '#101a20', '#0f181d', 380);
+    ctx.strokeStyle = 'rgba(120,210,225,0.05)';
+    ctx.lineWidth = 1;
+    for (let x = 24; x < 460; x += 36) line(x, 88, x, 380);
+
+    drawDoor(40, 170, 62, 132, true);
+    drawDoor(210, 160, 56, 110, false);
+
+    drawShelfUnit(42, 200, 166, 150);
+    drawShelfUnit(232, 200, 166, 150);
+
+    drawCounter(326, 352, 128, 92, '#1d2a2f', '#2b3b40');
+    drawRegister(366, 326);
+    ctx.fillStyle = 'rgba(94,231,199,0.12)';
+    rr(336, 366, 108, 26, 4);
+    ctx.fill();
+    drawText('CHECKOUT', 390, 383, {
+      size: 7, weight: 700, color: 'rgba(180,250,235,0.5)', align: 'center', track: 1.4,
+    });
+
+    drawPoster(132, 130, 52, 58, '#5ee7c7');
+    drawText('SALE', 158, 158, {
+      size: 8, weight: 700, color: 'rgba(180,250,235,0.6)', align: 'center', track: 1.2,
+    });
+
+    ctx.strokeStyle = 'rgba(140,220,230,0.18)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(88, 500, 24, 0.2, 2.6);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(140,220,230,0.12)';
+    ctx.fillRect(62, 520, 52, 3);
+    ctx.fillStyle = 'rgba(255,210,110,0.1)';
+    ctx.fillRect(20, 380, 440, 5);
+  }
+
+  function drawWorkshop() {
+    drawRoom('#1e2822', '#141b16', '#101512', 358);
+    ctx.strokeStyle = 'rgba(170,220,190,0.045)';
+    ctx.lineWidth = 1;
+    for (let y = 118; y < 358; y += 46) line(20, y, 460, y);
+    for (let x = 52; x < 460; x += 72) line(x, 88, x, 358);
+
+    drawPegboard(40, 120, 200, 100);
+    drawDoor(28, 195, 56, 140, true);
+    drawDoor(400, 190, 52, 130, true);
+
+    drawCounter(40, 292, 240, 94, '#243129', '#33443a');
+    ctx.fillStyle = '#3f5146';
+    rr(70, 280, 34, 8, 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(190,230,200,0.35)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(196, 272, 16, 18);
+    ctx.fillStyle = 'rgba(200,235,210,0.3)';
+    ctx.fillRect(54, 318, 100, 4);
+    ctx.fillRect(180, 318, 70, 4);
+
+    drawTableSaw(306, 330, 142, 80);
+
+    ctx.fillStyle = '#25352c';
+    rr(318, 206, 120, 7, 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(230,240,220,0.12)';
+    ctx.fillRect(330, 188, 18, 18);
+    ctx.fillRect(356, 192, 14, 14);
+
+    drawPoster(252, 132, 46, 58, '#c7ff6b');
+    ctx.fillStyle = '#3a1414';
+    rr(286, 300, 14, 26, 3);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,120,110,0.55)';
+    rr(289, 305, 8, 5, 1);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,190,120,0.1)';
+    ctx.fillRect(20, 358, 440, 5);
+  }
+
+  function drawRipples() {
+    for (const r of state.ripples) {
+      const a = clamp(r.life, 0, 1);
+      ctx.globalAlpha = a * 0.5;
+      ctx.strokeStyle = '#5ee7c7';
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.arc(r.x, r.y, 6 + (1 - a) * 24, 0, TAU);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawScene() {
+    ctx.save();
+    rr(20, 88, 440, 470, 16);
+    ctx.clip();
+    if (state.workplace.id === 'restaurant') drawRestaurant();
+    else if (state.workplace.id === 'store') drawStore();
+    else drawWorkshop();
+    drawRipples();
+    for (const h of state.hazards) drawHazard(h);
+    ctx.restore();
+
+    rr(20, 88, 440, 470, 16);
+    ctx.strokeStyle = 'rgba(94,231,199,0.14)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+
+  function drawHazard(h) {
+    ctx.save();
+    ctx.translate(h.x, h.y);
+    switch (h.def.type) {
+      case 'puddle': drawPuddle(); break;
+      case 'cord': drawCord(); break;
+      case 'exitBoxes': drawExitBoxes(); break;
+      case 'knife': drawKnife(); break;
+      case 'pan': drawPan(); break;
+      case 'bottle': drawBottle(); break;
+      case 'shelfBox': drawShelfBox(); break;
+      case 'mop': drawMop(); break;
+      case 'ladder': drawLadder(); break;
+      case 'boxCutter': drawBoxCutter(); break;
+      case 'crate': drawCrate(); break;
+      case 'sawdust': drawSawdust(); break;
+      case 'blade': drawBlade(); break;
+      case 'scrap': drawScrap(); break;
+      case 'hose': drawHose(); break;
+      case 'toolEdge': drawToolEdge(); break;
+      default: break;
+    }
+    ctx.restore();
+    if (h.found) drawFoundBadge(h);
+  }
+
+  function drawPuddle() {
+    ctx.fillStyle = 'rgba(96,204,228,0.22)';
+    ctx.beginPath();
+    ctx.ellipse(0, 3, 29, 9, 0, 0, TAU);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(170,240,255,0.48)';
+    ctx.lineWidth = 1.1;
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(210,250,255,0.22)';
+    ctx.beginPath();
+    ctx.ellipse(-8, 0, 8, 2.6, -0.16, 0, TAU);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(210,250,255,0.3)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(9, 2, 6, 3.6, 5.5);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(170,240,255,0.35)';
+    ctx.beginPath();
+    ctx.arc(24, -6, 1.4, 0, TAU);
+    ctx.fill();
+  }
+
+  function drawCord() {
+    const wire = () => {
+      ctx.beginPath();
+      ctx.moveTo(-30, 8);
+      ctx.bezierCurveTo(-20, -3, -7, 12, 4, 3);
+      ctx.bezierCurveTo(13, -4, 19, 5, 27, -2);
+    };
+    wire();
+    ctx.strokeStyle = '#20262b';
+    ctx.lineWidth = 5.5;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+    wire();
+    ctx.strokeStyle = 'rgba(140,165,170,0.55)';
+    ctx.lineWidth = 1.4;
+    ctx.stroke();
+    ctx.strokeStyle = '#ffb703';
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.moveTo(-10, 4);
+    ctx.lineTo(-7, 0);
+    ctx.lineTo(-4, 6);
+    ctx.lineTo(-1, 2);
+    ctx.stroke();
+    const spark = 0.5 + 0.5 * Math.sin(state.t * 9);
+    ctx.globalAlpha = 0.35 + spark * 0.6;
+    ctx.fillStyle = '#ffe08a';
+    ctx.beginPath();
+    ctx.arc(-5, 2, 2.2, 0, TAU);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#262d31';
+    rr(25, -9, 11, 12, 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(220,235,235,0.35)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(220,235,235,0.5)';
+    line(28, -9, 28, -13);
+    line(33, -9, 33, -13);
+  }
+
+  function drawExitBoxes() {
+    ctx.save();
+    ctx.rotate(-0.03);
+    const cardboard = '#8b5d34';
+    const edge = '#c08a51';
+    ctx.fillStyle = cardboard;
+    ctx.strokeStyle = edge;
+    ctx.lineWidth = 1;
+    rr(-25, 1, 28, 21, 2); ctx.fill(); ctx.stroke();
+    rr(0, 5, 26, 18, 2); ctx.fill(); ctx.stroke();
+    rr(-14, -19, 26, 19, 2); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = 'rgba(240,220,180,0.4)';
+    line(-14, -9, 12, -9);
+    line(-25, 11, 3, 11);
+    line(0, 14, 26, 14);
+    ctx.fillStyle = 'rgba(255,120,100,0.75)';
+    ctx.beginPath();
+    ctx.moveTo(8, -24);
+    ctx.lineTo(15, -12);
+    ctx.lineTo(1, -12);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#2a0e0e';
+    ctx.fillRect(7, -19, 2, 4);
+    ctx.fillRect(7, -14, 2, 1.6);
+    ctx.restore();
+  }
+
+  function drawKnife() {
+    ctx.rotate(-0.14);
+    ctx.fillStyle = '#cbd7da';
+    ctx.beginPath();
+    ctx.moveTo(-20, -4);
+    ctx.lineTo(6, -4);
+    ctx.lineTo(2, 4);
+    ctx.lineTo(-20, 2.5);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(245,255,255,0.7)';
+    ctx.lineWidth = 0.9;
+    ctx.stroke();
+    ctx.fillStyle = '#242c30';
+    rr(6, -5, 15, 10, 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    ctx.fillRect(10, -1, 8, 1.4);
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.beginPath();
+    ctx.arc(-14, -2, 1, 0, TAU);
+    ctx.fill();
+  }
+
+  function drawPan() {
+    ctx.fillStyle = '#182125';
+    ctx.beginPath();
+    ctx.arc(-6, 0, 14, 0, TAU);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(170,205,205,0.45)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(170,205,205,0.25)';
+    ctx.beginPath();
+    ctx.arc(-6, 0, 10, 0, TAU);
+    ctx.stroke();
+    ctx.strokeStyle = '#8e9a9c';
+    ctx.lineWidth = 5;
+    ctx.lineCap = 'round';
+    line(7, 2, 36, 7);
+    ctx.strokeStyle = 'rgba(240,250,250,0.2)';
+    ctx.lineWidth = 1.4;
+    for (let i = 0; i < 2; i++) {
+      ctx.beginPath();
+      ctx.arc(-10 + i * 8, -18 - i * 3, 4 + i * 2, 3.4, 5.6);
+      ctx.stroke();
+    }
+    ctx.fillStyle = 'rgba(255,190,120,0.5)';
+    ctx.beginPath();
+    ctx.arc(-20, 2, 1.5, 0, TAU);
+    ctx.fill();
+  }
+
+  function drawBottle() {
+    ctx.fillStyle = '#355045';
+    rr(-8, -16, 16, 31, 3);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(170,220,200,0.4)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.fillStyle = '#c7d1cf';
+    rr(-5, -21, 10, 6, 1.5);
+    ctx.fill();
+    ctx.fillStyle = '#e9e3cf';
+    rr(-6, -7, 12, 13, 2);
+    ctx.fill();
+    ctx.fillStyle = '#3a3a30';
+    ctx.font = '700 9px ui-monospace, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('?', 0, 3);
+    ctx.fillStyle = 'rgba(200,250,240,0.25)';
+    ctx.fillRect(-5, -14, 2, 8);
+  }
+
+  function drawShelfBox() {
+    ctx.rotate(-0.07);
+    ctx.fillStyle = '#955f32';
+    rr(-17, -12, 34, 22, 2);
+    ctx.fill();
+    ctx.strokeStyle = '#c98d55';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(245,220,180,0.45)';
+    line(-17, -3, 17, -3);
+    line(2, -12, 2, 10);
+    ctx.fillStyle = 'rgba(0,0,0,0.28)';
+    ctx.beginPath();
+    ctx.ellipse(3, 13, 18, 3, 0, 0, TAU);
+    ctx.fill();
+  }
+
+  function drawMop() {
+    ctx.fillStyle = '#b9801f';
+    ctx.beginPath();
+    ctx.moveTo(-15, 1);
+    ctx.lineTo(15, 1);
+    ctx.lineTo(11, 20);
+    ctx.lineTo(-11, 20);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,210,120,0.6)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(120,200,220,0.35)';
+    ctx.beginPath();
+    ctx.ellipse(0, 3, 11, 3, 0, 0, TAU);
+    ctx.fill();
+    ctx.strokeStyle = '#8a6a42';
+    ctx.lineWidth = 3;
+    line(2, 4, 14, -38);
+    ctx.fillStyle = '#d8c9a5';
+    ctx.beginPath();
+    ctx.ellipse(0, 6, 10, 5, 0.2, 0, TAU);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(220,210,180,0.5)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 4; i++) line(-6 + i * 4, 6, -9 + i * 5, 14);
+  }
+
+  function drawLadder() {
+    ctx.translate(0, 12);
+    ctx.strokeStyle = '#d6a11f';
+    ctx.lineWidth = 4;
+    line(-15, 0, -5, -42);
+    line(15, 0, 5, -42);
+    ctx.lineWidth = 2.6;
+    for (let i = 0; i < 4; i++) {
+      const y = -6 - i * 9;
+      line(-13 + i * 2.2, y, 13 - i * 2.2, y);
+    }
+    ctx.strokeStyle = 'rgba(255,215,120,0.35)';
+    ctx.lineWidth = 1;
+    line(-10, -29, 10, -29);
+  }
+
+  function drawBoxCutter() {
+    ctx.rotate(-0.08);
+    ctx.fillStyle = '#c46a1f';
+    rr(-15, -6, 25, 12, 3);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,190,130,0.55)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.fillStyle = '#d8e2e5';
+    ctx.beginPath();
+    ctx.moveTo(10, -3);
+    ctx.lineTo(25, -2);
+    ctx.lineTo(13, 3);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = 'rgba(90,60,30,0.5)';
+    ctx.beginPath();
+    ctx.arc(-5, 0, 2, 0, TAU);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+    line(-12, -4, 4, -4);
+  }
+
+  function drawCrate() {
+    const box = (x, y, w, h, rot) => {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(rot);
+      ctx.fillStyle = '#8b5d34';
+      rr(-w / 2, -h / 2, w, h, 2);
+      ctx.fill();
+      ctx.strokeStyle = '#c08a51';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(240,220,180,0.35)';
+      line(-w / 2, 0, w / 2, 0);
+      ctx.restore();
+    };
+    box(-3, 10, 28, 18, -0.04);
+    box(2, -7, 24, 16, -0.1);
+    box(7, -22, 20, 14, -0.2);
+  }
+
+  function drawSawdust() {
+    ctx.fillStyle = 'rgba(190,150,90,0.65)';
+    ctx.beginPath();
+    ctx.ellipse(0, 5, 25, 7, 0, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(220,185,120,0.5)';
+    ctx.beginPath();
+    ctx.ellipse(-5, 1, 15, 5, -0.1, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(235,205,150,0.55)';
+    for (let i = 0; i < 9; i++) {
+      const a = i * 1.7;
+      ctx.fillRect(Math.cos(a) * 20, Math.sin(a) * 5 + 3, 1.7, 1.2);
+    }
+    const puff = 0.5 + 0.5 * Math.sin(state.t * 2.4);
+    ctx.globalAlpha = 0.15 + puff * 0.18;
+    ctx.fillStyle = '#e2c894';
+    ctx.beginPath();
+    ctx.arc(12, -8 - puff * 3, 7, 0, TAU);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  function drawBlade() {
+    const spin = state.t * 7;
+    ctx.save();
+    ctx.rotate(spin);
+    ctx.fillStyle = '#b9c5c9';
+    for (let i = 0; i < 14; i++) {
+      const a = (i / 14) * TAU;
+      const x1 = Math.cos(a) * 16;
+      const y1 = Math.sin(a) * 16;
+      const x2 = Math.cos(a + 0.08) * 20;
+      const y2 = Math.sin(a + 0.08) * 20;
+      const x3 = Math.cos(a + 0.16) * 16;
+      const y3 = Math.sin(a + 0.16) * 16;
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.lineTo(x3, y3);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
+    ctx.fillStyle = '#9aa6a9';
+    ctx.beginPath();
+    ctx.arc(0, 0, 16, 0, TAU);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(235,250,250,0.6)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.fillStyle = '#323c40';
+    ctx.beginPath();
+    ctx.arc(0, 0, 4, 0, TAU);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,120,100,0.7)';
+    ctx.setLineDash([4, 4]);
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.arc(0, 0, 24, Math.PI * 1.05, Math.PI * 1.95);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = 'rgba(255,120,100,0.8)';
+    ctx.beginPath();
+    ctx.arc(22, -10, 1.8, 0, TAU);
+    ctx.fill();
+  }
+
+  function drawScrap() {
+    ctx.rotate(0.34);
+    ctx.fillStyle = '#8a6238';
+    rr(-24, -5, 48, 9, 1);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(230,195,140,0.4)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    line(-18, -2, 18, 1);
+    ctx.fillStyle = 'rgba(200,170,120,0.3)';
+    ctx.fillRect(8, -3, 6, 2);
+  }
+
+  function drawHose() {
+    ctx.strokeStyle = '#232f33';
+    ctx.lineWidth = 6;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.ellipse(0, 4, 24, 10, -0.15, 0.2, 5.9);
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(120,190,200,0.35)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.ellipse(0, 4, 24, 10, -0.15, 0.2, 5.9);
+    ctx.stroke();
+    ctx.fillStyle = '#3d4a4d';
+    rr(20, -5, 10, 10, 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(94,231,199,0.5)';
+    ctx.fillRect(24, -2, 4, 4);
+  }
+
+  function drawToolEdge() {
+    ctx.rotate(-0.16);
+    ctx.fillStyle = '#b9c3c6';
+    ctx.beginPath();
+    ctx.moveTo(2, -3);
+    ctx.lineTo(22, -2);
+    ctx.lineTo(24, 2);
+    ctx.lineTo(2, 3);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(240,250,250,0.5)';
+    ctx.lineWidth = 0.9;
+    ctx.stroke();
+    ctx.fillStyle = '#7a5a35';
+    rr(-20, -4, 24, 8, 3);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(230,195,140,0.35)';
+    line(-18, 0, 2, 0);
+  }
+
+  function drawFoundBadge(h) {
+    const color = h.correct ? '#5ee7c7' : '#ffb703';
+    const bx = h.x + 20;
+    const by = h.y - 20;
+    ctx.save();
+    ctx.fillStyle = '#07161a';
+    ctx.beginPath();
+    ctx.arc(bx, by, 8, 0, TAU);
+    ctx.fill();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.6;
+    ctx.stroke();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.8;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(bx - 3.4, by);
+    ctx.lineTo(bx - 0.6, by + 3);
+    ctx.lineTo(bx + 3.8, by - 3.2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawHeader() {
+    drawText('FIRST DAY', 30, 30, { size: 10, weight: 700, color: '#6ce9cd', track: 3 });
+    ctx.save();
+    if (state.scorePulse > 0) {
+      ctx.shadowColor = '#ffd166';
+      ctx.shadowBlur = 10 * state.scorePulse;
+    }
+    drawText('SCORE ' + Math.round(state.displayScore), 450, 30, {
+      size: 9, weight: 700, color: '#ffd166', align: 'right', track: 1,
+    });
+    ctx.restore();
+
+    drawText(state.workplace.name.toUpperCase(), 30, 59, {
+      size: 21, weight: 700, color: '#eafcff', track: 0.5,
+    });
+    drawText('SHIFT ' + (state.round + 1) + ' / ' + ROUNDS, 450, 58, {
+      size: 9, color: 'rgba(234,252,255,0.4)', align: 'right', track: 1,
+    });
+    drawText(state.workplace.kind + ' - ' + state.hazards.length + ' HAZARDS', 30, 78, {
+      size: 8, color: 'rgba(234,252,255,0.28)', track: 1.1,
+    });
+
+    for (let i = 0; i < ROUNDS; i++) {
+      const x = 450 - (ROUNDS - 1 - i) * 12;
+      ctx.beginPath();
+      if (i === state.round) {
+        ctx.fillStyle = '#ffd166';
+        ctx.arc(x, 75, 3.2, 0, TAU);
+        ctx.fill();
+      } else if (i < state.round) {
+        ctx.fillStyle = '#5ee7c7';
+        ctx.arc(x, 75, 2.5, 0, TAU);
+        ctx.fill();
+      } else {
+        ctx.strokeStyle = 'rgba(234,252,255,0.2)';
+        ctx.lineWidth = 1;
+        ctx.arc(x, 75, 2.4, 0, TAU);
+        ctx.stroke();
+      }
+    }
+  }
+
+  function drawBottomBar() {
+    rr(20, 566, 440, 62, 14);
+    ctx.fillStyle = 'rgba(9,18,21,0.94)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(94,231,199,0.1)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    drawText('HAZARDS', 36, 587, { size: 8, weight: 700, color: 'rgba(234,252,255,0.4)', track: 1.4 });
+    const n = state.hazards.length;
+    for (let i = 0; i < n; i++) {
+      const h = state.hazards[i];
+      const cx = 106 + i * 16;
+      ctx.beginPath();
+      if (h.found) {
+        ctx.fillStyle = h.answered ? (h.correct ? '#5ee7c7' : '#ffb703') : '#bff9ec';
+        ctx.arc(cx, 583, 3.4, 0, TAU);
+        ctx.fill();
+      } else {
+        ctx.strokeStyle = 'rgba(234,252,255,0.22)';
+        ctx.lineWidth = 1;
+        ctx.arc(cx, 583, 3.1, 0, TAU);
+        ctx.stroke();
+      }
+    }
+    drawText(state.found + '/' + n, 106 + n * 16 + 2, 587, {
+      size: 8.5, weight: 700, color: 'rgba(234,252,255,0.55)', track: 0.6,
+    });
+    drawText('SHIFT +' + state.roundScore, 444, 587, {
+      size: 8.5, weight: 700, color: '#ffd166', align: 'right', track: 0.7,
+    });
+    drawText('NO TIMER - NO SPEED BONUS - RIGHT RESPONSE +100', W / 2, 611, {
+      size: 7.2, color: 'rgba(234,252,255,0.3)', align: 'center', track: 0.7,
+    });
+  }
+
+  function canvasPoint(e) {
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: ((e.clientX - rect.left) / rect.width) * W,
+      y: ((e.clientY - rect.top) / rect.height) * H,
+    };
+  }
+
+  canvas.addEventListener('pointerdown', (e) => {
+    if (state.mode !== 'find') return;
+    const p = canvasPoint(e);
+    let target = null;
+    let bestDist = Infinity;
+    for (const h of state.hazards) {
+      if (h.found) continue;
+      const d = Math.hypot(p.x - h.x, p.y - h.y);
+      if (d <= h.def.radius && d < bestDist) {
+        bestDist = d;
+        target = h;
+      }
+    }
+    if (target) {
+      e.preventDefault();
+      openHazard(target);
+    } else if (p.x >= 20 && p.x <= 460 && p.y >= 88 && p.y <= 558) {
+      state.ripples.push({ x: p.x, y: p.y, life: 1 });
+      if (state.ripples.length > 12) state.ripples.shift();
+    }
+  });
+
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !overlay.hidden && !ovBtn.hidden) {
+      e.preventDefault();
+      ovBtn.click();
+    }
+  });
+
+  function update(dt) {
+    state.t += dt;
+    state.displayScore += (state.score - state.displayScore) * Math.min(1, dt * 8);
+    if (Math.abs(state.score - state.displayScore) < 0.4) state.displayScore = state.score;
+    if (state.scorePulse > 0) state.scorePulse = Math.max(0, state.scorePulse - dt * 2);
+
+    for (let i = state.ripples.length - 1; i >= 0; i--) {
+      state.ripples[i].life -= dt * 1.7;
+      if (state.ripples[i].life <= 0) state.ripples.splice(i, 1);
+    }
+  }
+
+  function render() {
+    drawBackground();
+    drawHeader();
+    drawScene();
+    drawBottomBar();
+  }
+
+  newRun();
+
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min((now - last) / 1000, 0.05);
+    last = now;
+    update(dt);
+    render();
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

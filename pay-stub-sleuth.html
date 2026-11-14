@@ -1,0 +1,2023 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0c1210">
+<title>The Short Check &middot; Pay Stub Sleuth</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --ink: #f4f0e4;
+    --muted: rgba(239, 233, 215, 0.5);
+    --faint: rgba(239, 233, 215, 0.23);
+    --mint: #82e3be;
+    --mint-deep: #3ec49d;
+    --amber: #ffc96b;
+    --amber-deep: #d99e38;
+    --red: #ff8d79;
+    --blue: #8bc8ff;
+    --violet: #c6abff;
+    --line: rgba(232, 205, 153, 0.16);
+    --paper: #eee5d2;
+    --paper-ink: #20241f;
+    --paper-muted: #6e695c;
+    --paper-line: rgba(63, 57, 44, 0.2);
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    overflow: hidden;
+    overscroll-behavior: none;
+    background:
+      radial-gradient(110% 80% at 50% 0%, #29352d 0%, #0c1411 54%, #030706 100%);
+    color: var(--ink);
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  #stage {
+    position: relative;
+    width: min(100%, calc((100dvh - 55px) * 0.75));
+    aspect-ratio: 3 / 4;
+    overflow: hidden;
+    border-radius: 20px;
+    background: #08100d;
+    box-shadow:
+      0 30px 70px -28px rgba(0, 0, 0, 0.96),
+      0 0 0 1px rgba(255, 255, 255, 0.07),
+      inset 0 0 0 1px rgba(255, 201, 107, 0.06);
+    container-type: size;
+  }
+  .hint {
+    margin: 0;
+    color: rgba(239, 233, 215, 0.26);
+    font-size: clamp(6.5px, 1.8vw, 8px);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  button, input { font: inherit; }
+  button:focus-visible, input:focus-visible { outline: 2px solid #e5ffe9; outline-offset: 2px; }
+  [hidden] { display: none !important; }
+
+  #app {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    background:
+      radial-gradient(75% 42% at 50% 0%, rgba(78, 91, 64, 0.2), transparent 76%),
+      linear-gradient(180deg, #101a15 0%, #08100d 72%, #040907 100%);
+  }
+
+  /* top bar */
+  .topbar {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 8px 8px 0;
+    padding: 6px 8px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: linear-gradient(180deg, rgba(31, 43, 35, 0.97), rgba(7, 15, 11, 0.92));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045);
+  }
+  .brand { display: flex; align-items: center; gap: 7px; min-width: 0; }
+  .brand-mark {
+    width: 24px;
+    height: 24px;
+    flex: none;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(255, 201, 107, 0.48);
+    border-radius: 6px;
+    background: rgba(255, 201, 107, 0.08);
+    color: var(--amber);
+    font-size: 11px;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.04em;
+  }
+  .brand b {
+    display: block;
+    color: var(--ink);
+    font-size: clamp(9.5px, 2.15cqw, 12px);
+    line-height: 1.05;
+    letter-spacing: 0.12em;
+    white-space: nowrap;
+  }
+  .brand small {
+    display: block;
+    margin-top: 2px;
+    color: var(--muted);
+    font-size: clamp(5px, 1.15cqw, 6.5px);
+    letter-spacing: 0.13em;
+    white-space: nowrap;
+  }
+  .hud { display: flex; align-items: center; gap: clamp(8px, 2.4cqw, 14px); flex: none; }
+  .stat { text-align: right; }
+  .stat span {
+    display: block;
+    color: var(--muted);
+    font-size: clamp(5px, 1.1cqw, 6.4px);
+    letter-spacing: 0.13em;
+  }
+  .stat strong {
+    display: block;
+    margin-top: 1px;
+    color: var(--amber);
+    font-size: clamp(10px, 2.4cqw, 14px);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .stat:last-child strong { color: var(--mint); }
+
+  /* case board */
+  .caseboard {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    margin: 6px 8px 8px;
+    overflow: hidden;
+    border: 1px solid rgba(232, 205, 153, 0.16);
+    border-radius: 18px;
+    background: linear-gradient(180deg, rgba(14, 25, 19, 0.99), rgba(5, 12, 9, 0.99));
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.045),
+      0 18px 38px -30px rgba(0, 0, 0, 0.9);
+  }
+  .case-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 8px 9px 12px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 201, 107, 0.24) transparent;
+  }
+  .case-scroll::-webkit-scrollbar { width: 4px; }
+  .case-scroll::-webkit-scrollbar-thumb { border-radius: 999px; background: rgba(255, 201, 107, 0.23); }
+
+  /* case header */
+  .period-head {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 63px;
+    gap: 8px;
+    align-items: start;
+    padding: 8px 8px 8px 10px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 201, 107, 0.2);
+    border-radius: 9px;
+    background:
+      radial-gradient(105% 155% at 100% 0%, rgba(255, 201, 107, 0.11), transparent 62%),
+      rgba(255, 201, 107, 0.025);
+  }
+  .period-head::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    border-radius: 0 2px 2px 0;
+    background: linear-gradient(180deg, var(--amber), rgba(255, 201, 107, 0.1));
+  }
+  .eyebrow {
+    margin: 0;
+    color: var(--amber);
+    font-size: clamp(5px, 1.08cqw, 6.2px);
+    letter-spacing: 0.18em;
+    line-height: 1.3;
+    text-transform: uppercase;
+  }
+  .period-copy h1 {
+    margin: 2px 0 0;
+    color: var(--ink);
+    font-size: clamp(14px, 3.3cqw, 20px);
+    line-height: 1.05;
+    letter-spacing: -0.035em;
+  }
+  .period-copy > p:last-child {
+    margin: 4px 0 0;
+    color: rgba(239, 233, 215, 0.58);
+    font-size: clamp(5.8px, 1.24cqw, 7.1px);
+    line-height: 1.43;
+  }
+  .check-badge {
+    padding-left: 7px;
+    border-left: 1px dashed rgba(255, 201, 107, 0.2);
+    text-align: right;
+  }
+  .check-badge span, .check-badge small {
+    display: block;
+    color: rgba(255, 224, 166, 0.5);
+    font-size: clamp(4.6px, 0.98cqw, 5.6px);
+    letter-spacing: 0.1em;
+    line-height: 1.3;
+  }
+  .check-badge strong {
+    display: block;
+    margin: 2px 0 3px;
+    color: var(--amber);
+    font-size: clamp(17px, 4cqw, 24px);
+    line-height: 0.9;
+    font-variant-numeric: tabular-nums;
+  }
+  .status-pill {
+    display: inline-block;
+    padding: 2px 4px;
+    border: 1px solid rgba(255, 201, 107, 0.22);
+    border-radius: 3px;
+    color: rgba(255, 224, 166, 0.65);
+    font-size: clamp(4.2px, 0.88cqw, 5.1px);
+    letter-spacing: 0.08em;
+  }
+  .status-pill.logged {
+    border-color: rgba(130, 227, 190, 0.28);
+    color: var(--mint);
+  }
+
+  /* timecard and clue */
+  .context-grid {
+    display: grid;
+    grid-template-columns: 0.92fr 1.08fr;
+    gap: 5px;
+    margin-top: 5px;
+  }
+  .context-card {
+    min-width: 0;
+    padding: 6px 7px;
+    border: 1px solid rgba(255, 255, 255, 0.065);
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.022);
+  }
+  .context-title {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 5px;
+    padding-bottom: 3px;
+    border-bottom: 1px dashed rgba(255, 255, 255, 0.08);
+  }
+  .context-title span {
+    color: var(--mint);
+    font-size: clamp(4.6px, 0.97cqw, 5.65px);
+    letter-spacing: 0.13em;
+  }
+  .context-title b {
+    color: rgba(239, 233, 215, 0.62);
+    font-size: clamp(4.6px, 0.97cqw, 5.65px);
+    letter-spacing: 0.06em;
+    font-weight: 600;
+  }
+  .hour-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3px 5px;
+    margin-top: 4px;
+  }
+  .hour-grid span, .rate-line span {
+    display: block;
+    color: var(--muted);
+    font-size: clamp(4.4px, 0.92cqw, 5.3px);
+    letter-spacing: 0.08em;
+  }
+  .hour-grid strong {
+    display: block;
+    color: var(--ink);
+    font-size: clamp(9px, 2cqw, 11.5px);
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+  }
+  .rate-line {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 5px;
+    margin-top: 4px;
+    padding-top: 3px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+  }
+  .rate-line b {
+    color: var(--amber);
+    font-size: clamp(7.5px, 1.65cqw, 9.4px);
+    font-variant-numeric: tabular-nums;
+  }
+  .mini-note {
+    margin: 4px 0 0;
+    color: rgba(239, 233, 215, 0.36);
+    font-size: clamp(4.55px, 0.95cqw, 5.45px);
+    line-height: 1.37;
+  }
+  .clue-quote {
+    margin: 4px 0 0;
+    color: rgba(239, 233, 215, 0.7);
+    font-size: clamp(5.6px, 1.18cqw, 6.7px);
+    line-height: 1.45;
+  }
+  .handbook-line {
+    margin: 4px 0 0;
+    padding-top: 3px;
+    border-top: 1px dashed rgba(255, 255, 255, 0.08);
+    color: rgba(255, 214, 134, 0.62);
+    font-size: clamp(4.75px, 1cqw, 5.75px);
+    line-height: 1.4;
+  }
+  .handbook-line b { color: var(--amber); letter-spacing: 0.05em; }
+
+  /* paper pay stub */
+  .stub {
+    position: relative;
+    margin-top: 6px;
+    overflow: hidden;
+    border-radius: 7px;
+    background: linear-gradient(180deg, #f2ead9 0%, #eae0cb 100%);
+    color: var(--paper-ink);
+    box-shadow: 0 10px 24px -15px rgba(0, 0, 0, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.55);
+  }
+  .stub::before {
+    content: "";
+    display: block;
+    height: 4px;
+    background: repeating-linear-gradient(90deg, #bfb39d 0 5px, transparent 5px 8px);
+    opacity: 0.48;
+  }
+  .stub-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 7px 9px 6px;
+    border-bottom: 1px solid var(--paper-line);
+  }
+  .stub-kicker {
+    margin: 0;
+    color: #9c4a2e;
+    font-size: clamp(4.5px, 0.94cqw, 5.4px);
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    line-height: 1.3;
+  }
+  .stub-name {
+    margin: 2px 0 0;
+    color: var(--paper-ink);
+    font-size: clamp(10px, 2.2cqw, 13px);
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+  }
+  .stub-role {
+    margin: 2px 0 0;
+    color: var(--paper-muted);
+    font-size: clamp(4.55px, 0.95cqw, 5.45px);
+    line-height: 1.3;
+  }
+  .check-meta {
+    flex: none;
+    text-align: right;
+    color: var(--paper-muted);
+    font-size: clamp(4.4px, 0.9cqw, 5.2px);
+    line-height: 1.45;
+  }
+  .check-meta b {
+    display: block;
+    color: #7d3825;
+    font-size: clamp(6.4px, 1.35cqw, 7.6px);
+    line-height: 1.2;
+    letter-spacing: 0.04em;
+  }
+  .stub-key {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 9px;
+    background: rgba(109, 96, 64, 0.08);
+    border-bottom: 1px solid rgba(63, 57, 44, 0.13);
+    color: var(--paper-muted);
+    font-size: clamp(4.25px, 0.87cqw, 5.05px);
+    line-height: 1.3;
+  }
+  .stub-key b { color: #37452d; }
+  .stub-key .arrow { color: #a46534; font-weight: 700; }
+  .section-label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 9px 2px;
+    color: #7e7059;
+    font-size: clamp(4.1px, 0.85cqw, 4.9px);
+    font-weight: 700;
+    letter-spacing: 0.16em;
+  }
+  .section-label::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: rgba(63, 57, 44, 0.13);
+  }
+  .stub-row {
+    width: 100%;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 7px;
+    align-items: center;
+    padding: 3.5px 9px;
+    border: 0;
+    border-bottom: 1px dotted rgba(63, 57, 44, 0.14);
+    background: transparent;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background 110ms ease, box-shadow 110ms ease;
+  }
+  .stub-row:hover { background: rgba(132, 83, 42, 0.07); }
+  .stub-row.selected {
+    background: rgba(164, 76, 43, 0.13);
+    box-shadow: inset 3px 0 0 #a44c2b;
+  }
+  .line-label {
+    display: block;
+    color: #2b2d27;
+    font-size: clamp(5.2px, 1.08cqw, 6.2px);
+    font-weight: 600;
+    line-height: 1.25;
+  }
+  .line-detail {
+    display: block;
+    margin-top: 1px;
+    color: var(--paper-muted);
+    font-size: clamp(4.15px, 0.85cqw, 4.9px);
+    line-height: 1.25;
+  }
+  .line-right { text-align: right; white-space: nowrap; }
+  .line-amount {
+    display: block;
+    color: #272b25;
+    font-size: clamp(5.9px, 1.2cqw, 6.9px);
+    font-weight: 700;
+    line-height: 1.2;
+    font-variant-numeric: tabular-nums;
+  }
+  .line-tag {
+    display: block;
+    margin-top: 1px;
+    color: #99836a;
+    font-size: clamp(3.8px, 0.76cqw, 4.4px);
+    letter-spacing: 0.08em;
+    line-height: 1.2;
+  }
+  .stub-row.gross-row {
+    background: rgba(72, 96, 59, 0.08);
+    border-top: 1px solid rgba(63, 57, 44, 0.16);
+  }
+  .stub-row.gross-row .line-label { font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; }
+  .stub-row.gross-row .line-amount { color: #38513a; }
+  .stub-row.total-deductions .line-label { color: #703726; font-weight: 700; }
+  .stub-row.net-row {
+    padding-top: 5px;
+    padding-bottom: 5px;
+    border-top: 3px double rgba(56, 76, 48, 0.52);
+    border-bottom: 0;
+    background: #d9e2ce;
+  }
+  .stub-row.net-row .line-label {
+    color: #263c2a;
+    font-size: clamp(6px, 1.25cqw, 7.2px);
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .stub-row.net-row .line-amount {
+    color: #1f3e2b;
+    font-size: clamp(8px, 1.7cqw, 9.8px);
+  }
+  .stub-row.net-row .line-tag { color: #56715a; }
+  .stub-row.deduction-row .line-amount { color: #7c3c2c; }
+  .stub-foot {
+    margin: 0;
+    padding: 4px 9px 5px;
+    background: rgba(109, 96, 64, 0.08);
+    color: #8b806d;
+    font-size: clamp(3.9px, 0.79cqw, 4.6px);
+    line-height: 1.3;
+    text-align: center;
+    letter-spacing: 0.03em;
+  }
+
+  /* pinned evidence */
+  .pin-box {
+    min-height: 29px;
+    margin-top: 5px;
+    padding: 5px 7px;
+    border: 1px solid rgba(255, 201, 107, 0.15);
+    border-radius: 6px;
+    background: rgba(255, 201, 107, 0.03);
+    color: rgba(239, 233, 215, 0.45);
+    font-size: clamp(4.95px, 1.02cqw, 5.9px);
+    line-height: 1.4;
+  }
+  .pin-box.has-pin {
+    border-color: rgba(255, 201, 107, 0.32);
+    color: rgba(255, 230, 184, 0.72);
+  }
+  .pin-box b { color: var(--amber); }
+  .pin-box .pin-tag {
+    display: inline-block;
+    margin-right: 4px;
+    color: rgba(255, 201, 107, 0.55);
+    font-size: 0.86em;
+    letter-spacing: 0.08em;
+  }
+  .no-error-wrap { display: flex; justify-content: flex-end; margin-top: 3px; }
+  .no-error-btn {
+    padding: 3px 6px;
+    border: 1px solid rgba(130, 227, 190, 0.18);
+    border-radius: 4px;
+    background: rgba(130, 227, 190, 0.035);
+    color: rgba(189, 241, 220, 0.56);
+    font-size: clamp(4.35px, 0.9cqw, 5.2px);
+    cursor: pointer;
+  }
+  .no-error-btn:hover { border-color: rgba(130, 227, 190, 0.4); color: var(--mint); }
+  .no-error-btn.selected {
+    border-color: rgba(130, 227, 190, 0.52);
+    background: rgba(130, 227, 190, 0.1);
+    color: var(--mint);
+  }
+
+  /* calculations */
+  .paper-panel {
+    margin-top: 6px;
+    padding: 7px;
+    border: 1px solid rgba(255, 255, 255, 0.065);
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.018);
+  }
+  .panel-title {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 6px;
+    margin-bottom: 5px;
+  }
+  .panel-title h2 {
+    margin: 0;
+    color: var(--ink);
+    font-size: clamp(6.2px, 1.3cqw, 7.5px);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+  .panel-title span {
+    color: var(--muted);
+    font-size: clamp(4.2px, 0.87cqw, 5px);
+    letter-spacing: 0.05em;
+  }
+  .calc-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+  }
+  .calc-field { min-width: 0; }
+  .calc-field.net-field { grid-column: 1 / -1; }
+  .calc-field label {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 4px;
+    color: rgba(239, 233, 215, 0.7);
+    font-size: clamp(4.55px, 0.94cqw, 5.4px);
+    line-height: 1.2;
+  }
+  .calc-field label span {
+    color: rgba(239, 233, 215, 0.3);
+    font-size: 0.9em;
+    white-space: nowrap;
+  }
+  .input-wrap {
+    position: relative;
+    margin-top: 2px;
+  }
+  .input-wrap::before {
+    content: "$";
+    position: absolute;
+    left: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: rgba(255, 201, 107, 0.55);
+    font-size: clamp(6px, 1.3cqw, 7.2px);
+    pointer-events: none;
+  }
+  .calc-field input {
+    width: 100%;
+    min-width: 0;
+    padding: 4px 5px 4px 15px;
+    border: 1px solid rgba(255, 201, 107, 0.17);
+    border-radius: 4px;
+    background: rgba(3, 8, 6, 0.6);
+    color: var(--ink);
+    font-size: clamp(7px, 1.5cqw, 8.5px);
+    font-variant-numeric: tabular-nums;
+    -webkit-user-select: text;
+    user-select: text;
+    appearance: textfield;
+  }
+  .calc-field input::-webkit-outer-spin-button,
+  .calc-field input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .calc-field input:focus { border-color: rgba(255, 201, 107, 0.57); }
+  .calc-field input::placeholder { color: rgba(239, 233, 215, 0.14); }
+  .calc-help {
+    margin: 4px 0 0;
+    color: rgba(239, 233, 215, 0.28);
+    font-size: clamp(4.15px, 0.84cqw, 4.85px);
+    line-height: 1.35;
+  }
+
+  /* explanation */
+  .explain-list { display: grid; gap: 3px; }
+  .explain-option {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 16px minmax(0, 1fr);
+    gap: 5px;
+    align-items: start;
+    padding: 5px 6px;
+    border: 1px solid rgba(255, 255, 255, 0.065);
+    border-radius: 5px;
+    background: rgba(255, 255, 255, 0.02);
+    color: rgba(239, 233, 215, 0.6);
+    font-size: clamp(4.9px, 1.01cqw, 5.85px);
+    line-height: 1.4;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 110ms ease, background 110ms ease;
+  }
+  .explain-option:hover { border-color: rgba(255, 201, 107, 0.28); background: rgba(255, 201, 107, 0.04); }
+  .explain-option.selected {
+    border-color: rgba(255, 201, 107, 0.48);
+    background: rgba(255, 201, 107, 0.09);
+    color: rgba(255, 240, 212, 0.88);
+  }
+  .opt-letter {
+    display: grid;
+    place-items: center;
+    width: 15px;
+    height: 15px;
+    border: 1px solid rgba(255, 201, 107, 0.22);
+    border-radius: 50%;
+    color: var(--amber);
+    font-size: clamp(4.7px, 0.95cqw, 5.55px);
+    font-weight: 700;
+    line-height: 1;
+  }
+  .explain-option.selected .opt-letter { border-color: var(--amber); background: rgba(255, 201, 107, 0.16); }
+
+  /* action bar */
+  .actionbar {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-height: 30px;
+    padding: 0 9px 8px;
+  }
+  .notice {
+    min-width: 0;
+    flex: 1;
+    margin: 0;
+    color: rgba(239, 233, 215, 0.36);
+    font-size: clamp(4.9px, 1.01cqw, 5.9px);
+    line-height: 1.35;
+  }
+  .notice.ready { color: rgba(130, 227, 190, 0.7); }
+  .audit-btn {
+    flex: none;
+    padding: 7px 11px;
+    border: 0;
+    border-radius: 6px;
+    background: linear-gradient(180deg, #ffd887, #e7ab43);
+    box-shadow: 0 8px 18px -10px rgba(255, 201, 107, 0.8), inset 0 -2px 0 rgba(0, 0, 0, 0.17);
+    color: #2c210b;
+    font-size: clamp(5.7px, 1.16cqw, 6.8px);
+    font-weight: 800;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .audit-btn:hover:not(:disabled) { filter: brightness(1.05); }
+  .audit-btn:active:not(:disabled) { transform: translateY(1px); }
+  .audit-btn:disabled { opacity: 0.4; cursor: default; }
+
+  /* overlays */
+  .overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 9;
+    display: grid;
+    place-items: center;
+    padding: 13px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    background: rgba(3, 8, 6, 0.88);
+    -webkit-backdrop-filter: blur(5px);
+    backdrop-filter: blur(5px);
+    animation: fade-in 160ms ease-out;
+  }
+  @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+  .panel {
+    width: 100%;
+    max-width: 355px;
+    max-height: 100%;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 15px;
+    border: 1px solid rgba(232, 205, 153, 0.2);
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(25, 36, 28, 0.998), rgba(5, 12, 9, 0.998));
+    box-shadow: 0 25px 60px -24px rgba(0, 0, 0, 0.97), inset 0 1px 0 rgba(255, 255, 255, 0.045);
+    text-align: center;
+    scrollbar-width: thin;
+  }
+  .intro-panel { max-width: 335px; }
+  .intro-title {
+    margin: 4px 0 7px;
+    color: var(--ink);
+    font-size: clamp(29px, 7.6cqw, 40px);
+    line-height: 0.94;
+    letter-spacing: -0.065em;
+    text-shadow: 0 0 32px rgba(255, 201, 107, 0.1);
+  }
+  .intro-title span { color: var(--amber); }
+  .intro-lede {
+    margin: 0;
+    color: rgba(239, 233, 215, 0.64);
+    font-size: clamp(7.3px, 1.5cqw, 8.6px);
+    line-height: 1.5;
+  }
+  .intro-lede b { color: rgba(255, 223, 156, 0.94); }
+  .intro-card {
+    margin-top: 9px;
+    padding: 7px 8px;
+    border: 1px solid rgba(255, 201, 107, 0.24);
+    border-radius: 7px;
+    background: rgba(255, 201, 107, 0.045);
+    text-align: left;
+  }
+  .intro-card span {
+    display: block;
+    color: var(--amber);
+    font-size: clamp(4.8px, 1cqw, 5.7px);
+    letter-spacing: 0.14em;
+  }
+  .intro-card p {
+    margin: 3px 0 0;
+    color: rgba(255, 242, 213, 0.72);
+    font-size: clamp(5.8px, 1.2cqw, 6.8px);
+    line-height: 1.47;
+  }
+  .intro-card b { color: var(--ink); }
+  .intro-rules { display: grid; gap: 3px; margin-top: 8px; text-align: left; }
+  .intro-rule {
+    position: relative;
+    padding-left: 12px;
+    color: rgba(239, 233, 215, 0.55);
+    font-size: clamp(5.6px, 1.16cqw, 6.6px);
+    line-height: 1.4;
+  }
+  .intro-rule::before { content: "\25B8"; position: absolute; left: 1px; color: var(--amber); }
+  .intro-rule b { color: rgba(239, 233, 215, 0.86); }
+  .score-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; margin-top: 8px; }
+  .score-cell {
+    padding: 5px 3px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.022);
+  }
+  .score-cell span {
+    display: block;
+    color: var(--muted);
+    font-size: clamp(4.1px, 0.82cqw, 4.8px);
+    letter-spacing: 0.05em;
+    line-height: 1.2;
+    text-transform: uppercase;
+  }
+  .score-cell strong {
+    display: block;
+    margin-top: 2px;
+    color: var(--amber);
+    font-size: clamp(8px, 1.65cqw, 9.5px);
+    line-height: 1.1;
+  }
+  .score-cell:nth-child(2) strong { color: var(--mint); }
+  .score-cell:nth-child(3) strong { color: var(--blue); }
+  .btn {
+    margin-top: 11px;
+    padding: 9px 20px;
+    border: 0;
+    border-radius: 999px;
+    background: linear-gradient(180deg, #ffd989, #e5a73e);
+    box-shadow: 0 14px 30px -14px rgba(255, 201, 107, 0.75), inset 0 -2px 0 rgba(0, 0, 0, 0.17);
+    color: #2c210b;
+    font-size: clamp(7px, 1.42cqw, 8.3px);
+    font-weight: 800;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+  .btn:hover { filter: brightness(1.05); }
+  .btn:active { transform: translateY(1px) scale(0.99); }
+  .fine {
+    margin: 7px 0 0;
+    color: rgba(239, 233, 215, 0.27);
+    font-size: clamp(4.7px, 0.94cqw, 5.4px);
+    letter-spacing: 0.07em;
+    line-height: 1.4;
+    text-transform: uppercase;
+  }
+
+  /* result */
+  .result-panel { max-width: 345px; }
+  .result-title {
+    margin: 3px 0 2px;
+    color: var(--ink);
+    font-size: clamp(20px, 4.9cqw, 27px);
+    line-height: 1.02;
+    letter-spacing: -0.045em;
+  }
+  .result-title.good { color: var(--mint); }
+  .result-title.low { color: var(--red); }
+  .result-score-line {
+    margin: 5px 0 0;
+    color: rgba(239, 233, 215, 0.58);
+    font-size: clamp(6px, 1.2cqw, 6.9px);
+  }
+  .result-score-line strong { color: var(--amber); font-size: 1.7em; }
+  .result-chips { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; margin-top: 7px; }
+  .result-chip {
+    padding: 4px 3px;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.022);
+  }
+  .result-chip span {
+    display: block;
+    color: var(--muted);
+    font-size: clamp(4.1px, 0.82cqw, 4.8px);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .result-chip strong {
+    display: block;
+    margin-top: 1px;
+    color: var(--mint);
+    font-size: clamp(7.4px, 1.5cqw, 8.7px);
+    font-variant-numeric: tabular-nums;
+  }
+  .result-gap {
+    margin-top: 7px;
+    padding: 6px 7px;
+    border-left: 2px solid rgba(255, 201, 107, 0.6);
+    border-radius: 0 5px 5px 0;
+    background: rgba(255, 201, 107, 0.045);
+    color: rgba(255, 236, 196, 0.75);
+    font-size: clamp(5.4px, 1.1cqw, 6.3px);
+    line-height: 1.45;
+    text-align: left;
+  }
+  .result-gap b { color: var(--amber); }
+  .math-review { margin-top: 6px; border-top: 1px solid rgba(255, 255, 255, 0.07); }
+  .review-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto 30px;
+    gap: 6px;
+    align-items: center;
+    padding: 2.5px 0;
+    border-bottom: 1px dotted rgba(255, 255, 255, 0.07);
+    text-align: left;
+  }
+  .review-row span {
+    color: rgba(239, 233, 215, 0.58);
+    font-size: clamp(5px, 1.03cqw, 5.9px);
+  }
+  .review-row span small { display: block; color: rgba(239, 233, 215, 0.3); font-size: 0.85em; }
+  .review-row b {
+    color: var(--ink);
+    font-size: clamp(5.5px, 1.13cqw, 6.5px);
+    font-variant-numeric: tabular-nums;
+  }
+  .review-points {
+    text-align: right;
+    color: var(--mint);
+    font-size: clamp(4.8px, 0.98cqw, 5.6px);
+  }
+  .review-points.miss { color: var(--red); }
+  .result-explain {
+    margin: 6px 0 0;
+    padding-top: 5px;
+    border-top: 1px solid rgba(255, 255, 255, 0.07);
+    color: rgba(239, 233, 215, 0.53);
+    font-size: clamp(5.2px, 1.06cqw, 6px);
+    line-height: 1.45;
+    text-align: left;
+  }
+  .result-explain b { color: var(--amber); }
+  .result-explain .correct { color: rgba(189, 241, 220, 0.83); }
+
+  /* final */
+  .final-panel { max-width: 345px; }
+  .final-title {
+    margin: 4px 0 2px;
+    color: var(--mint);
+    font-size: clamp(24px, 5.9cqw, 33px);
+    line-height: 0.98;
+    letter-spacing: -0.05em;
+  }
+  .final-title.low { color: var(--red); }
+  .rank {
+    margin: 5px 0 0;
+    color: var(--amber);
+    font-size: clamp(6px, 1.25cqw, 7.1px);
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+  }
+  .final-score {
+    margin-top: 7px;
+    padding: 6px;
+    border: 1px solid rgba(255, 201, 107, 0.23);
+    border-radius: 7px;
+    background: rgba(255, 201, 107, 0.045);
+  }
+  .final-score span {
+    display: block;
+    color: var(--muted);
+    font-size: clamp(4.5px, 0.9cqw, 5.2px);
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+  .final-score strong {
+    display: block;
+    margin-top: 1px;
+    color: var(--amber);
+    font-size: clamp(24px, 6cqw, 34px);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .final-score em { color: var(--muted); font-size: 0.32em; font-style: normal; letter-spacing: 0.08em; }
+  .final-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; margin-top: 5px; }
+  .final-stat {
+    padding: 4px 3px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.02);
+  }
+  .final-stat span { display: block; color: var(--muted); font-size: clamp(3.9px, 0.79cqw, 4.6px); letter-spacing: 0.05em; text-transform: uppercase; }
+  .final-stat b { display: block; margin-top: 1px; color: var(--ink); font-size: clamp(6.2px, 1.27cqw, 7.4px); }
+  .final-stat:nth-child(1) b { color: var(--mint); }
+  .final-stat:nth-child(2) b { color: var(--amber); }
+  .final-stat:nth-child(3) b { color: var(--blue); }
+  .final-ledger { margin-top: 7px; border-top: 1px solid rgba(255, 255, 255, 0.07); }
+  .ledger-row {
+    display: grid;
+    grid-template-columns: 15px minmax(0, 1fr) auto auto;
+    gap: 5px;
+    align-items: center;
+    padding: 3px 0;
+    border-bottom: 1px dotted rgba(255, 255, 255, 0.07);
+    color: rgba(239, 233, 215, 0.5);
+    font-size: clamp(4.7px, 0.96cqw, 5.5px);
+    text-align: left;
+  }
+  .ledger-row b { color: rgba(255, 201, 107, 0.8); font-weight: 600; }
+  .ledger-row em { color: var(--mint); font-style: normal; }
+  .ledger-row em.miss { color: var(--red); }
+  .ledger-row strong { color: var(--ink); font-variant-numeric: tabular-nums; }
+  .final-copy {
+    margin: 7px 0 0;
+    color: rgba(239, 233, 215, 0.54);
+    font-size: clamp(5.4px, 1.1cqw, 6.25px);
+    line-height: 1.47;
+    text-align: left;
+  }
+  .final-copy b { color: rgba(255, 225, 163, 0.85); }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+  }
+  @container (max-height: 600px) {
+    .period-head { padding-top: 6px; padding-bottom: 6px; }
+    .context-card { padding-top: 5px; padding-bottom: 5px; }
+    .stub-row { padding-top: 3px; padding-bottom: 3px; }
+    .paper-panel { margin-top: 5px; padding: 6px; }
+    .intro-rules { gap: 2px; }
+    .panel { padding-top: 12px; padding-bottom: 12px; }
+  }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="app" inert>
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">PS</span>
+        <div>
+          <b>PAY STUB SLEUTH</b>
+          <small>CASE 021 &middot; ATLAS ARCADE</small>
+        </div>
+      </div>
+      <div class="hud">
+        <div class="stat"><span>AUDIT</span><strong id="roundHud">1/5</strong></div>
+        <div class="stat"><span>SCORE</span><strong id="scoreHud">0/500</strong></div>
+      </div>
+    </header>
+
+    <section class="caseboard" aria-label="June Park's payroll audit">
+      <div id="caseScroll" class="case-scroll">
+        <header class="period-head">
+          <div class="period-copy">
+            <p class="eyebrow" id="periodKicker">CHECK 01 &middot; TRAINING WEEK</p>
+            <h1 id="periodTitle" tabindex="-1">The free uniform</h1>
+            <p id="periodSummary">Dee said the uniform shirts were supplied at no cost. Mine says otherwise.</p>
+          </div>
+          <div class="check-badge">
+            <span>CHECK</span>
+            <strong id="periodNumber">01</strong>
+            <small class="status-pill" id="checkStatus">OPEN</small>
+          </div>
+        </header>
+
+        <div class="context-grid">
+          <section class="context-card" aria-label="Clocked hours and rate">
+            <div class="context-title"><span>CLOCKED HOURS</span><b>JUNE PARK</b></div>
+            <div class="hour-grid">
+              <div><span>REGULAR</span><strong id="timeRegular">22.0</strong></div>
+              <div><span>OVERTIME</span><strong id="timeOvertime">0.0</strong></div>
+            </div>
+            <div class="rate-line"><span>HOURLY RATE</span><b id="timeRate">$14.00</b></div>
+            <p class="mini-note"><span id="timeTotal">22.0 total hours</span> &middot; <span id="timePolicy">overtime after 40</span></p>
+          </section>
+          <section class="context-card" aria-label="Case clue and payroll handbook">
+            <div class="context-title"><span>JUNE'S NOTE</span><b>WEEK 1</b></div>
+            <blockquote class="clue-quote" id="clueQuote">&ldquo;Dee said the uniform shirts were supplied at no cost. Mine says otherwise.&rdquo;</blockquote>
+            <p class="handbook-line"><b>HANDBOOK:</b> <span id="handbookNote">Uniforms are supplied at no cost. Any uniform charge is unauthorized.</span></p>
+          </section>
+        </div>
+
+        <article class="stub" aria-label="Fictional pay stub for June Park">
+          <div class="stub-head">
+            <div>
+              <p class="stub-kicker">ATLAS ARCADE &middot; EARNINGS STATEMENT</p>
+              <h2 class="stub-name">JUNE PARK</h2>
+              <p class="stub-role">Sales associate &middot; hourly &middot; fictional practice stub</p>
+            </div>
+            <div class="check-meta">
+              <b id="stubCheck">PS-041</b>
+              <span id="stubPeriod">MAR 03 &ndash; MAR 09</span>
+              <span id="stubRate">RATE $14.00</span>
+            </div>
+          </div>
+          <div class="stub-key"><span><b>GROSS</b> before deductions</span><span class="arrow">&rarr;</span><span><b>DEDUCTIONS</b> taken out</span><span class="arrow">&rarr;</span><span><b>NET</b> take-home</span></div>
+          <div id="stubRows"></div>
+          <p class="stub-foot">Fictional employer and figures for practice &middot; not a real check or tax document</p>
+        </article>
+
+        <div id="pinBox" class="pin-box" aria-live="polite">Tap any pay-stub row to inspect it. Then pin the line that explains the gap.</div>
+        <div class="no-error-wrap"><button type="button" id="noErrorBtn" class="no-error-btn" aria-pressed="false">No line needs correction</button></div>
+
+        <section class="paper-panel" aria-labelledby="calcHeading">
+          <div class="panel-title"><h2 id="calcHeading">Rebuild the check</h2><span>All amounts in dollars</span></div>
+          <div id="calcGrid" class="calc-grid">
+            <div class="calc-field">
+              <label for="calc-regular">Regular pay <span>hours &times; rate</span></label>
+              <div class="input-wrap"><input id="calc-regular" data-field="regular" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00" autocomplete="off"></div>
+            </div>
+            <div class="calc-field">
+              <label for="calc-overtime">Overtime pay <span>OT &times; rate &times; 1.5</span></label>
+              <div class="input-wrap"><input id="calc-overtime" data-field="overtime" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00" autocomplete="off"></div>
+            </div>
+            <div class="calc-field">
+              <label for="calc-gross">Gross pay <span>regular + overtime</span></label>
+              <div class="input-wrap"><input id="calc-gross" data-field="gross" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00" autocomplete="off"></div>
+            </div>
+            <div class="calc-field">
+              <label for="calc-deductions">Total deductions <span>valid lines only</span></label>
+              <div class="input-wrap"><input id="calc-deductions" data-field="deductions" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00" autocomplete="off"></div>
+            </div>
+            <div class="calc-field net-field">
+              <label for="calc-net">Net pay <span>gross &minus; deductions</span></label>
+              <div class="input-wrap"><input id="calc-net" data-field="net" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00" autocomplete="off"></div>
+            </div>
+          </div>
+          <p class="calc-help">Use the timecard for hours. Include only valid deductions. All amounts round to the nearest cent.</p>
+        </section>
+
+        <section class="paper-panel" aria-labelledby="explainHeading">
+          <div class="panel-title"><h2 id="explainHeading">What did the audit find?</h2><span>Choose one explanation</span></div>
+          <div id="explainList" class="explain-list" role="group" aria-label="Payroll explanation choices"></div>
+        </section>
+      </div>
+
+      <div class="actionbar">
+        <p id="notice" class="notice">Five calculations, one pinned line, and one explanation.</p>
+        <button type="button" id="auditBtn" class="audit-btn" disabled>Audit check</button>
+      </div>
+    </section>
+  </div>
+
+  <div id="intro" class="overlay" role="dialog" aria-modal="true" aria-labelledby="introTitle">
+    <div class="panel intro-panel">
+      <p class="eyebrow">A FIRST-JOB PAYROLL MYSTERY</p>
+      <h1 class="intro-title" id="introTitle">The Short<br><span>Check</span></h1>
+      <p class="intro-lede">June Park just started at <b>Atlas Arcade</b>. Five pay stubs. Somewhere between the timecard and the take-home pay, money keeps disappearing.</p>
+      <div class="intro-card">
+        <span>CASE FILE &middot; JUNE PARK, 17</span>
+        <p>Rebuild each check, <b>pin the stub line</b> that explains the gap, and choose the explanation. Every period changes the hours and deductions.</p>
+      </div>
+      <div class="intro-rules">
+        <div class="intro-rule"><b>Gross pay</b> is all earnings before deductions. <b>Net pay</b> is what remains after they are subtracted.</div>
+        <div class="intro-rule">Regular pay is hours &times; rate. <b>Overtime</b> begins after 40 hours and pays 1.5&times;.</div>
+        <div class="intro-rule">Tap any stub row for its role. Pin the line that explains the gap, or mark a clean check.</div>
+        <div class="intro-rule">New hours and deduction amounts each period. <b>No answer carries forward.</b></div>
+      </div>
+      <div class="score-grid">
+        <div class="score-cell"><span>MATH</span><strong>60</strong></div>
+        <div class="score-cell"><span>EVIDENCE</span><strong>20</strong></div>
+        <div class="score-cell"><span>EXPLANATION</span><strong>20</strong></div>
+      </div>
+      <button type="button" id="startBtn" class="btn">Open the case file &rarr;</button>
+      <p class="fine">5 checks &middot; 500 points &middot; no timer &middot; fictional figures</p>
+    </div>
+  </div>
+
+  <div id="resultOverlay" class="overlay" role="dialog" aria-modal="true" aria-labelledby="resultTitle" hidden>
+    <div id="resultPanel" class="panel result-panel"></div>
+  </div>
+
+  <div id="finalOverlay" class="overlay" role="dialog" aria-modal="true" aria-labelledby="finalTitle" hidden>
+    <div class="panel final-panel">
+      <p class="eyebrow" id="finalEyebrow">CASE CLOSED &middot; TRIAL MONTH</p>
+      <h1 class="final-title" id="finalTitle">The ledger<br>balances.</h1>
+      <p class="rank" id="finalRank">Payroll detective</p>
+      <div class="final-score"><span>FINAL SCORE</span><strong><span id="finalScore">0</span><em> / 500</em></strong></div>
+      <div class="final-stats">
+        <div class="final-stat"><span>READS</span><b id="finalReads">0 / 5</b></div>
+        <div class="final-stat"><span>MATH</span><b id="finalMath">0 / 25</b></div>
+        <div class="final-stat"><span>ERRORS</span><b id="finalErrors">0 / 4</b></div>
+      </div>
+      <div class="final-ledger" id="finalLedger" aria-label="Five-check score ledger"></div>
+      <p class="final-copy" id="finalNarrative"></p>
+      <button type="button" id="restartBtn" class="btn">Audit another month &rarr;</button>
+      <p class="fine" id="finalFoot">Fictional employer and figures &middot; illustrative deductions &middot; not tax advice</p>
+    </div>
+  </div>
+</div>
+<p class="hint">FICTIONAL PAY STUBS &middot; CLICK THE LINES &middot; NO TIMER</p>
+<script>
+(() => {
+  'use strict';
+
+  const MAX_SCORE = 500;
+  const FIELD_POINTS = 12;
+  const EVIDENCE_POINTS = 20;
+  const EXPLANATION_POINTS = 20;
+  const FIELDS = [
+    { id: 'regular', label: 'Regular pay', formula: 'regular hours × rate' },
+    { id: 'overtime', label: 'Overtime pay', formula: 'OT hours × rate × 1.5' },
+    { id: 'gross', label: 'Gross pay', formula: 'regular + overtime' },
+    { id: 'deductions', label: 'Total deductions', formula: 'sum of valid deductions' },
+    { id: 'net', label: 'Net pay', formula: 'gross − deductions' },
+  ];
+
+  const ROUNDS = [
+    {
+      id: 'training',
+      checkNo: 'PS-041',
+      period: 'MAR 03 – MAR 09',
+      kicker: 'CHECK 01 · TRAINING WEEK',
+      week: 'WEEK 1',
+      title: 'The free uniform',
+      summary: 'Dee said the uniform shirts were supplied at no cost. Mine says otherwise.',
+      quote: '“Dee said the uniform shirts were supplied at no cost. Mine says otherwise.”',
+      handbook: 'Uniforms are supplied at no cost. Any uniform charge is unauthorized.',
+      rate: 14,
+      regHours: 22,
+      otHours: 0,
+      printedRegHours: 22,
+      printedOtHours: 0,
+      deductions: [
+        { id: 'fed', label: 'Federal income tax', amount: 26, kind: 'tax', valid: true, note: 'Illustrative federal income tax withheld from gross pay.' },
+        { id: 'state', label: 'State income tax', amount: 10, kind: 'tax', valid: true, note: 'Illustrative state income tax withheld from gross pay.' },
+        { id: 'ss', label: 'Social Security', amount: 19.10, kind: 'tax', valid: true, note: 'A payroll withholding taken out before net pay.' },
+        { id: 'medicare', label: 'Medicare', amount: 4.47, kind: 'tax', valid: true, note: 'A payroll withholding taken out before net pay.' },
+        { id: 'uniform', label: 'Uniform fee', amount: 18, kind: 'charge', valid: false, note: 'A charge for uniform shirts. The handbook says uniforms are supplied at no cost.' },
+      ],
+      evidence: ['uniform'],
+      clean: false,
+      options: [
+        { id: 'uniform-tax', text: 'The uniform fee is a required tax, so it belongs beside Medicare.', correct: false },
+        { id: 'uniform-wrong', text: 'An unauthorized uniform fee was deducted. Gross pay is correct, but net pay is lower.', correct: true },
+        { id: 'uniform-rate', text: 'Regular hours were paid at the wrong hourly rate.', correct: false },
+      ],
+      explain: 'The $18.00 uniform charge is not authorized. The earnings and printed gross are correct, but the invalid deduction lowers net pay. Remove it from deductions to get the correct take-home amount.',
+    },
+    {
+      id: 'overtime-folded',
+      checkNo: 'PS-042',
+      period: 'MAR 10 – MAR 16',
+      kicker: 'CHECK 02 · FIRST FULL WEEK',
+      week: 'WEEK 2',
+      title: 'The missing half-time',
+      summary: 'I worked five hours past forty. The stub has no overtime line.',
+      quote: '“I worked five hours past forty. The stub has no overtime line.”',
+      handbook: 'Overtime begins after 40 hours in a week. Overtime rate = 1.5 × the hourly rate.',
+      rate: 14,
+      regHours: 40,
+      otHours: 5,
+      printedRegHours: 45,
+      printedOtHours: 0,
+      deductions: [
+        { id: 'fed', label: 'Federal income tax', amount: 52, kind: 'tax', valid: true, note: 'Illustrative federal income tax withheld from gross pay.' },
+        { id: 'state', label: 'State income tax', amount: 18, kind: 'tax', valid: true, note: 'Illustrative state income tax withheld from gross pay.' },
+        { id: 'ss', label: 'Social Security', amount: 39.06, kind: 'tax', valid: true, note: 'A payroll withholding taken out before net pay.' },
+        { id: 'medicare', label: 'Medicare', amount: 9.14, kind: 'tax', valid: true, note: 'A payroll withholding taken out before net pay.' },
+        { id: 'retirement', label: 'Retirement plan', amount: 25, kind: 'benefit', valid: true, note: 'An elected retirement contribution deducted from gross pay.' },
+      ],
+      evidence: ['regular', 'overtime'],
+      clean: false,
+      options: [
+        { id: 'retirement-twice', text: 'The retirement deduction was charged twice.', correct: false },
+        { id: 'ot-folded', text: 'The five overtime hours were folded into regular pay. Overtime should add a half-time premium.', correct: true },
+        { id: 'ot-unpaid', text: 'Overtime is unpaid during an employee’s first month.', correct: false },
+      ],
+      explain: 'The stub pays all 45 hours at the regular rate. The five hours beyond 40 should be overtime at 1.5×. The extra half-time premium is missing from gross pay, so the printed net is also too low.',
+    },
+    {
+      id: 'short-overtime',
+      checkNo: 'PS-043',
+      period: 'MAR 17 – MAR 23',
+      kicker: 'CHECK 03 · LATE SHIFTS',
+      week: 'WEEK 3',
+      title: 'Three hours on the clock',
+      summary: 'The timecard shows eight overtime hours. The stub only pays three.',
+      quote: '“The timecard shows eight overtime hours. The stub only pays three.”',
+      handbook: 'Overtime begins after 40 hours in a week. Overtime rate = 1.5 × the hourly rate.',
+      rate: 14,
+      regHours: 34,
+      otHours: 8,
+      printedRegHours: 34,
+      printedOtHours: 3,
+      deductions: [
+        { id: 'fed', label: 'Federal income tax', amount: 49.50, kind: 'tax', valid: true, note: 'Illustrative federal income tax withheld from gross pay.' },
+        { id: 'state', label: 'State income tax', amount: 17, kind: 'tax', valid: true, note: 'Illustrative state income tax withheld from gross pay.' },
+        { id: 'ss', label: 'Social Security', amount: 37.44, kind: 'tax', valid: true, note: 'A payroll withholding taken out before net pay.' },
+        { id: 'medicare', label: 'Medicare', amount: 8.76, kind: 'tax', valid: true, note: 'A payroll withholding taken out before net pay.' },
+        { id: 'meal', label: 'Meal plan', amount: 22, kind: 'benefit', valid: true, note: 'The optional $22.00 meal plan, charged once this period.' },
+        { id: 'retirement', label: 'Retirement plan', amount: 20, kind: 'benefit', valid: true, note: 'An elected retirement contribution deducted from gross pay.' },
+      ],
+      evidence: ['overtime'],
+      clean: false,
+      options: [
+        { id: 'short-ot', text: 'Five overtime hours were left off the stub, so gross and net are understated.', correct: true },
+        { id: 'state-twice', text: 'The state income tax line was charged twice.', correct: false },
+        { id: 'rate-drop', text: 'June’s hourly rate fell after the first 34 hours.', correct: false },
+      ],
+      explain: 'Five of the eight overtime hours never appear on the stub. The missing OT hours reduce gross pay, and because deductions are unchanged, printed net is lower than the correct take-home amount.',
+    },
+    {
+      id: 'duplicate-meal',
+      checkNo: 'PS-044',
+      period: 'MAR 24 – MAR 30',
+      kicker: 'CHECK 04 · BENEFITS WEEK',
+      week: 'WEEK 4',
+      title: 'The duplicate line',
+      summary: 'I signed up for the meal plan once. It appears twice.',
+      quote: '“I signed up for the meal plan once. It appears twice.”',
+      handbook: 'The optional meal plan costs $22.00 per pay period and may be charged only once.',
+      rate: 14,
+      regHours: 39,
+      otHours: 0,
+      printedRegHours: 39,
+      printedOtHours: 0,
+      deductions: [
+        { id: 'fed', label: 'Federal income tax', amount: 43.68, kind: 'tax', valid: true, note: 'Illustrative federal income tax withheld from gross pay.' },
+        { id: 'state', label: 'State income tax', amount: 16.38, kind: 'tax', valid: true, note: 'Illustrative state income tax withheld from gross pay.' },
+        { id: 'ss', label: 'Social Security', amount: 33.85, kind: 'tax', valid: true, note: 'A payroll withholding taken out before net pay.' },
+        { id: 'medicare', label: 'Medicare', amount: 7.92, kind: 'tax', valid: true, note: 'A payroll withholding taken out before net pay.' },
+        { id: 'meal1', label: 'Meal plan', amount: 22, kind: 'benefit', valid: true, note: 'The first $22.00 meal-plan charge. The handbook allows one per period.' },
+        { id: 'meal2', label: 'Meal plan', amount: 22, kind: 'benefit', valid: false, note: 'A second $22.00 meal-plan charge. Only one is authorized per pay period.' },
+      ],
+      evidence: ['meal1', 'meal2'],
+      clean: false,
+      options: [
+        { id: 'meal-twice', text: 'The meal plan was deducted twice. Remove one duplicate charge before calculating net.', correct: true },
+        { id: 'zero-tax', text: 'Federal income tax should be zero for part-time work.', correct: false },
+        { id: 'missing-ot', text: 'The check omitted overtime pay.', correct: false },
+      ],
+      explain: 'Both earnings and printed gross are correct, but the meal plan appears twice. Only one $22.00 charge is authorized. Removing the duplicate raises total valid deductions down to one meal charge and raises net pay by $22.00.',
+    },
+    {
+      id: 'clean-check',
+      checkNo: 'PS-045',
+      period: 'MAR 31 – APR 06',
+      kicker: 'CHECK 05 · TRIAL MONTH CLOSE',
+      week: 'MONTH END',
+      title: 'The clean check',
+      summary: 'Final check of my first month. Maybe the template is finally fixed.',
+      quote: '“Final check of my first month. Maybe the template is finally fixed.”',
+      handbook: 'Overtime begins after 40 hours. The optional meal plan is $22.00 per pay period.',
+      rate: 14.50,
+      regHours: 40,
+      otHours: 4,
+      printedRegHours: 40,
+      printedOtHours: 4,
+      deductions: [
+        { id: 'fed', label: 'Federal income tax', amount: 53.36, kind: 'tax', valid: true, note: 'Illustrative federal income tax withheld from gross pay.' },
+        { id: 'state', label: 'State income tax', amount: 20.01, kind: 'tax', valid: true, note: 'Illustrative state income tax withheld from gross pay.' },
+        { id: 'ss', label: 'Social Security', amount: 41.35, kind: 'tax', valid: true, note: 'A payroll withholding taken out before net pay.' },
+        { id: 'medicare', label: 'Medicare', amount: 9.67, kind: 'tax', valid: true, note: 'A payroll withholding taken out before net pay.' },
+        { id: 'meal', label: 'Meal plan', amount: 22, kind: 'benefit', valid: true, note: 'The optional $22.00 meal plan, charged once this period.' },
+        { id: 'retirement', label: 'Retirement plan', amount: 20, kind: 'benefit', valid: true, note: 'An elected retirement contribution deducted from gross pay.' },
+      ],
+      evidence: ['noError'],
+      clean: true,
+      options: [
+        { id: 'all-clean', text: 'Everything reconciles: gross minus valid deductions equals printed net.', correct: true },
+        { id: 'double-ot', text: 'Overtime should be double time, so the stub is short.', correct: false },
+        { id: 'meal-gross', text: 'The meal plan belongs in gross earnings, not deductions.', correct: false },
+      ],
+      explain: 'This stub is correct. The 40 regular hours and 4 overtime hours produce the printed gross. Every deduction is valid, and gross minus total deductions equals net pay.',
+    },
+  ];
+
+  const els = {
+    app: document.getElementById('app'),
+    roundHud: document.getElementById('roundHud'),
+    scoreHud: document.getElementById('scoreHud'),
+    caseScroll: document.getElementById('caseScroll'),
+    periodKicker: document.getElementById('periodKicker'),
+    periodTitle: document.getElementById('periodTitle'),
+    periodSummary: document.getElementById('periodSummary'),
+    periodNumber: document.getElementById('periodNumber'),
+    checkStatus: document.getElementById('checkStatus'),
+    timeRegular: document.getElementById('timeRegular'),
+    timeOvertime: document.getElementById('timeOvertime'),
+    timeRate: document.getElementById('timeRate'),
+    timeTotal: document.getElementById('timeTotal'),
+    timePolicy: document.getElementById('timePolicy'),
+    clueQuote: document.getElementById('clueQuote'),
+    handbookNote: document.getElementById('handbookNote'),
+    stubCheck: document.getElementById('stubCheck'),
+    stubPeriod: document.getElementById('stubPeriod'),
+    stubRate: document.getElementById('stubRate'),
+    stubRows: document.getElementById('stubRows'),
+    pinBox: document.getElementById('pinBox'),
+    noErrorBtn: document.getElementById('noErrorBtn'),
+    calcGrid: document.getElementById('calcGrid'),
+    explainList: document.getElementById('explainList'),
+    notice: document.getElementById('notice'),
+    auditBtn: document.getElementById('auditBtn'),
+    intro: document.getElementById('intro'),
+    startBtn: document.getElementById('startBtn'),
+    resultOverlay: document.getElementById('resultOverlay'),
+    resultPanel: document.getElementById('resultPanel'),
+    finalOverlay: document.getElementById('finalOverlay'),
+    finalEyebrow: document.getElementById('finalEyebrow'),
+    finalTitle: document.getElementById('finalTitle'),
+    finalRank: document.getElementById('finalRank'),
+    finalScore: document.getElementById('finalScore'),
+    finalReads: document.getElementById('finalReads'),
+    finalMath: document.getElementById('finalMath'),
+    finalErrors: document.getElementById('finalErrors'),
+    finalLedger: document.getElementById('finalLedger'),
+    finalNarrative: document.getElementById('finalNarrative'),
+    finalFoot: document.getElementById('finalFoot'),
+    restartBtn: document.getElementById('restartBtn'),
+  };
+
+  function freshState() {
+    return {
+      phase: 'intro',
+      roundIndex: 0,
+      score: 0,
+      fields: { regular: null, overtime: null, gross: null, deductions: null, net: null },
+      evidence: null,
+      explanation: null,
+      results: [],
+    };
+  }
+
+  let state = freshState();
+  let lastSession = null;
+
+  function cents(value) {
+    return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+  }
+
+  function money(value) {
+    const safe = Number.isFinite(Number(value)) ? Number(value) : 0;
+    const sign = safe < 0 ? '−' : '';
+    return sign + '$' + Math.abs(safe).toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  }
+
+  function hours(value) {
+    return Number(value).toFixed(1);
+  }
+
+  function esc(value) {
+    return String(value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function calculateRound(round) {
+    const regular = cents(round.regHours * round.rate);
+    const overtimeRate = cents(round.rate * 1.5);
+    const overtime = cents(round.otHours * overtimeRate);
+    const gross = cents(regular + overtime);
+    const deductions = cents(round.deductions
+      .filter((line) => line.valid)
+      .reduce((sum, line) => sum + line.amount, 0));
+    const net = cents(gross - deductions);
+    return { regular, overtimeRate, overtime, gross, deductions, net };
+  }
+
+  function printedFor(round) {
+    const regular = cents(round.printedRegHours * round.rate);
+    const overtimeRate = cents(round.rate * 1.5);
+    const overtime = cents(round.printedOtHours * overtimeRate);
+    const gross = cents(regular + overtime);
+    const deductions = cents(round.deductions.reduce((sum, line) => sum + line.amount, 0));
+    const net = cents(gross - deductions);
+    return { regular, overtimeRate, overtime, gross, deductions, net };
+  }
+
+  function allLines(round) {
+    const printed = printedFor(round);
+    const lines = [
+      {
+        id: 'regular',
+        label: 'Regular',
+        detail: hours(round.printedRegHours) + ' hrs × ' + money(round.rate),
+        amount: printed.regular,
+        tag: 'EARNING',
+        kind: 'earning',
+        note: 'Earning. Regular hours × the hourly rate. This adds to gross pay.',
+      },
+      {
+        id: 'overtime',
+        label: 'Overtime',
+        detail: hours(round.printedOtHours) + ' hrs × ' + money(printed.overtimeRate),
+        amount: printed.overtime,
+        tag: 'EARNING',
+        kind: 'earning',
+        note: 'Earning. Overtime hours × 1.5 × the hourly rate. This also adds to gross pay.',
+      },
+      {
+        id: 'gross',
+        label: 'Gross pay',
+        detail: 'Regular + overtime earnings',
+        amount: printed.gross,
+        tag: 'GROSS PAY',
+        kind: 'gross',
+        note: 'Gross pay. All earnings before any deductions. It is not the amount that reaches the bank account.',
+      },
+    ];
+    round.deductions.forEach((deduction) => {
+      lines.push({
+        id: deduction.id,
+        label: deduction.label,
+        detail: deduction.kind === 'tax' ? 'Withheld from gross pay' : 'Subtracted from gross pay',
+        amount: deduction.amount,
+        tag: deduction.kind === 'tax' ? 'WITHHOLDING' : deduction.kind === 'benefit' ? 'BENEFIT' : 'DEDUCTION',
+        kind: 'deduction',
+        note: 'Deduction. This comes out of gross pay. It lowers net pay but does not change the hourly rate. ' + deduction.note,
+      });
+    });
+    lines.push({
+      id: 'totalDeductions',
+      label: 'Total deductions',
+      detail: 'Every deduction on the stub',
+      amount: printed.deductions,
+      tag: 'DEDUCTIONS',
+      kind: 'total',
+      note: 'Deductions total. Add the deduction lines. Net pay is gross pay minus this total.',
+    });
+    lines.push({
+      id: 'net',
+      label: 'Net pay',
+      detail: 'Direct deposit',
+      amount: printed.net,
+      tag: 'TAKE-HOME',
+      kind: 'net',
+      note: 'Net pay. Take-home pay: gross pay minus total deductions. This is the amount left after every valid deduction.',
+    });
+    return lines;
+  }
+
+  function evidenceLabel(round, evidence) {
+    if (evidence === 'noError') return 'No line needs correction';
+    const found = allLines(round).find((line) => line.id === evidence);
+    if (!found) return 'No line pinned';
+    if (round.id === 'duplicate-meal' && (evidence === 'meal1' || evidence === 'meal2')) {
+      return 'Meal plan (one of two duplicate lines)';
+    }
+    return found.label + ' · ' + money(found.amount);
+  }
+
+  function normalizeField(value) {
+    if (value === '' || value === null || value === undefined) return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+  }
+
+  function evaluateRound(round, fields, evidence, explanationId, roundIndex = state.roundIndex) {
+    const correct = calculateRound(round);
+    const printed = printedFor(round);
+    const fieldResults = FIELDS.map((field) => {
+      const userValue = normalizeField(fields[field.id]);
+      const correctValue = correct[field.id];
+      const isCorrect = userValue !== null && Math.abs(userValue - correctValue) <= 0.005;
+      return {
+        ...field,
+        userValue,
+        correctValue,
+        isCorrect,
+        points: isCorrect ? FIELD_POINTS : 0,
+      };
+    });
+    const mathPoints = fieldResults.reduce((sum, field) => sum + field.points, 0);
+    const mathCorrect = fieldResults.filter((field) => field.isCorrect).length;
+    const evidenceCorrect = round.evidence.includes(evidence);
+    const selectedOption = round.options.find((option) => option.id === explanationId) || null;
+    const correctOption = round.options.find((option) => option.correct) || null;
+    const explanationCorrect = !!selectedOption && selectedOption.correct;
+    const evidencePoints = evidenceCorrect ? EVIDENCE_POINTS : 0;
+    const explanationPoints = explanationCorrect ? EXPLANATION_POINTS : 0;
+    return {
+      roundIndex,
+      roundId: round.id,
+      checkNo: round.checkNo,
+      title: round.title,
+      clean: round.clean,
+      fields: fieldResults,
+      correct,
+      printed,
+      evidence,
+      evidenceLabel: evidenceLabel(round, evidence),
+      evidenceCorrect,
+      evidencePoints,
+      explanation: explanationId,
+      selectedExplanation: selectedOption ? selectedOption.text : '',
+      correctExplanation: correctOption ? correctOption.text : '',
+      explanationText: round.explain,
+      explanationCorrect,
+      explanationPoints,
+      mathCorrect,
+      mathPoints,
+      total: mathPoints + evidencePoints + explanationPoints,
+      gap: cents(correct.net - printed.net),
+    };
+  }
+
+  function rankFor(score) {
+    if (score >= 460) return 'Ledger legend';
+    if (score >= 390) return 'Payroll detective';
+    if (score >= 300) return 'Number sleuth';
+    if (score >= 200) return 'Stub apprentice';
+    return 'First-day rookie';
+  }
+
+  function currentRound() {
+    return ROUNDS[state.roundIndex];
+  }
+
+  function renderHud() {
+    els.roundHud.textContent = (state.roundIndex + 1) + '/5';
+    els.scoreHud.textContent = state.score + '/' + MAX_SCORE;
+  }
+
+  function stubRowHTML(line, selected) {
+    const classes = ['stub-row'];
+    if (line.kind === 'gross') classes.push('gross-row');
+    if (line.kind === 'deduction') classes.push('deduction-row');
+    if (line.kind === 'total') classes.push('total-deductions');
+    if (line.kind === 'net') classes.push('net-row');
+    if (selected) classes.push('selected');
+    const negative = line.kind === 'deduction' || line.kind === 'total';
+    return '<button type="button" class="' + classes.join(' ') + '" data-line="' + line.id + '" aria-pressed="' + String(selected) + '">' +
+      '<span><span class="line-label">' + esc(line.label) + '</span><span class="line-detail">' + esc(line.detail) + '</span></span>' +
+      '<span class="line-right"><span class="line-amount">' + (negative ? '−' : '') + money(line.amount) + '</span><span class="line-tag">' + esc(line.tag) + '</span></span>' +
+      '</button>';
+  }
+
+  function renderStub() {
+    const round = currentRound();
+    const lines = allLines(round);
+    let html = '';
+    lines.forEach((line) => {
+      if (line.id === 'regular') html += '<div class="section-label">EARNINGS</div>';
+      if (line.id === 'fed') html += '<div class="section-label">DEDUCTIONS</div>';
+      html += stubRowHTML(line, line.id === state.evidence);
+    });
+    els.stubRows.innerHTML = html;
+    els.stubCheck.textContent = round.checkNo;
+    els.stubPeriod.textContent = round.period;
+    els.stubRate.textContent = 'RATE ' + money(round.rate);
+  }
+
+  function renderExplanation() {
+    const round = currentRound();
+    els.explainList.innerHTML = round.options.map((option, index) => {
+      const selected = state.explanation === option.id;
+      return '<button type="button" class="explain-option' + (selected ? ' selected' : '') + '" data-explanation="' + option.id + '" aria-pressed="' + String(selected) + '">' +
+        '<span class="opt-letter" aria-hidden="true">' + String.fromCharCode(65 + index) + '</span>' +
+        '<span>' + esc(option.text) + '</span>' +
+        '</button>';
+    }).join('');
+  }
+
+  function clearInputs() {
+    FIELDS.forEach((field) => {
+      const input = document.getElementById('calc-' + field.id);
+      if (input) input.value = '';
+    });
+  }
+
+  function renderPin() {
+    const round = currentRound();
+    if (!state.evidence) {
+      els.pinBox.className = 'pin-box';
+      els.pinBox.textContent = 'Tap any pay-stub row to inspect it. Then pin the line that explains the gap.';
+      return;
+    }
+    els.pinBox.className = 'pin-box has-pin';
+    if (state.evidence === 'noError') {
+      els.pinBox.innerHTML = '<b>PINNED: NO CORRECTION</b> · This check is marked clean. Verify every line before you submit.';
+      return;
+    }
+    const line = allLines(round).find((item) => item.id === state.evidence);
+    if (!line) {
+      els.pinBox.className = 'pin-box';
+      els.pinBox.textContent = 'Tap any pay-stub row to inspect it.';
+      return;
+    }
+    els.pinBox.innerHTML = '<span class="pin-tag">' + esc(line.tag) + '</span><b>' + esc(line.label) + '</b> · ' +
+      (line.kind === 'deduction' || line.kind === 'total' ? '−' : '') + money(line.amount) + '<br>' + esc(line.note);
+  }
+
+  function syncEvidenceUI() {
+    const round = currentRound();
+    els.stubRows.querySelectorAll('.stub-row').forEach((row) => {
+      const selected = row.dataset.line === state.evidence;
+      row.classList.toggle('selected', selected);
+      row.setAttribute('aria-pressed', String(selected));
+    });
+    els.noErrorBtn.classList.toggle('selected', state.evidence === 'noError');
+    els.noErrorBtn.setAttribute('aria-pressed', String(state.evidence === 'noError'));
+    renderPin(round);
+    updateAction();
+  }
+
+  function syncExplanationUI() {
+    els.explainList.querySelectorAll('.explain-option').forEach((button) => {
+      const selected = button.dataset.explanation === state.explanation;
+      button.classList.toggle('selected', selected);
+      button.setAttribute('aria-pressed', String(selected));
+    });
+    updateAction();
+  }
+
+  function isReady() {
+    return FIELDS.every((field) => state.fields[field.id] !== null) && !!state.evidence && !!state.explanation;
+  }
+
+  function updateAction() {
+    const filled = FIELDS.filter((field) => state.fields[field.id] !== null).length;
+    const ready = isReady();
+    els.auditBtn.disabled = state.phase !== 'plan' || !ready;
+    els.notice.classList.toggle('ready', ready);
+    if (ready) {
+      els.notice.textContent = 'Audit ready. New hours and deductions every check — submit your own math.';
+      return;
+    }
+    const missing = [];
+    if (filled < FIELDS.length) missing.push((FIELDS.length - filled) + ' calculation' + (FIELDS.length - filled === 1 ? '' : 's'));
+    if (!state.evidence) missing.push('one pinned line');
+    if (!state.explanation) missing.push('one explanation');
+    els.notice.textContent = 'Still needed: ' + missing.join(' · ') + '.';
+  }
+
+  function setField(fieldId, value) {
+    if (state.phase !== 'plan') return false;
+    if (!FIELDS.some((field) => field.id === fieldId)) return false;
+    state.fields[fieldId] = normalizeField(value);
+    const input = document.getElementById('calc-' + fieldId);
+    if (input && String(input.value) !== String(value ?? '')) input.value = value ?? '';
+    updateAction();
+    return true;
+  }
+
+  function setEvidence(lineId) {
+    if (state.phase !== 'plan') return false;
+    const round = currentRound();
+    const valid = lineId === 'noError' || allLines(round).some((line) => line.id === lineId);
+    if (!valid) return false;
+    state.evidence = lineId;
+    syncEvidenceUI();
+    return true;
+  }
+
+  function setExplanation(optionId) {
+    if (state.phase !== 'plan') return false;
+    const round = currentRound();
+    if (!round.options.some((option) => option.id === optionId)) return false;
+    state.explanation = optionId;
+    syncExplanationUI();
+    return true;
+  }
+
+  function renderRound(index) {
+    state.roundIndex = index;
+    state.phase = 'plan';
+    state.fields = { regular: null, overtime: null, gross: null, deductions: null, net: null };
+    state.evidence = null;
+    state.explanation = null;
+    const round = ROUNDS[index];
+
+    els.periodKicker.textContent = round.kicker;
+    els.periodTitle.textContent = round.title;
+    els.periodSummary.textContent = round.summary;
+    els.periodNumber.textContent = String(index + 1).padStart(2, '0');
+    els.checkStatus.textContent = 'OPEN';
+    els.checkStatus.className = 'status-pill';
+    els.timeRegular.textContent = hours(round.regHours);
+    els.timeOvertime.textContent = hours(round.otHours);
+    els.timeRate.textContent = money(round.rate);
+    els.timeTotal.textContent = hours(round.regHours + round.otHours) + ' total hours';
+    els.timePolicy.textContent = 'overtime after 40';
+    els.clueQuote.textContent = round.quote;
+    els.handbookNote.textContent = round.handbook;
+    clearInputs();
+    renderStub();
+    renderExplanation();
+    renderPin();
+    els.noErrorBtn.classList.remove('selected');
+    els.noErrorBtn.setAttribute('aria-pressed', 'false');
+    renderHud();
+    updateAction();
+    els.caseScroll.scrollTop = 0;
+  }
+
+  function auditCheck() {
+    if (state.phase !== 'plan' || !isReady()) return null;
+    const round = currentRound();
+    const session = evaluateRound(round, state.fields, state.evidence, state.explanation);
+    state.score += session.total;
+    state.results.push(session);
+    state.phase = 'result';
+    lastSession = session;
+    els.checkStatus.textContent = 'LOGGED';
+    els.checkStatus.className = 'status-pill logged';
+    renderHud();
+    updateAction();
+    showResult(session);
+    return session;
+  }
+
+  function showResult(session) {
+    const round = currentRound();
+    const tone = session.total >= 80 ? 'good' : session.total < 60 ? 'low' : '';
+    const title = session.total === 100
+      ? 'Every line accounted for.'
+      : session.total >= 80
+        ? 'The gap is in sight.'
+        : session.total >= 60
+          ? 'A partial reconciliation.'
+          : 'The audit needs another pass.';
+    const grossGap = cents(session.correct.gross - session.printed.gross);
+    const deductionGap = cents(session.printed.deductions - session.correct.deductions);
+    const gapLine = round.clean
+      ? '<b>No payroll error.</b> Printed net and corrected net both land at ' + money(session.correct.net) + '.'
+      : session.gap > 0 && grossGap === 0 && deductionGap > 0
+        ? '<b>The stub overdeducted by ' + money(session.gap) + '.</b> Printed net: ' + money(session.printed.net) + ' · correct net: ' + money(session.correct.net) + '.'
+        : session.gap > 0
+          ? '<b>The stub underpaid net by ' + money(session.gap) + '.</b> Printed net: ' + money(session.printed.net) + ' · correct net: ' + money(session.correct.net) + '.'
+          : session.gap < 0
+            ? '<b>The stub overstated net by ' + money(Math.abs(session.gap)) + '.</b> Printed net: ' + money(session.printed.net) + ' · correct net: ' + money(session.correct.net) + '.'
+            : '<b>Net matches.</b> The printed total reconciles with the valid lines.';
+
+    const fieldRows = session.fields.map((field) => {
+      const detail = field.isCorrect ? field.formula : 'You entered ' + (field.userValue === null ? 'nothing' : money(field.userValue));
+      return '<div class="review-row">' +
+        '<span>' + esc(field.label) + '<small>' + esc(detail) + '</small></span>' +
+        '<b>' + money(field.correctValue) + '</b>' +
+        '<span class="review-points' + (field.isCorrect ? '' : ' miss') + '">+' + field.points + '</span>' +
+        '</div>';
+    }).join('');
+
+    const explanationReview = session.correctExplanation;
+    const selectedReview = session.explanationCorrect
+      ? '<span class="correct">Your explanation was correct.</span>'
+      : '<span>Your explanation did not match. The correct explanation is above.</span>';
+
+    els.resultPanel.innerHTML =
+      '<p class="eyebrow" id="resultEyebrow">CHECK ' + String(round.checkNo.slice(-2)) + ' · AUDIT LOGGED</p>' +
+      '<h2 class="result-title ' + tone + '" id="resultTitle">' + title + '</h2>' +
+      '<p class="result-score-line"><strong id="resultTotal">' + session.total + '</strong> / 100 on this check</p>' +
+      '<div class="result-chips">' +
+        '<div class="result-chip"><span>MATH</span><strong id="resultMath">' + session.mathPoints + ' / 60</strong></div>' +
+        '<div class="result-chip"><span>EVIDENCE</span><strong id="resultEvidence">' + session.evidencePoints + ' / 20</strong></div>' +
+        '<div class="result-chip"><span>EXPLANATION</span><strong id="resultExplanation">' + session.explanationPoints + ' / 20</strong></div>' +
+      '</div>' +
+      '<div class="result-gap">' + gapLine + '</div>' +
+      '<div class="math-review">' + fieldRows + '</div>' +
+      '<p class="result-explain"><b>PINNED:</b> ' + esc(session.evidenceLabel) + ' · ' + (session.evidenceCorrect ? 'correct.' : 'not the line that explains the gap.') +
+        '<br><b>THE EXPLANATION:</b> <span class="correct">' + esc(explanationReview) + '</span><br>' +
+        esc(session.explanationText) + '<br>' + selectedReview + '</p>' +
+      '<button type="button" class="btn" data-result-action="next">' + (state.roundIndex < ROUNDS.length - 1 ? 'Next check' : 'Close the case') + ' &rarr;</button>' +
+      '<p class="fine">Check ' + (state.roundIndex + 1) + ' of 5 · score ' + state.score + ' / ' + MAX_SCORE + '</p>';
+
+    els.resultOverlay.hidden = false;
+    els.app.inert = true;
+    els.resultPanel.scrollTop = 0;
+    const nextButton = els.resultPanel.querySelector('[data-result-action="next"]');
+    if (nextButton) window.setTimeout(() => nextButton.focus({ preventScroll: true }), 30);
+  }
+
+  function nextCheck() {
+    if (state.phase !== 'result') return false;
+    els.resultOverlay.hidden = true;
+    els.app.inert = false;
+    if (state.roundIndex >= ROUNDS.length - 1) {
+      showFinal();
+      return true;
+    }
+    renderRound(state.roundIndex + 1);
+    window.setTimeout(() => els.periodTitle.focus({ preventScroll: true }), 30);
+    return true;
+  }
+
+  function finalNarrative(score) {
+    if (score >= 460) {
+      return 'You rebuilt all five checks and followed the money from hours to gross to net. The pattern is the lesson: verify the timecard, apply overtime, add only valid deductions, then subtract. A clean-looking stub is not proof until the math reconciles.';
+    }
+    if (score >= 390) {
+      return 'Most of the ledger holds together. You caught the major errors and rebuilt the checks, but a few calculations or explanations slipped. Gross is earnings; deductions come out of it; net is what remains.';
+    }
+    if (score >= 300) {
+      return 'You found part of the pattern, but some gaps survived the audit. Start with hours × rate, handle overtime separately, sum only valid deductions, and subtract that total from gross.';
+    }
+    return 'The stubs still hold the answer. Treat every printed total as a claim to verify: rebuild gross from the timecard, list valid deductions, and subtract them to reach net. None of the next checks can reuse these numbers.';
+  }
+
+  function showFinal() {
+    if (state.results.length !== ROUNDS.length) return false;
+    state.phase = 'final';
+    els.resultOverlay.hidden = true;
+    els.finalOverlay.hidden = false;
+    els.app.inert = true;
+    els.checkStatus.textContent = 'CLOSED';
+    els.checkStatus.className = 'status-pill logged';
+    renderHud();
+
+    const reads = state.results.filter((result) => result.evidenceCorrect && result.explanationCorrect).length;
+    const mathFields = state.results.reduce((sum, result) => sum + result.mathCorrect, 0);
+    const errors = state.results.slice(0, 4).filter((result) => result.evidenceCorrect && result.explanationCorrect).length;
+    const rank = rankFor(state.score);
+    const title = state.score >= 460
+      ? 'The ledger<br>balances.'
+      : state.score >= 390
+        ? 'Case closed.<br>Check by check.'
+        : state.score >= 300
+          ? 'The gap is<br>in the numbers.'
+          : 'The ledger<br>got away.';
+
+    els.finalTitle.innerHTML = title;
+    els.finalTitle.className = 'final-title' + (state.score < 300 ? ' low' : '');
+    els.finalRank.textContent = rank;
+    els.finalScore.textContent = String(state.score);
+    els.finalReads.textContent = reads + ' / 5';
+    els.finalMath.textContent = mathFields + ' / 25';
+    els.finalErrors.textContent = errors + ' / 4';
+    els.finalEyebrow.textContent = state.score >= 390 ? 'CASE CLOSED · TRIAL MONTH' : 'CASE REVIEW · TRIAL MONTH';
+    els.finalLedger.innerHTML = state.results.map((result, index) => {
+      const identified = result.evidenceCorrect && result.explanationCorrect;
+      const status = result.clean ? 'CLEAN' : identified ? 'CAUGHT' : 'MISSED';
+      return '<div class="ledger-row">' +
+        '<span>' + String(index + 1).padStart(2, '0') + '</span>' +
+        '<span>' + esc(result.title) + '</span>' +
+        '<em class="' + (identified ? '' : 'miss') + '">' + status + '</em>' +
+        '<strong>' + result.total + '</strong>' +
+        '</div>';
+    }).join('');
+    els.finalNarrative.textContent = finalNarrative(state.score);
+    els.finalFoot.textContent = 'Four checks contained errors · fifth check clean · fictional figures, not tax advice';
+    els.finalOverlay.scrollTop = 0;
+    window.setTimeout(() => els.restartBtn.focus({ preventScroll: true }), 30);
+    return true;
+  }
+
+  function boot() {
+    state = freshState();
+    lastSession = null;
+    renderRound(0);
+    state.phase = 'intro';
+    els.intro.hidden = false;
+    els.resultOverlay.hidden = true;
+    els.finalOverlay.hidden = true;
+    els.resultPanel.innerHTML = '';
+    els.app.inert = true;
+    renderHud();
+    updateAction();
+    window.setTimeout(() => els.startBtn.focus({ preventScroll: true }), 30);
+  }
+
+  function startGame() {
+    state = freshState();
+    lastSession = null;
+    els.intro.hidden = true;
+    els.resultOverlay.hidden = true;
+    els.finalOverlay.hidden = true;
+    els.app.inert = false;
+    renderRound(0);
+    window.setTimeout(() => els.periodTitle.focus({ preventScroll: true }), 30);
+  }
+
+  els.startBtn.addEventListener('click', startGame);
+  els.restartBtn.addEventListener('click', startGame);
+
+  els.stubRows.addEventListener('click', (event) => {
+    const row = event.target.closest('[data-line]');
+    if (row) setEvidence(row.dataset.line);
+  });
+
+  els.noErrorBtn.addEventListener('click', () => {
+    setEvidence('noError');
+  });
+
+  els.explainList.addEventListener('click', (event) => {
+    const option = event.target.closest('[data-explanation]');
+    if (option) setExplanation(option.dataset.explanation);
+  });
+
+  els.calcGrid.addEventListener('input', (event) => {
+    const input = event.target.closest('[data-field]');
+    if (!input) return;
+    setField(input.dataset.field, input.value);
+  });
+
+  els.auditBtn.addEventListener('click', () => {
+    auditCheck();
+  });
+
+  els.resultPanel.addEventListener('click', (event) => {
+    const action = event.target.closest('[data-result-action]');
+    if (action && action.dataset.resultAction === 'next') nextCheck();
+  });
+
+  boot();
+
+  window.__PAYSTUBSLEUTH__ = {
+    maxScore: MAX_SCORE,
+    rounds: ROUNDS,
+    fields: FIELDS,
+    getState: () => JSON.parse(JSON.stringify(state)),
+    getRound: (index = state.roundIndex) => JSON.parse(JSON.stringify(ROUNDS[index])),
+    correctFor: (index = state.roundIndex) => calculateRound(ROUNDS[index]),
+    printedFor: (index = state.roundIndex) => printedFor(ROUNDS[index]),
+    evaluate: (index, fields, evidence, explanation) => evaluateRound(ROUNDS[index], fields, evidence, explanation, index),
+    allLines: (index = state.roundIndex) => allLines(ROUNDS[index]),
+    start: startGame,
+    restart: boot,
+    setField,
+    setEvidence,
+    setExplanation,
+    isReady,
+    audit: auditCheck,
+    next: nextCheck,
+    showFinal,
+    rankFor,
+  };
+})();
+</script>
+</body>
+</html>

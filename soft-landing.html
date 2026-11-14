@@ -1,0 +1,2283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#08110f">
+<title>Soft Landing</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --ink: #f1f8f3;
+    --muted: rgba(229, 244, 234, 0.5);
+    --faint: rgba(229, 244, 234, 0.24);
+    --green: #8ce8c4;
+    --green-deep: #42c7a2;
+    --amber: #ffc76d;
+    --red: #ff8d7a;
+    --blue: #88caff;
+    --violet: #c4a8ff;
+    --line: rgba(150, 226, 203, 0.16);
+    --panel: rgba(10, 23, 20, 0.96);
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    background:
+      radial-gradient(110% 82% at 50% 0%, #2b3b2f 0%, #0b1412 55%, #040908 100%);
+    color: var(--ink);
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    -webkit-user-select: none;
+    user-select: none;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+  #stage {
+    position: relative;
+    width: min(100%, calc((100dvh - 55px) * 0.75));
+    aspect-ratio: 3 / 4;
+    border-radius: 20px;
+    overflow: hidden;
+    background: #07100e;
+    box-shadow:
+      0 30px 70px -28px rgba(0, 0, 0, 0.96),
+      0 0 0 1px rgba(255, 255, 255, 0.07),
+      inset 0 0 0 1px rgba(140, 232, 196, 0.07);
+    container-type: size;
+  }
+  .hint {
+    margin: 0;
+    color: rgba(240, 249, 242, 0.28);
+    font-size: clamp(6.5px, 1.8vw, 8px);
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  button { font: inherit; }
+  button:focus-visible, input:focus-visible {
+    outline: 2px solid #cbffed;
+    outline-offset: 2px;
+  }
+  [hidden] { display: none !important; }
+
+  #app {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    background:
+      radial-gradient(80% 46% at 50% 0%, rgba(57, 87, 69, 0.24), transparent 76%),
+      linear-gradient(180deg, #0c1815 0%, #07100e 72%, #050b09 100%);
+  }
+
+  /* ---------- top bar ---------- */
+  .topbar {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 8px 8px 0;
+    padding: 6px 8px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: linear-gradient(180deg, rgba(26, 45, 38, 0.96), rgba(7, 16, 14, 0.91));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045);
+  }
+  .brand { display: flex; align-items: center; gap: 7px; min-width: 0; }
+  .brand-mark {
+    width: 23px;
+    height: 23px;
+    flex: none;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(140, 232, 196, 0.5);
+    border-radius: 6px;
+    background: rgba(140, 232, 196, 0.08);
+    color: var(--green);
+    font-size: 13px;
+    font-weight: 800;
+    line-height: 1;
+  }
+  .brand b {
+    display: block;
+    font-size: clamp(9px, 2.1cqw, 12px);
+    letter-spacing: 0.1em;
+    line-height: 1.05;
+    white-space: nowrap;
+  }
+  .brand small {
+    display: block;
+    margin-top: 2px;
+    color: var(--muted);
+    font-size: clamp(5px, 1.15cqw, 6.6px);
+    letter-spacing: 0.12em;
+    white-space: nowrap;
+  }
+  .topstats { display: flex; align-items: center; gap: clamp(7px, 2.2cqw, 13px); flex: none; }
+  .topstat { text-align: right; }
+  .topstat span {
+    display: block;
+    color: var(--muted);
+    font-size: clamp(5px, 1.1cqw, 6.4px);
+    letter-spacing: 0.13em;
+  }
+  .topstat strong {
+    display: block;
+    margin-top: 1px;
+    color: var(--green);
+    font-size: clamp(10px, 2.35cqw, 14px);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .topstat:nth-child(2) strong { color: var(--amber); }
+  .topstat:last-child strong { color: rgba(241, 248, 243, 0.74); }
+
+  /* ---------- board ---------- */
+  .board {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    margin: 6px 8px 8px;
+    overflow: hidden;
+    border: 1px solid rgba(150, 226, 203, 0.16);
+    border-radius: 18px;
+    background: linear-gradient(180deg, rgba(11, 25, 21, 0.97), rgba(6, 14, 12, 0.98));
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.045),
+      0 18px 38px -30px rgba(0, 0, 0, 0.9);
+  }
+  .month-head {
+    position: relative;
+    flex: 0 0 auto;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 8px 9px 0;
+    padding: 8px 9px 8px 10px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 199, 109, 0.2);
+    border-radius: 9px;
+    background:
+      radial-gradient(100% 150% at 100% 0%, rgba(255, 199, 109, 0.11), transparent 61%),
+      rgba(255, 199, 109, 0.03);
+  }
+  .month-head::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    border-radius: 0 2px 2px 0;
+    background: linear-gradient(180deg, var(--amber), rgba(255, 199, 109, 0.13));
+  }
+  .month-copy { min-width: 0; flex: 1; }
+  .eyebrow {
+    margin: 0;
+    color: var(--amber);
+    font-size: clamp(5.1px, 1.1cqw, 6.3px);
+    letter-spacing: 0.18em;
+    line-height: 1.3;
+    text-transform: uppercase;
+  }
+  .month-copy h1 {
+    margin: 2px 0 0;
+    color: var(--ink);
+    font-size: clamp(13px, 3cqw, 18px);
+    line-height: 1.08;
+    letter-spacing: -0.025em;
+  }
+  .month-copy p:last-child {
+    margin: 3px 0 0;
+    color: rgba(230, 244, 234, 0.56);
+    font-size: clamp(5.8px, 1.22cqw, 7.1px);
+    line-height: 1.42;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .payblock {
+    flex: none;
+    min-width: 64px;
+    padding-left: 7px;
+    border-left: 1px dashed rgba(255, 199, 109, 0.19);
+    text-align: right;
+  }
+  .payblock span, .payblock small {
+    display: block;
+    color: rgba(255, 224, 168, 0.45);
+    font-size: clamp(4.8px, 1.02cqw, 5.8px);
+    letter-spacing: 0.12em;
+    line-height: 1.3;
+  }
+  .payblock strong {
+    display: block;
+    margin: 1px 0;
+    color: var(--amber);
+    font-size: clamp(13px, 2.9cqw, 18px);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---------- account strip ---------- */
+  .account-strip {
+    flex: 0 0 auto;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 5px;
+    margin: 5px 9px 0;
+  }
+  .account {
+    min-width: 0;
+    padding: 5px 6px 4px;
+    border: 1px solid rgba(255, 255, 255, 0.062);
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.021);
+  }
+  .account span {
+    display: block;
+    overflow: hidden;
+    color: var(--muted);
+    font-size: clamp(4.7px, 1.02cqw, 5.8px);
+    letter-spacing: 0.1em;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .account strong {
+    display: block;
+    margin-top: 2px;
+    overflow: hidden;
+    color: var(--ink);
+    font-size: clamp(9px, 2.05cqw, 12px);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .account small {
+    display: block;
+    margin-top: 2px;
+    overflow: hidden;
+    color: var(--muted);
+    font-size: clamp(4.6px, 1cqw, 5.7px);
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .account.due strong { color: var(--amber); }
+  .account.reserve strong { color: var(--green); }
+  .account.move strong { color: var(--blue); }
+  .account.attention { border-color: rgba(255, 141, 122, 0.26); }
+  .account.attention strong { color: #ffb3a5; }
+
+  .scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 8px 9px 11px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(140, 232, 196, 0.2) transparent;
+  }
+  .scroll::-webkit-scrollbar { width: 4px; }
+  .scroll::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: rgba(140, 232, 196, 0.2);
+  }
+
+  /* ---------- allocation ---------- */
+  .section-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 0 1px;
+  }
+  .section-head h2 {
+    margin: 0;
+    color: var(--ink);
+    font-size: clamp(12px, 2.8cqw, 16px);
+    line-height: 1.1;
+    letter-spacing: -0.035em;
+  }
+  .section-head p {
+    margin: 3px 0 0;
+    color: var(--muted);
+    font-size: clamp(5.5px, 1.16cqw, 6.8px);
+    line-height: 1.4;
+  }
+  .assign-total { flex: none; text-align: right; }
+  .assign-total strong {
+    display: block;
+    color: var(--green);
+    font-size: clamp(14px, 3cqw, 18px);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .assign-total span {
+    display: block;
+    margin-top: 1px;
+    color: var(--muted);
+    font-size: clamp(4.7px, 1cqw, 5.7px);
+    letter-spacing: 0.1em;
+  }
+  .alloc-bar {
+    display: flex;
+    height: 7px;
+    margin: 7px 0 6px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.055);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.035);
+  }
+  .alloc-segment {
+    display: block;
+    height: 100%;
+    transition: width 140ms ease;
+  }
+  .alloc-segment.essentials { background: var(--amber); }
+  .alloc-segment.reserve { background: var(--green); }
+  .alloc-segment.move { background: var(--blue); }
+
+  .slider-stack { display: grid; gap: 5px; }
+  .slider-card {
+    --accent: var(--amber);
+    padding: 5px 7px 4px 8px;
+    border: 1px solid rgba(255, 255, 255, 0.062);
+    border-left: 2px solid var(--accent);
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.022);
+  }
+  .slider-card.reserve { --accent: var(--green); }
+  .slider-card.move { --accent: var(--blue); }
+  .slider-top {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 6px;
+  }
+  .slider-name { display: flex; align-items: baseline; gap: 5px; min-width: 0; }
+  .slider-dot {
+    width: 5px;
+    height: 5px;
+    flex: none;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 60%, transparent);
+  }
+  .slider-name b {
+    color: var(--ink);
+    font-size: clamp(7.4px, 1.5cqw, 8.8px);
+    line-height: 1.2;
+    white-space: nowrap;
+  }
+  .slider-tag {
+    flex: none;
+    color: rgba(230, 244, 234, 0.32);
+    font-size: clamp(4.4px, 0.95cqw, 5.4px);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .slider-numbers {
+    display: flex;
+    align-items: baseline;
+    gap: 5px;
+    flex: none;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .slider-pct { color: var(--accent); font-size: clamp(10px, 2.2cqw, 13px); font-weight: 700; line-height: 1; }
+  .slider-amount { color: rgba(230, 244, 234, 0.66); font-size: clamp(6px, 1.2cqw, 7px); }
+  .slider-desc {
+    margin: 2px 0 3px;
+    color: var(--muted);
+    font-size: clamp(5.35px, 1.1cqw, 6.4px);
+    line-height: 1.35;
+  }
+  .range-row { display: flex; align-items: center; gap: 6px; }
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    flex: 1;
+    min-width: 0;
+    height: 4px;
+    margin: 2px 0 3px;
+    border-radius: 99px;
+    background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 85%, #fff 0%) 0 var(--fill, 0%), rgba(255, 255, 255, 0.08) var(--fill, 0%) 100%);
+    cursor: pointer;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 11px;
+    height: 11px;
+    border: 2px solid #07100e;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 60%, transparent), 0 0 8px color-mix(in srgb, var(--accent) 32%, transparent);
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 9px;
+    height: 9px;
+    border: 2px solid #07100e;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 60%, transparent);
+  }
+  .range-ends {
+    display: flex;
+    justify-content: space-between;
+    margin: -1px 0 0;
+    color: rgba(230, 244, 234, 0.23);
+    font-size: clamp(4.2px, 0.88cqw, 5px);
+    letter-spacing: 0.05em;
+  }
+  .slider-caption {
+    margin-top: 4px;
+    color: rgba(230, 244, 234, 0.33);
+    font-size: clamp(5px, 1.02cqw, 5.9px);
+    line-height: 1.3;
+  }
+
+  /* ---------- forecast ---------- */
+  .forecast { margin-top: 9px; }
+  .forecast-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 0 1px 4px;
+  }
+  .forecast-head h2 {
+    margin: 0;
+    color: rgba(240, 249, 242, 0.82);
+    font-size: clamp(6.2px, 1.25cqw, 7.4px);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .forecast-head span {
+    color: var(--muted);
+    font-size: clamp(4.8px, 1cqw, 5.7px);
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+  }
+  .forecast-list {
+    display: grid;
+    gap: 3px;
+    padding: 5px 6px;
+    border: 1px solid rgba(255, 255, 255, 0.055);
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.017);
+  }
+  .forecast-row {
+    display: grid;
+    grid-template-columns: 0.9fr 1.05fr 0.6fr;
+    align-items: baseline;
+    gap: 5px;
+    padding: 2px 1px;
+    border-bottom: 1px dashed rgba(255, 255, 255, 0.045);
+    font-size: clamp(5.3px, 1.08cqw, 6.3px);
+    line-height: 1.35;
+  }
+  .forecast-row:last-child { border-bottom: 0; }
+  .forecast-row .f-label { color: rgba(230, 244, 234, 0.66); white-space: nowrap; }
+  .forecast-row .f-value { color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .forecast-row .f-state { text-align: right; white-space: nowrap; }
+  .f-state.ok { color: var(--green); }
+  .f-state.warn { color: var(--amber); }
+  .f-state.bad { color: var(--red); }
+  .forecast-tip {
+    margin: 4px 0 0;
+    color: rgba(230, 244, 234, 0.35);
+    font-size: clamp(5px, 1.03cqw, 6px);
+    line-height: 1.4;
+  }
+  .forecast-tip b { color: rgba(240, 249, 242, 0.68); font-weight: 600; }
+  .extra-due {
+    display: inline-block;
+    margin-left: 4px;
+    padding: 1px 4px;
+    border: 1px solid rgba(255, 141, 122, 0.24);
+    border-radius: 3px;
+    color: #ffb1a3;
+    font-size: 0.88em;
+    letter-spacing: 0.03em;
+    vertical-align: 1px;
+  }
+
+  .rule-card {
+    margin-top: 8px;
+    padding: 6px 8px 6px 9px;
+    border: 1px solid rgba(140, 232, 196, 0.13);
+    border-radius: 7px;
+    background: rgba(140, 232, 196, 0.028);
+  }
+  .rule-card b {
+    display: block;
+    color: rgba(195, 255, 234, 0.78);
+    font-size: clamp(5.5px, 1.13cqw, 6.5px);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .rule-card p {
+    margin: 3px 0 0;
+    color: rgba(230, 244, 234, 0.4);
+    font-size: clamp(5.2px, 1.05cqw, 6.1px);
+    line-height: 1.42;
+  }
+  .rule-card p b { display: inline; color: rgba(240, 249, 242, 0.7); font-size: inherit; letter-spacing: 0; text-transform: none; }
+
+  /* ---------- action bar ---------- */
+  .actionbar {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-height: 29px;
+    padding: 0 9px 8px;
+  }
+  .notice {
+    min-width: 0;
+    flex: 1;
+    color: rgba(230, 244, 234, 0.36);
+    font-size: clamp(5.1px, 1.03cqw, 6px);
+    line-height: 1.38;
+  }
+  .notice.good { color: rgba(140, 232, 196, 0.7); }
+  .notice.warn { color: #ffb0a3; }
+  .commit-btn {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 8px 11px;
+    border: 0;
+    border-radius: 7px;
+    background: linear-gradient(180deg, #82efd0, #47c7a5);
+    box-shadow: 0 8px 18px -10px rgba(94, 231, 199, 0.9), inset 0 -2px 0 rgba(0, 0, 0, 0.16);
+    color: #05251f;
+    font-size: clamp(6.1px, 1.25cqw, 7.2px);
+    font-weight: 800;
+    letter-spacing: 0.065em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .commit-btn:hover:not(:disabled) { filter: brightness(1.06); }
+  .commit-btn:active:not(:disabled) { transform: translateY(1px); }
+  .commit-btn:disabled { opacity: 0.42; cursor: default; }
+
+  /* ---------- overlays ---------- */
+  .overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 8;
+    display: grid;
+    place-items: center;
+    padding: 13px;
+    background: rgba(3, 8, 7, 0.86);
+    -webkit-backdrop-filter: blur(5px);
+    backdrop-filter: blur(5px);
+    animation: fade-in 160ms ease-out;
+  }
+  @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+  .panel {
+    width: 100%;
+    max-width: 385px;
+    max-height: 100%;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 15px 15px 13px;
+    border: 1px solid rgba(150, 226, 203, 0.19);
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(20, 39, 33, 0.998), rgba(5, 14, 12, 0.998));
+    box-shadow:
+      0 25px 60px -24px rgba(0, 0, 0, 0.97),
+      inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    text-align: center;
+    scrollbar-width: thin;
+  }
+  .panel .eyebrow { color: var(--amber); }
+  .title {
+    margin: 3px 0 7px;
+    color: var(--ink);
+    font-size: clamp(26px, 7cqw, 35px);
+    line-height: 1.01;
+    letter-spacing: -0.012em;
+    text-shadow: 0 0 30px rgba(140, 232, 196, 0.12);
+  }
+  .title .accent { color: var(--green); }
+  .title .slash { color: rgba(255, 199, 109, 0.52); font-weight: 400; }
+  .lead {
+    margin: 0;
+    color: rgba(229, 244, 234, 0.62);
+    font-size: clamp(7.6px, 1.55cqw, 8.8px);
+    line-height: 1.48;
+    letter-spacing: 0.004em;
+  }
+  .lead b { color: rgba(255, 215, 142, 0.92); font-weight: 700; }
+  .rules { display: grid; gap: 4px; margin: 9px 0 0; text-align: left; }
+  .rule {
+    position: relative;
+    padding-left: 12px;
+    color: rgba(229, 244, 234, 0.57);
+    font-size: clamp(6.4px, 1.3cqw, 7.4px);
+    line-height: 1.4;
+  }
+  .rule::before {
+    content: "▸";
+    position: absolute;
+    left: 1px;
+    color: var(--amber);
+  }
+  .rule b { color: rgba(241, 248, 243, 0.9); font-weight: 700; }
+  .score-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 3px;
+    margin-top: 9px;
+  }
+  .score-cell {
+    padding: 5px 2px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 5px;
+    background: rgba(255, 255, 255, 0.022);
+  }
+  .score-cell span {
+    display: block;
+    color: var(--muted);
+    font-size: clamp(4.55px, 0.9cqw, 5.25px);
+    letter-spacing: 0.045em;
+    line-height: 1.2;
+    text-transform: uppercase;
+  }
+  .score-cell strong {
+    display: block;
+    margin-top: 2px;
+    color: var(--green);
+    font-size: clamp(7.5px, 1.5cqw, 8.6px);
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+  }
+  .score-cell:nth-child(2) strong { color: var(--amber); }
+  .score-cell:nth-child(3) strong { color: var(--blue); }
+  .score-cell:nth-child(4) strong { color: var(--violet); }
+  .btn {
+    margin-top: 12px;
+    padding: 9px 20px;
+    border: 0;
+    border-radius: 999px;
+    background: linear-gradient(180deg, #82efd0, #47c7a5);
+    box-shadow: 0 14px 30px -14px rgba(94, 231, 199, 0.9), inset 0 -2px 0 rgba(0, 0, 0, 0.16);
+    color: #05251f;
+    font-size: clamp(7.2px, 1.45cqw, 8.4px);
+    font-weight: 800;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+  .btn:hover { filter: brightness(1.06); }
+  .btn:active { transform: translateY(1px) scale(0.99); }
+  .fine {
+    margin: 7px 0 0;
+    color: rgba(229, 244, 234, 0.27);
+    font-size: clamp(5.2px, 1.02cqw, 5.9px);
+    letter-spacing: 0.065em;
+    text-transform: uppercase;
+  }
+
+  /* ---------- event card ---------- */
+  .event-stamp {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-bottom: 6px;
+    padding: 3px 6px;
+    border: 1px solid rgba(255, 141, 122, 0.26);
+    border-radius: 4px;
+    background: rgba(255, 141, 122, 0.055);
+    color: #ffb1a4;
+    font-size: clamp(5.1px, 1cqw, 5.9px);
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+  }
+  .event-icon {
+    width: 31px;
+    height: 31px;
+    margin: 0 auto 5px;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(255, 141, 122, 0.3);
+    border-radius: 8px;
+    background: rgba(255, 141, 122, 0.07);
+    color: #ffb4a7;
+    font-size: 15px;
+    line-height: 1;
+  }
+  .event-title {
+    margin: 0 0 5px;
+    color: var(--ink);
+    font-size: clamp(16px, 3.6cqw, 21px);
+    line-height: 1.08;
+    letter-spacing: -0.025em;
+  }
+  .event-copy {
+    margin: 0;
+    color: rgba(229, 244, 234, 0.57);
+    font-size: clamp(6.7px, 1.35cqw, 7.7px);
+    line-height: 1.5;
+  }
+  .budget-read {
+    margin: 7px 0 0;
+    padding: 5px 7px;
+    border-left: 2px solid rgba(140, 232, 196, 0.4);
+    border-radius: 0 5px 5px 0;
+    background: rgba(140, 232, 196, 0.035);
+    color: rgba(199, 246, 228, 0.62);
+    font-size: clamp(5.7px, 1.15cqw, 6.6px);
+    line-height: 1.4;
+    text-align: left;
+  }
+  .budget-read.warn {
+    border-left-color: rgba(255, 141, 122, 0.55);
+    background: rgba(255, 141, 122, 0.045);
+    color: rgba(255, 198, 191, 0.75);
+  }
+  .cost-block {
+    margin: 8px 0 7px;
+    padding: 7px;
+    border: 1px solid rgba(255, 141, 122, 0.22);
+    border-radius: 7px;
+    background: rgba(255, 141, 122, 0.045);
+  }
+  .cost-block span {
+    display: block;
+    color: rgba(255, 186, 177, 0.56);
+    font-size: clamp(4.8px, 0.95cqw, 5.5px);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+  .cost-block strong {
+    display: block;
+    margin-top: 1px;
+    color: #ffb0a2;
+    font-size: clamp(21px, 4.7cqw, 27px);
+    line-height: 1.05;
+    font-variant-numeric: tabular-nums;
+  }
+  .options-label {
+    margin: 0 0 4px;
+    color: var(--muted);
+    font-size: clamp(4.9px, 1cqw, 5.7px);
+    letter-spacing: 0.13em;
+    text-align: left;
+    text-transform: uppercase;
+  }
+  .event-options { display: grid; gap: 4px; }
+  .event-option {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    width: 100%;
+    padding: 6px 7px;
+    border: 1px solid rgba(255, 255, 255, 0.075);
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.025);
+    color: var(--ink);
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 110ms ease, background 110ms ease;
+  }
+  .event-option:hover:not(:disabled) {
+    border-color: rgba(140, 232, 196, 0.42);
+    background: rgba(140, 232, 196, 0.055);
+  }
+  .event-option:disabled {
+    opacity: 0.42;
+    cursor: not-allowed;
+    filter: saturate(0.45);
+  }
+  .option-source {
+    width: 26px;
+    height: 26px;
+    flex: none;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(140, 232, 196, 0.22);
+    border-radius: 5px;
+    background: rgba(140, 232, 196, 0.055);
+    color: var(--green);
+    font-size: clamp(6.2px, 1.25cqw, 7.2px);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+  .option-source.savings {
+    border-color: rgba(136, 202, 255, 0.24);
+    background: rgba(136, 202, 255, 0.055);
+    color: var(--blue);
+  }
+  .option-source.defer {
+    border-color: rgba(255, 199, 109, 0.24);
+    background: rgba(255, 199, 109, 0.055);
+    color: var(--amber);
+  }
+  .option-text { min-width: 0; flex: 1; }
+  .option-text b {
+    display: block;
+    color: var(--ink);
+    font-size: clamp(6.4px, 1.28cqw, 7.3px);
+    line-height: 1.28;
+  }
+  .option-text small {
+    display: block;
+    margin-top: 1px;
+    color: rgba(229, 244, 234, 0.39);
+    font-size: clamp(5.1px, 1.02cqw, 5.85px);
+    line-height: 1.32;
+  }
+  .option-effect {
+    flex: none;
+    min-width: 58px;
+    text-align: right;
+    color: rgba(229, 244, 234, 0.72);
+    font-size: clamp(5.4px, 1.08cqw, 6.2px);
+    line-height: 1.3;
+    font-variant-numeric: tabular-nums;
+  }
+  .option-effect b { display: block; color: var(--green); font-size: clamp(6.7px, 1.3cqw, 7.7px); }
+  .option-effect.defer b { color: var(--amber); }
+  .option-effect.savings b { color: var(--blue); }
+  .option-effect small { display: block; color: var(--muted); font-size: 0.84em; }
+  .event-foot {
+    margin: 7px 0 0;
+    color: rgba(229, 244, 234, 0.3);
+    font-size: clamp(4.9px, 0.96cqw, 5.55px);
+    line-height: 1.38;
+  }
+
+  /* ---------- event result ---------- */
+  .result-seal {
+    width: 36px;
+    height: 36px;
+    margin: 1px auto 7px;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(140, 232, 196, 0.35);
+    border-radius: 50%;
+    background: rgba(140, 232, 196, 0.07);
+    color: var(--green);
+    font-size: 17px;
+    line-height: 1;
+  }
+  .result-seal.savings {
+    border-color: rgba(136, 202, 255, 0.38);
+    background: rgba(136, 202, 255, 0.065);
+    color: var(--blue);
+  }
+  .result-seal.defer {
+    border-color: rgba(255, 199, 109, 0.38);
+    background: rgba(255, 199, 109, 0.065);
+    color: var(--amber);
+  }
+  .result-title {
+    margin: 0 0 5px;
+    color: var(--ink);
+    font-size: clamp(18px, 4.1cqw, 24px);
+    line-height: 1.07;
+    letter-spacing: -0.03em;
+  }
+  .result-copy {
+    margin: 0;
+    color: rgba(229, 244, 234, 0.56);
+    font-size: clamp(6.6px, 1.3cqw, 7.5px);
+    line-height: 1.48;
+  }
+  .result-strip {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+    margin-top: 8px;
+  }
+  .result-cell {
+    padding: 5px 3px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 5px;
+    background: rgba(255, 255, 255, 0.02);
+  }
+  .result-cell span {
+    display: block;
+    color: var(--muted);
+    font-size: clamp(4.6px, 0.93cqw, 5.4px);
+    letter-spacing: 0.08em;
+    line-height: 1.25;
+    text-transform: uppercase;
+  }
+  .result-cell strong {
+    display: block;
+    margin-top: 2px;
+    color: var(--ink);
+    font-size: clamp(8px, 1.65cqw, 9.5px);
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+  }
+  .result-cell:nth-child(1) strong { color: var(--green); }
+  .result-cell:nth-child(2) strong { color: var(--blue); }
+  .result-cell:nth-child(3) strong { color: var(--amber); }
+  .result-lesson {
+    margin: 7px 0 0;
+    padding: 6px 7px;
+    border-top: 1px dashed rgba(255, 255, 255, 0.08);
+    border-bottom: 1px dashed rgba(255, 255, 255, 0.08);
+    color: rgba(229, 244, 234, 0.45);
+    font-size: clamp(5.4px, 1.06cqw, 6.1px);
+    line-height: 1.42;
+    text-align: left;
+  }
+  .next-line {
+    margin: 7px 0 0;
+    color: var(--muted);
+    font-size: clamp(5.1px, 1cqw, 5.8px);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .next-line b { color: var(--amber); }
+
+  /* ---------- final report ---------- */
+  .rank {
+    margin: 6px 0 0;
+    color: var(--amber);
+    font-size: clamp(6.1px, 1.25cqw, 7.2px);
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  .final-score {
+    margin-top: 7px;
+    padding: 7px;
+    border: 1px solid rgba(140, 232, 196, 0.16);
+    border-radius: 8px;
+    background: rgba(140, 232, 196, 0.04);
+  }
+  .final-score span {
+    display: block;
+    color: var(--muted);
+    font-size: clamp(4.9px, 0.98cqw, 5.6px);
+    letter-spacing: 0.17em;
+  }
+  .final-score strong {
+    display: block;
+    margin-top: 1px;
+    color: var(--green);
+    font-size: clamp(29px, 6.4cqw, 38px);
+    line-height: 0.98;
+    letter-spacing: 0.01em;
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 26px rgba(140, 232, 196, 0.25);
+  }
+  .final-score small {
+    display: block;
+    margin-top: 3px;
+    color: var(--muted);
+    font-size: clamp(4.8px, 0.96cqw, 5.5px);
+    letter-spacing: 0.075em;
+  }
+  .report-grid {
+    display: grid;
+    grid-template-columns: 0.85fr 1.15fr 1fr 1fr;
+    gap: 3px;
+    margin-top: 6px;
+  }
+  .report-stat {
+    min-width: 0;
+    padding: 4px 3px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 5px;
+    background: rgba(255, 255, 255, 0.02);
+  }
+  .report-stat span {
+    display: block;
+    overflow: hidden;
+    color: var(--muted);
+    font-size: clamp(4.2px, 0.84cqw, 4.9px);
+    letter-spacing: 0.04em;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .report-stat strong {
+    display: block;
+    margin-top: 2px;
+    overflow: hidden;
+    color: var(--ink);
+    font-size: clamp(7px, 1.4cqw, 8.2px);
+    line-height: 1.12;
+    font-variant-numeric: tabular-nums;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .report-stat:nth-child(1) strong { color: var(--green); }
+  .report-stat:nth-child(2) strong { color: var(--amber); }
+  .report-stat:nth-child(3) strong { color: var(--green); }
+  .report-stat:nth-child(4) strong { color: var(--blue); }
+  .breakdown {
+    display: grid;
+    gap: 2px;
+    margin-top: 6px;
+    padding: 5px 7px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.017);
+  }
+  .break-line {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 7px;
+    color: rgba(229, 244, 234, 0.5);
+    font-size: clamp(5.35px, 1.05cqw, 6.15px);
+    line-height: 1.4;
+  }
+  .break-line b {
+    flex: none;
+    color: var(--ink);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .break-line.total {
+    margin-top: 2px;
+    padding-top: 3px;
+    border-top: 1px dashed rgba(255, 255, 255, 0.09);
+    color: rgba(229, 244, 234, 0.7);
+  }
+  .break-line.total b { color: var(--green); }
+  .rebuild-note {
+    margin: 5px 0 0;
+    color: rgba(136, 202, 255, 0.6);
+    font-size: clamp(5.1px, 1cqw, 5.8px);
+    line-height: 1.4;
+    text-align: left;
+  }
+  .log-label {
+    margin: 7px 0 3px;
+    color: var(--muted);
+    font-size: clamp(4.9px, 0.98cqw, 5.6px);
+    letter-spacing: 0.12em;
+    text-align: left;
+    text-transform: uppercase;
+  }
+  .event-log {
+    display: grid;
+    gap: 2px;
+    max-height: 106px;
+    overflow-y: auto;
+    padding: 4px 5px;
+    border: 1px solid rgba(255, 255, 255, 0.055);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.015);
+    scrollbar-width: thin;
+  }
+  .log-row {
+    display: grid;
+    grid-template-columns: 25px minmax(0, 1fr) auto;
+    align-items: baseline;
+    gap: 4px;
+    padding: 2px 1px;
+    border-bottom: 1px dashed rgba(255, 255, 255, 0.045);
+    text-align: left;
+  }
+  .log-row:last-child { border-bottom: 0; }
+  .log-row span { color: var(--amber); font-size: clamp(4.7px, 0.92cqw, 5.4px); letter-spacing: 0.04em; }
+  .log-row b {
+    overflow: hidden;
+    color: rgba(229, 244, 234, 0.64);
+    font-size: clamp(5.1px, 1cqw, 5.9px);
+    font-weight: 500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .log-row em {
+    color: rgba(136, 202, 255, 0.62);
+    font-size: clamp(4.8px, 0.94cqw, 5.5px);
+    font-style: normal;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .log-row em.reserve { color: rgba(140, 232, 196, 0.65); }
+  .log-row em.defer { color: rgba(255, 199, 109, 0.64); }
+  .outro {
+    margin: 7px 0 0;
+    color: rgba(229, 244, 234, 0.54);
+    font-size: clamp(5.9px, 1.15cqw, 6.7px);
+    line-height: 1.45;
+    text-align: left;
+  }
+
+  /* ---------- compact heights ---------- */
+  @container (max-height: 610px) {
+    .topbar { margin-top: 6px; padding: 5px 7px; }
+    .board { margin-top: 5px; margin-bottom: 6px; }
+    .month-head { margin-top: 6px; padding: 6px 8px 6px 9px; }
+    .month-copy p:last-child { -webkit-line-clamp: 1; }
+    .account-strip { margin-top: 4px; }
+    .account { padding-top: 4px; padding-bottom: 3px; }
+    .scroll { padding-top: 6px; padding-bottom: 8px; }
+    .slider-card { padding-top: 4px; padding-bottom: 3px; }
+    .slider-desc { margin-top: 1px; margin-bottom: 2px; }
+    .forecast { margin-top: 7px; }
+    .rule-card { margin-top: 6px; padding-top: 5px; padding-bottom: 5px; }
+    .actionbar { min-height: 27px; padding-bottom: 6px; }
+    .panel { padding: 12px 12px 10px; }
+  }
+  @container (max-height: 535px) {
+    .brand small { display: none; }
+    .month-copy p:last-child { display: none; }
+    .account small { display: none; }
+    .slider-desc { display: none; }
+    .slider-caption { display: none; }
+    .forecast-head span { display: none; }
+    .rule-card p { display: none; }
+    .title { font-size: clamp(24px, 6.4cqw, 31px); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.001ms !important;
+      transition-duration: 0.001ms !important;
+    }
+  }
+</style>
+</head>
+<body>
+<p class="hint">Eight paychecks &middot; seven small setbacks &middot; one move-in date</p>
+<main id="stage">
+  <div id="app">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">↘</div>
+        <div>
+          <b>SOFT LANDING</b>
+          <small>RESERVE / BILLS / MOVE FUND</small>
+        </div>
+      </div>
+      <div class="topstats" aria-label="Game status">
+        <div class="topstat"><span>MONTH</span><strong id="hudMonth">1/8</strong></div>
+        <div class="topstat"><span>RESERVE</span><strong id="hudReserve">$380</strong></div>
+        <div class="topstat"><span>SCORE</span><strong id="hudScore">000</strong></div>
+      </div>
+    </header>
+
+    <section class="board" aria-labelledby="monthTitle">
+      <div class="month-head">
+        <div class="month-copy">
+          <p class="eyebrow" id="monthEyebrow">MONTH 01 · FIRST PAYCHECK</p>
+          <h1 id="monthTitle">Rent is no longer theoretical.</h1>
+          <p id="monthCopy">Your first independent-living paycheck is here. Cover the month before you build the bridge.</p>
+        </div>
+        <div class="payblock" aria-label="Monthly take-home pay">
+          <span>PAYDAY</span>
+          <strong id="income">$1,780</strong>
+          <small>TAKE-HOME</small>
+        </div>
+      </div>
+
+      <div class="account-strip">
+        <div class="account due" id="dueAccount">
+          <span>ESSENTIALS DUE</span>
+          <strong id="dueValue">$1,230</strong>
+          <small id="dueNote">regular bills</small>
+        </div>
+        <div class="account reserve">
+          <span>CASH RESERVE</span>
+          <strong id="reserveValue">$380</strong>
+          <small id="reserveNote">$1,600 target</small>
+        </div>
+        <div class="account move">
+          <span>MOVE FUND</span>
+          <strong id="moveValue">$620</strong>
+          <small id="moveNote">$2,400 goal</small>
+        </div>
+      </div>
+
+      <div class="scroll" id="planScroll">
+        <section class="allocation" aria-labelledby="allocTitle">
+          <div class="section-head">
+            <div>
+              <h2 id="allocTitle">Split the paycheck.</h2>
+              <p>Move one slider; the other two rebalance so 100% stays assigned.</p>
+            </div>
+            <div class="assign-total">
+              <strong id="allocPercent">100%</strong>
+              <span>ASSIGNED</span>
+            </div>
+          </div>
+          <div class="alloc-bar" id="allocBar" aria-hidden="true"></div>
+          <div class="slider-stack" id="sliderList"></div>
+        </section>
+
+        <section class="forecast" aria-labelledby="forecastTitle">
+          <div class="forecast-head">
+            <h2 id="forecastTitle">This month's read</h2>
+            <span>before small setbacks</span>
+          </div>
+          <div class="forecast-list" id="forecastList"></div>
+          <p class="forecast-tip" id="forecastTip"></p>
+        </section>
+
+        <div class="rule-card">
+          <b>Build. Use. Rebuild.</b>
+          <p><b>Regular essentials come first.</b> Unused essentials roll into the reserve. If you underfund them, the reserve covers the gap before the move fund does. A setback card waits after you commit.</p>
+        </div>
+      </div>
+
+      <footer class="actionbar">
+        <div class="notice" id="notice" role="status" aria-live="polite">Set a split, then commit the month.</div>
+        <button class="commit-btn" id="commitBtn" type="button">Commit month <span aria-hidden="true">→</span></button>
+      </footer>
+    </section>
+  </div>
+
+  <div class="overlay" id="overlay" role="dialog" aria-modal="true" aria-labelledby="ovTitle" hidden>
+    <div class="panel" id="panel"></div>
+  </div>
+</main>
+
+<script>
+'use strict';
+
+const RESERVE_GOAL = 1600;
+const MOVE_GOAL = 2400;
+const MAX_SCORE = 1000;
+const START_RESERVE = 380;
+const START_MOVE = 620;
+
+const BUCKETS = [
+  {
+    id: 'essentials',
+    name: 'Essentials',
+    icon: '⌂',
+    tag: 'MUST FUND',
+    desc: 'Rent share, groceries, transit, phone.',
+    caption: 'A shortfall is covered from reserve first, then the move fund.'
+  },
+  {
+    id: 'reserve',
+    name: 'Cash reserve',
+    icon: '◈',
+    tag: 'SHOCK ABSORBER',
+    desc: 'The first line of defense for ordinary setbacks.',
+    caption: 'Using it is smart. Rebuilding it is the survival skill.'
+  },
+  {
+    id: 'savings',
+    name: 'Move fund',
+    icon: '▤',
+    tag: 'MOVE-IN GOAL',
+    desc: 'Deposit, first month, and the cost of getting there.',
+    caption: 'A withdrawal is not a failure if you put the money back.'
+  }
+];
+
+const MONTHS = [
+  {
+    n: 1,
+    label: 'JUNE',
+    kicker: 'FIRST PAYCHECK',
+    title: 'Rent is no longer theoretical.',
+    copy: 'Your name is on the lease for January. For now it is a share of a room, a grocery list, and a bus schedule that has to work every week.',
+    income: 1780,
+    due: 1230
+  },
+  {
+    n: 2,
+    label: 'JULY',
+    kicker: 'THE GROCERY DRIFT',
+    title: 'The quiet costs settle in.',
+    copy: 'The first month was a rehearsal. July is the same bills with less novelty and a little more food on the receipt.',
+    income: 1780,
+    due: 1245
+  },
+  {
+    n: 3,
+    label: 'AUGUST',
+    kicker: 'FALL SCHEDULE',
+    title: 'Books and bus fare arrive together.',
+    copy: 'Course materials land before the semester does. The commute stays long, and the phone bill refuses to become optional.',
+    income: 1780,
+    due: 1260
+  },
+  {
+    n: 4,
+    label: 'SEPTEMBER',
+    kicker: 'CLASSES CUT HOURS',
+    title: 'The paycheck gets smaller.',
+    copy: 'A new class block costs you two shifts. September asks the same bills to fit into a thinner check without borrowing from the future.',
+    income: 1540,
+    due: 1210
+  },
+  {
+    n: 5,
+    label: 'OCTOBER',
+    kicker: 'COLDER COMMUTE',
+    title: 'The margin gets weather.',
+    copy: 'The heating share rises and the walk to the bus is colder. None of it is dramatic. All of it is regular.',
+    income: 1780,
+    due: 1290
+  },
+  {
+    n: 6,
+    label: 'NOVEMBER',
+    kicker: 'HOLIDAY HOURS',
+    title: 'More shifts, higher food costs.',
+    copy: 'Holiday hours help, but the grocery run gets longer and the apartment wants a little more heat. The move is close enough to feel real.',
+    income: 1780,
+    due: 1310
+  },
+  {
+    n: 7,
+    label: 'DECEMBER',
+    kicker: 'EXTRA SHIFTS',
+    title: 'The biggest check of the year.',
+    copy: 'Peak season hands you extra hours. This is the month that can turn a plan into a cushion, if the setback bin stays quiet.',
+    income: 2020,
+    due: 1340
+  },
+  {
+    n: 8,
+    label: 'JANUARY',
+    kicker: 'MOVE MONTH',
+    title: 'One last regular month.',
+    copy: 'The keys are almost yours. Cover January, protect the reserve, and carry enough move fund into the apartment to survive the first quiet week.',
+    income: 1780,
+    due: 1360
+  }
+];
+
+const EVENTS = [
+  {
+    id: 'transit',
+    icon: '↯',
+    flag: 'TRANSIT',
+    title: 'The express pass stops covering your route.',
+    copy: 'A schedule change adds a transfer to every co-op shift. The difference is $35 this month.',
+    amount: 35,
+    deferExtra: 60,
+    reserve: {
+      label: 'Add $35 to the transit card',
+      detail: 'Keeps every shift reachable. This is exactly what a reserve is for.'
+    },
+    savings: {
+      label: 'Take $35 from the move fund',
+      detail: 'The move fund covers it now, but those dollars have to be rebuilt.'
+    },
+    defer: {
+      label: 'Ask for rides for one week',
+      detail: 'No cash today. Repaying the favor adds $60 to next month’s essentials.'
+    }
+  },
+  {
+    id: 'phone',
+    icon: '⌁',
+    flag: 'PHONE',
+    title: 'The phone screen finally cracks.',
+    copy: 'A corner catches the pavement on the way out of class. The repair quote is $65, and the bus app lives on that screen.',
+    amount: 65,
+    deferExtra: 90,
+    reserve: {
+      label: 'Pay for the screen repair',
+      detail: 'Restores the phone now without slowing the move fund.'
+    },
+    savings: {
+      label: 'Replace it from the move fund',
+      detail: 'You stay connected, but the deposit takes the hit.'
+    },
+    defer: {
+      label: 'Tape it and keep moving',
+      detail: 'The screen still works—barely. A proper fix next month adds $90 to essentials.'
+    }
+  },
+  {
+    id: 'clinic',
+    icon: '✚',
+    flag: 'HEALTH',
+    title: 'A toothache needs a clinic visit.',
+    copy: 'The campus clinic can see you, but the copay is $80. Waiting is free until it stops being free.',
+    amount: 80,
+    deferExtra: 105,
+    reserve: {
+      label: 'Pay the clinic copay',
+      detail: 'Handles the problem before it grows into a bigger bill.'
+    },
+    savings: {
+      label: 'Use the move fund for care',
+      detail: 'Your health comes first, even when the move fund pays.'
+    },
+    defer: {
+      label: 'Set up a payment plan',
+      detail: 'No cash today. The clinic adds $105 to what next month owes.'
+    }
+  },
+  {
+    id: 'charger',
+    icon: '▣',
+    flag: 'LAPTOP',
+    title: 'The laptop charger dies before a quiz.',
+    copy: 'The online quiz is open for six hours. The replacement charger costs $55.',
+    amount: 55,
+    deferExtra: 80,
+    reserve: {
+      label: 'Buy the charger today',
+      detail: 'Small, boring, and exactly the kind of thing a reserve absorbs.'
+    },
+    savings: {
+      label: 'Pull $55 from the move fund',
+      detail: 'You make the quiz, but the move fund gives up the money.'
+    },
+    defer: {
+      label: 'Borrow a charger for now',
+      detail: 'You can borrow one this week. Returning the favor adds $80 next month.'
+    }
+  },
+  {
+    id: 'application',
+    icon: '⌂',
+    flag: 'APARTMENT',
+    title: 'The application fee posts early.',
+    copy: 'The landlord wants the $70 screening fee before the lease signing. It is small, official, and due now.',
+    amount: 70,
+    deferExtra: 95,
+    reserve: {
+      label: 'Pay the application fee',
+      detail: 'Keeps the paperwork moving without touching the deposit.'
+    },
+    savings: {
+      label: 'Cover it from the move fund',
+      detail: 'A move-related cost, but the fund still needs to be made whole.'
+    },
+    defer: {
+      label: 'Ask to pay at signing',
+      detail: 'The landlord agrees, with a $95 late-processing add-on next month.'
+    }
+  },
+  {
+    id: 'utilities',
+    icon: '◈',
+    flag: 'ROOMMATE',
+    title: 'The utility share falls through.',
+    copy: 'A roommate’s hours get cut and their share of the heating bill does not arrive. You are short $95.',
+    amount: 95,
+    deferExtra: 120,
+    reserve: {
+      label: 'Cover the missing utility share',
+      detail: 'Keeps the lights on and the roommate relationship intact.'
+    },
+    savings: {
+      label: 'Take it from the move fund',
+      detail: 'The deposit absorbs the gap. Rebuild it before January.'
+    },
+    defer: {
+      label: 'Carry the balance one month',
+      detail: 'No cash today. The utility company adds $120 to next month’s essentials.'
+    }
+  },
+  {
+    id: 'van',
+    icon: '→',
+    flag: 'MOVE WEEK',
+    title: 'The move-week van costs more than quoted.',
+    copy: 'The only available van plus the cleaning kit comes to $155. The keys are waiting on the other side.',
+    amount: 155,
+    deferExtra: 180,
+    reserve: {
+      label: 'Pay the van from the reserve',
+      detail: 'Gets you to the door with the move fund still on the table.'
+    },
+    savings: {
+      label: 'Use the move fund for moving',
+      detail: 'This is what it was saved for—but the cushion shrinks.'
+    },
+    defer: {
+      label: 'Book a cheaper late slot',
+      detail: 'No cash today. The later slot and extra supplies add $180 to January essentials.'
+    }
+  }
+];
+
+const els = {
+  app: document.getElementById('app'),
+  overlay: document.getElementById('overlay'),
+  panel: document.getElementById('panel'),
+  hudMonth: document.getElementById('hudMonth'),
+  hudReserve: document.getElementById('hudReserve'),
+  hudScore: document.getElementById('hudScore'),
+  monthEyebrow: document.getElementById('monthEyebrow'),
+  monthTitle: document.getElementById('monthTitle'),
+  monthCopy: document.getElementById('monthCopy'),
+  income: document.getElementById('income'),
+  dueAccount: document.getElementById('dueAccount'),
+  dueValue: document.getElementById('dueValue'),
+  dueNote: document.getElementById('dueNote'),
+  reserveValue: document.getElementById('reserveValue'),
+  reserveNote: document.getElementById('reserveNote'),
+  moveValue: document.getElementById('moveValue'),
+  moveNote: document.getElementById('moveNote'),
+  planScroll: document.getElementById('planScroll'),
+  allocPercent: document.getElementById('allocPercent'),
+  allocBar: document.getElementById('allocBar'),
+  sliderList: document.getElementById('sliderList'),
+  forecastList: document.getElementById('forecastList'),
+  forecastTip: document.getElementById('forecastTip'),
+  notice: document.getElementById('notice'),
+  commitBtn: document.getElementById('commitBtn')
+};
+
+function money(value) {
+  const number = Math.round(Number(value) || 0);
+  const sign = number < 0 ? '-' : '';
+  return sign + '$' + Math.abs(number).toLocaleString('en-US');
+}
+
+function padScore(value) {
+  const number = Math.max(0, Math.round(value));
+  return String(number).padStart(3, '0');
+}
+
+function freshState() {
+  return {
+    phase: 'title',
+    monthIndex: 0,
+    plan: { essentials: 70, reserve: 20, savings: 10 },
+    reserve: START_RESERVE,
+    savings: START_MOVE,
+    reserveCovered: 0,
+    responsePoints: 0,
+    essentialsMet: 0,
+    savingsWithdrawn: 0,
+    savingsRecovered: 0,
+    unrecovered: 0,
+    extraDue: 0,
+    history: [],
+    lastSettlement: null,
+    lastEvent: null,
+    notice: 'Set a split, then commit the month.',
+    noticeKind: ''
+  };
+}
+
+let state = freshState();
+
+function setNotice(text, kind) {
+  state.notice = text || '';
+  state.noticeKind = kind || '';
+}
+
+function planAmounts() {
+  const month = MONTHS[state.monthIndex];
+  return {
+    essentials: Math.round(month.income * state.plan.essentials / 100),
+    reserve: Math.round(month.income * state.plan.reserve / 100),
+    savings: Math.round(month.income * state.plan.savings / 100)
+  };
+}
+
+function dueForMonth() {
+  return MONTHS[state.monthIndex].due + state.extraDue;
+}
+
+function projectMonth() {
+  const month = MONTHS[state.monthIndex];
+  const amounts = planAmounts();
+  const due = dueForMonth();
+  const essentialsGap = Math.max(0, due - amounts.essentials);
+  const essentialsOver = Math.max(0, amounts.essentials - due);
+  let reserveAfter = state.reserve + amounts.reserve + essentialsOver;
+  let savingsAfter = state.savings + amounts.savings;
+  const reserveDraw = Math.min(reserveAfter, essentialsGap);
+  reserveAfter -= reserveDraw;
+  const savingsDraw = Math.min(savingsAfter, essentialsGap - reserveDraw);
+  savingsAfter -= savingsDraw;
+  const unpaid = Math.max(0, essentialsGap - reserveDraw - savingsDraw);
+  return {
+    month,
+    amounts,
+    due,
+    essentialsGap,
+    essentialsOver,
+    essentialsMet: essentialsGap === 0,
+    reserveAdd: amounts.reserve,
+    savingsAdd: amounts.savings,
+    reserveAfter,
+    savingsAfter,
+    reserveDraw,
+    savingsDraw,
+    unpaid
+  };
+}
+
+function computeScore() {
+  const essentials = state.essentialsMet * 40;
+  const reserveProgress = Math.round(Math.min(1, Math.max(0, state.reserve) / RESERVE_GOAL) * 180);
+  const reserveUse = Math.round(Math.min(EVENTS.length, state.reserveCovered) * 100 / EVENTS.length);
+  const savingsProgress = Math.round(Math.min(1, Math.max(0, state.savings) / MOVE_GOAL) * 160);
+  const rebuildRatio = state.savingsWithdrawn > 0
+    ? Math.min(1, state.savingsRecovered / state.savingsWithdrawn)
+    : 1;
+  const rebuild = Math.round(rebuildRatio * 100);
+  const response = Math.min(140, state.responsePoints);
+  return {
+    essentials,
+    reserveProgress,
+    reserveUse,
+    savingsProgress,
+    rebuild,
+    response,
+    rebuildRatio,
+    total: essentials + reserveProgress + reserveUse + savingsProgress + rebuild + response
+  };
+}
+
+function rankFor(score) {
+  if (score >= 900) return 'Steady ground';
+  if (score >= 780) return 'Soft landing';
+  if (score >= 620) return 'Almost ready';
+  if (score >= 450) return 'Thin margin';
+  return 'Still exposed';
+}
+
+function buildSliders() {
+  els.sliderList.innerHTML = BUCKETS.map((bucket) => (
+    '<div class="slider-card ' + bucket.id + '">' +
+      '<div class="slider-top">' +
+        '<div class="slider-name">' +
+          '<span class="slider-dot" aria-hidden="true"></span>' +
+          '<b>' + bucket.name + '</b>' +
+          '<span class="slider-tag">' + bucket.tag + '</span>' +
+        '</div>' +
+        '<div class="slider-numbers">' +
+          '<strong class="slider-pct" data-percent="' + bucket.id + '">0%</strong>' +
+          '<span class="slider-amount" data-amount="' + bucket.id + '">$0</span>' +
+        '</div>' +
+      '</div>' +
+      '<p class="slider-desc">' + bucket.desc + '</p>' +
+      '<div class="range-row">' +
+        '<input type="range" id="slider-' + bucket.id + '" min="0" max="100" step="5" value="0" ' +
+          'aria-label="' + bucket.name + ' share of this month’s paycheck" ' +
+          'aria-describedby="caption-' + bucket.id + '">' +
+      '</div>' +
+      '<div class="range-ends" aria-hidden="true"><span>0%</span><span>100%</span></div>' +
+      '<div class="slider-caption" id="caption-' + bucket.id + '">' + bucket.caption + '</div>' +
+    '</div>'
+  )).join('');
+
+  BUCKETS.forEach((bucket) => {
+    const input = document.getElementById('slider-' + bucket.id);
+    input.addEventListener('input', () => {
+      rebalancePlan(bucket.id, Number(input.value));
+    });
+  });
+}
+
+function rebalancePlan(changedId, desired) {
+  if (state.phase !== 'plan') return;
+  const clamped = Math.max(0, Math.min(100, Math.round(Number(desired) / 5) * 5));
+  const others = BUCKETS.map((bucket) => bucket.id).filter((id) => id !== changedId);
+  const remaining = 100 - clamped;
+  const oldTotal = state.plan[others[0]] + state.plan[others[1]];
+  let first;
+  if (remaining === 0) {
+    first = 0;
+  } else if (oldTotal > 0) {
+    first = Math.round((remaining * state.plan[others[0]] / oldTotal) / 5) * 5;
+  } else {
+    first = Math.floor((remaining / 2) / 5) * 5;
+  }
+  first = Math.max(0, Math.min(remaining, first));
+  state.plan[changedId] = clamped;
+  state.plan[others[0]] = first;
+  state.plan[others[1]] = remaining - first;
+  setNotice('Every dollar is still assigned. Commit when the split feels survivable.', '');
+  renderPlan();
+  renderHud();
+}
+
+function setPlan(plan) {
+  if (state.phase !== 'plan') return false;
+  if (!plan || typeof plan !== 'object') return false;
+  const next = {
+    essentials: Number(plan.essentials),
+    reserve: Number(plan.reserve),
+    savings: Number(plan.savings)
+  };
+  const values = Object.values(next);
+  if (values.some((value) => !Number.isFinite(value) || value < 0 || value > 100 || value % 5 !== 0)) return false;
+  if (next.essentials + next.reserve + next.savings !== 100) return false;
+  state.plan = next;
+  setNotice('Plan updated. Commit when you are ready for the month.', '');
+  renderPlan();
+  renderHud();
+  return true;
+}
+
+function renderHud() {
+  const score = computeScore();
+  els.hudMonth.textContent = (state.monthIndex + 1) + '/' + MONTHS.length;
+  els.hudReserve.textContent = money(state.reserve);
+  els.hudScore.textContent = padScore(score.total);
+}
+
+function renderMonthHeader() {
+  const month = MONTHS[state.monthIndex];
+  const due = dueForMonth();
+  const reserveProgress = Math.min(100, (state.reserve / RESERVE_GOAL) * 100);
+  const moveProgress = Math.min(100, (state.savings / MOVE_GOAL) * 100);
+  els.monthEyebrow.textContent = 'MONTH ' + String(month.n).padStart(2, '0') + ' · ' + month.kicker;
+  els.monthTitle.textContent = month.title;
+  els.monthCopy.textContent = month.copy;
+  els.income.textContent = money(month.income);
+  els.dueValue.textContent = money(due);
+  els.dueNote.textContent = state.extraDue > 0
+    ? 'includes ' + money(state.extraDue) + ' carried'
+    : 'regular bills';
+  els.dueAccount.classList.toggle('attention', state.extraDue > 0);
+  els.reserveValue.textContent = money(state.reserve);
+  els.reserveNote.textContent = Math.round(reserveProgress) + '% of ' + money(RESERVE_GOAL) + ' target';
+  els.moveValue.textContent = money(state.savings);
+  els.moveNote.textContent = Math.round(moveProgress) + '% of ' + money(MOVE_GOAL) + ' goal';
+}
+
+function renderPlan() {
+  const month = MONTHS[state.monthIndex];
+  const amounts = planAmounts();
+  document.querySelectorAll('[data-percent]').forEach((element) => {
+    element.textContent = state.plan[element.dataset.percent] + '%';
+  });
+  document.querySelectorAll('[data-amount]').forEach((element) => {
+    element.textContent = money(amounts[element.dataset.amount]);
+  });
+
+  BUCKETS.forEach((bucket) => {
+    const input = document.getElementById('slider-' + bucket.id);
+    if (input) {
+      input.value = String(state.plan[bucket.id]);
+      input.style.setProperty('--fill', state.plan[bucket.id] + '%');
+    }
+  });
+
+  els.allocPercent.textContent = '100%';
+  els.allocBar.innerHTML = BUCKETS.map((bucket) => (
+    '<span class="alloc-segment ' + bucket.id + '" style="width:' + state.plan[bucket.id] + '%"></span>'
+  )).join('');
+
+  renderForecast();
+  renderNotice();
+  els.commitBtn.disabled = state.phase !== 'plan';
+  els.commitBtn.innerHTML = state.phase === 'final'
+    ? 'Plan complete'
+    : 'Commit month <span aria-hidden="true">→</span>';
+}
+
+function renderForecast() {
+  const projection = projectMonth();
+  const amount = projection.amounts;
+  const due = projection.due;
+  const essentialsState = projection.essentialsMet
+    ? '<span class="f-state ok">FUNDED</span>'
+    : '<span class="f-state warn">SHORT ' + money(projection.essentialsGap) + '</span>';
+  const reserveAfter = projection.reserveAfter;
+  const moveAfter = projection.savingsAfter;
+  const rebuildTarget = Math.min(state.unrecovered, amount.savings);
+
+  const rows = [
+    '<div class="forecast-row">' +
+      '<span class="f-label">Essentials</span>' +
+      '<span class="f-value">' + money(amount.essentials) + ' / ' + money(due) + '</span>' +
+      essentialsState +
+    '</div>',
+    '<div class="forecast-row">' +
+      '<span class="f-label">Cash reserve</span>' +
+      '<span class="f-value">+' + money(amount.reserve) + ' → ' + money(reserveAfter) + '</span>' +
+      '<span class="f-state ' + (reserveAfter >= 0 ? 'ok' : 'bad') + '">' + Math.min(100, Math.round(reserveAfter / RESERVE_GOAL * 100)) + '%</span>' +
+    '</div>',
+    '<div class="forecast-row">' +
+      '<span class="f-label">Move fund</span>' +
+      '<span class="f-value">+' + money(amount.savings) + ' → ' + money(moveAfter) + '</span>' +
+      '<span class="f-state ok">' + Math.min(100, Math.round(moveAfter / MOVE_GOAL * 100)) + '%</span>' +
+    '</div>',
+    '<div class="forecast-row">' +
+      '<span class="f-label">Essentials surplus</span>' +
+      '<span class="f-value">' + money(projection.essentialsOver) + '</span>' +
+      '<span class="f-state ok">TO RESERVE</span>' +
+    '</div>'
+  ];
+
+  els.forecastList.innerHTML = rows.join('');
+
+  let tip = '';
+  if (!projection.essentialsMet) {
+    if (projection.unpaid > 0) {
+      tip = '<b>This month is short.</b> Reserve and move fund cover ' + money(projection.reserveDraw + projection.savingsDraw) +
+        '; ' + money(projection.unpaid) + ' rolls into next month. The month earns no essentials points.';
+    } else {
+      tip = '<b>The paycheck is short ' + money(projection.essentialsGap) + '.</b> The reserve covers the gap automatically, so the bills stay paid—but this month does not earn its essentials points.';
+    }
+  } else if (state.unrecovered > 0) {
+    tip = '<b>' + money(state.unrecovered) + ' of the move fund still needs rebuilding.</b> ' +
+      money(rebuildTarget) + ' of this month’s move-fund share counts toward that recovery.';
+  } else if (projection.essentialsOver > 0) {
+    tip = '<b>Essentials are covered.</b> The ' + money(projection.essentialsOver) + ' surplus rolls into the reserve after the month.';
+  } else {
+    tip = '<b>Essentials are covered exactly.</b> Every other assigned dollar goes to the reserve or the move fund.';
+  }
+
+  const extra = state.extraDue > 0
+    ? '<span class="extra-due">+' + money(state.extraDue) + ' carried due</span>'
+    : '';
+  els.forecastTip.innerHTML = tip + extra;
+}
+
+function renderNotice() {
+  els.notice.textContent = state.notice || '';
+  els.notice.className = 'notice' + (state.noticeKind ? ' ' + state.noticeKind : '');
+}
+
+function renderAll() {
+  if (!MONTHS[state.monthIndex]) return;
+  renderHud();
+  renderMonthHeader();
+  renderPlan();
+}
+
+/* ---------- monthly settlement ---------- */
+function commitMonth() {
+  if (state.phase !== 'plan') return null;
+  const projection = projectMonth();
+  const month = projection.month;
+  const recovered = Math.min(state.unrecovered, projection.savingsAdd);
+
+  state.unrecovered -= recovered;
+  state.savingsRecovered += recovered;
+  state.reserve = projection.reserveAfter;
+  state.savings = projection.savingsAfter;
+
+  if (projection.savingsDraw > 0) {
+    state.savingsWithdrawn += projection.savingsDraw;
+    state.unrecovered += projection.savingsDraw;
+  }
+
+  state.extraDue = projection.unpaid;
+  if (projection.essentialsMet) state.essentialsMet += 1;
+
+  const record = {
+    month: month.n,
+    label: month.label,
+    income: month.income,
+    due: projection.due,
+    essentialsFunded: projection.amounts.essentials,
+    essentialsMet: projection.essentialsMet,
+    essentialsGap: projection.essentialsGap,
+    reserveDraw: projection.reserveDraw,
+    savingsDraw: projection.savingsDraw,
+    unpaid: projection.unpaid,
+    reserveAdd: projection.reserveAdd,
+    savingsAdd: projection.savingsAdd,
+    savingsRecovered: recovered,
+    reserveAfter: state.reserve,
+    savingsAfter: state.savings,
+    event: null
+  };
+  state.history.push(record);
+  state.lastSettlement = record;
+  state.phase = 'event';
+  state.notice = projection.essentialsMet
+    ? 'Month committed. Regular essentials are covered; a small setback is next.'
+    : 'Month committed. The gap was covered where possible; a small setback is next.';
+  state.noticeKind = projection.essentialsMet ? 'good' : 'warn';
+  renderAll();
+
+  if (state.monthIndex < EVENTS.length) {
+    showEvent(EVENTS[state.monthIndex]);
+  } else {
+    showFinal();
+  }
+  return record;
+}
+
+/* ---------- event cards ---------- */
+function budgetRead(record) {
+  if (record.essentialsMet) {
+    return 'Regular essentials were fully funded from this paycheck.';
+  }
+  const covered = record.reserveDraw + record.savingsDraw;
+  if (record.unpaid > 0) {
+    return 'Essentials were ' + money(record.essentialsGap) + ' short. ' + money(covered) +
+      ' came from savings accounts, and ' + money(record.unpaid) + ' rolls into next month.';
+  }
+  const sources = [];
+  if (record.reserveDraw > 0) sources.push(money(record.reserveDraw) + ' reserve');
+  if (record.savingsDraw > 0) sources.push(money(record.savingsDraw) + ' move fund');
+  return 'Essentials were ' + money(record.essentialsGap) + ' short in the paycheck. ' +
+    sources.join(' and ') + ' kept the bill paid—but the month earns no essentials points.';
+}
+
+function eventOptionMarkup(event, kind, label, detail, amount, extra) {
+  const reserveShort = state.reserve < amount;
+  const savingsShort = state.savings < amount;
+  const disabled = kind === 'reserve' ? reserveShort : kind === 'savings' ? savingsShort : false;
+  const sourceText = kind === 'reserve' ? 'RES' : kind === 'savings' ? 'MOVE' : 'NEXT';
+  const sourceClass = kind === 'reserve' ? '' : kind === 'savings' ? ' savings' : ' defer';
+  let effect;
+  if (kind === 'reserve') {
+    effect = '<b>−' + money(amount) + '</b><small>+20 pts</small>';
+  } else if (kind === 'savings') {
+    effect = '<b>−' + money(amount) + '</b><small>+10 pts · rebuild</small>';
+  } else {
+    effect = '<b>+ ' + money(extra) + '</b><small>next due</small>';
+  }
+  if (disabled) {
+    effect = '<b>LOCKED</b><small>' + money(amount - (kind === 'reserve' ? state.reserve : state.savings)) + ' short</small>';
+  }
+  return '<button type="button" class="event-option" data-choice="' + kind + '"' +
+    (disabled ? ' disabled aria-disabled="true"' : '') + '>' +
+      '<span class="option-source' + sourceClass + '" aria-hidden="true">' + sourceText + '</span>' +
+      '<span class="option-text"><b>' + label + '</b><small>' + detail + '</small></span>' +
+      '<span class="option-effect' + sourceClass + '">' + effect + '</span>' +
+    '</button>';
+}
+
+function showEvent(event) {
+  const record = state.lastSettlement;
+  const deferExtra = event.deferExtra;
+  const readClass = record.essentialsMet ? 'budget-read' : 'budget-read warn';
+  const options = [
+    eventOptionMarkup(event, 'reserve', event.reserve.label, event.reserve.detail, event.amount, deferExtra),
+    eventOptionMarkup(event, 'savings', event.savings.label, event.savings.detail, event.amount, deferExtra),
+    eventOptionMarkup(event, 'defer', event.defer.label, event.defer.detail, event.amount, deferExtra)
+  ].join('');
+
+  showOverlay(
+    '<div class="event-stamp">SETBACK ' + (state.monthIndex + 1) + ' OF ' + EVENTS.length + ' · ' + MONTHS[state.monthIndex].label + '</div>' +
+    '<div class="event-icon" aria-hidden="true">' + event.icon + '</div>' +
+    '<h2 class="event-title" id="ovTitle">' + event.title + '</h2>' +
+    '<p class="event-copy">' + event.copy + '</p>' +
+    '<p class="' + readClass + '">' + budgetRead(record) + '</p>' +
+    '<div class="cost-block"><span>DUE NOW</span><strong>' + money(event.amount) + '</strong></div>' +
+    '<p class="options-label">Where does it come from?</p>' +
+    '<div class="event-options">' + options + '</div>' +
+    '<p class="event-foot">The reserve is your first line of defense. The move fund is your last. Pushing the bill forward makes next month harder.</p>'
+  );
+}
+
+function chooseEvent(kind) {
+  if (state.phase !== 'event') return null;
+  const event = EVENTS[state.monthIndex];
+  if (!event) return null;
+  const amount = event.amount;
+  let points = 0;
+  let result;
+  const record = state.history[state.history.length - 1];
+
+  if (kind === 'reserve') {
+    if (state.reserve < amount) return null;
+    state.reserve -= amount;
+    state.reserveCovered += 1;
+    points = 20;
+    result = {
+      kind,
+      points,
+      title: 'The reserve did its job.',
+      message: money(amount) + ' came out of the cash reserve. The move fund is untouched, and the month is still standing.',
+      lesson: 'A reserve is not wasted when it is used. It is wasted when it is never rebuilt.'
+    };
+  } else if (kind === 'savings') {
+    if (state.savings < amount) return null;
+    state.savings -= amount;
+    state.savingsWithdrawn += amount;
+    state.unrecovered += amount;
+    points = 10;
+    result = {
+      kind,
+      points,
+      title: 'The move fund takes the hit.',
+      message: money(amount) + ' came out of the money set aside for the apartment. The setback is handled; the deposit now has a hole in it.',
+      lesson: 'This was a good use of the move fund if you rebuild it. Assign more to the fund next month and the recovery counts.'
+    };
+  } else if (kind === 'defer') {
+    state.extraDue += event.deferExtra;
+    result = {
+      kind,
+      points: 0,
+      title: 'The bill slides forward.',
+      message: 'Nothing left your accounts today. Next month’s essentials bill is now ' + money(event.deferExtra) + ' higher.',
+      lesson: 'Delaying can keep this month alive. It also makes the next month less forgiving. No response points for this one.'
+    };
+  } else {
+    return null;
+  }
+
+  state.responsePoints += points;
+  state.lastEvent = result;
+
+  if (record) {
+    record.event = {
+      kind,
+      amount,
+      points,
+      extraDue: kind === 'defer' ? event.deferExtra : 0,
+      title: event.title,
+      label: event[kind].label
+    };
+  }
+
+  state.phase = 'eventResult';
+  renderAll();
+  showEventResult(event, result);
+  return result;
+}
+
+function showEventResult(event, result) {
+  const nextMonth = MONTHS[state.monthIndex + 1];
+  const sealClass = result.kind === 'reserve' ? '' : result.kind === 'savings' ? ' savings' : ' defer';
+  const sourceNote = result.kind === 'reserve'
+    ? 'Reserve left: ' + money(state.reserve) + '. Rebuild it next month if you can.'
+    : result.kind === 'savings'
+      ? 'Move fund left: ' + money(state.savings) + '. Future move-fund assignments restore this automatically.'
+      : 'Next month’s extra essentials: ' + money(state.extraDue) + '.';
+  const nextLabel = nextMonth ? 'Plan ' + nextMonth.label.toLowerCase() + ' →' : 'See the final report →';
+
+  showOverlay(
+    '<p class="eyebrow">SETBACK RESOLVED · ' + MONTHS[state.monthIndex].label + '</p>' +
+    '<div class="result-seal' + sealClass + '" aria-hidden="true">' + (result.kind === 'defer' ? '↷' : '✓') + '</div>' +
+    '<h2 class="result-title" id="ovTitle">' + result.title + '</h2>' +
+    '<p class="result-copy">' + result.message + '</p>' +
+    '<div class="result-strip">' +
+      '<div class="result-cell"><span>RESERVE</span><strong>' + money(state.reserve) + '</strong></div>' +
+      '<div class="result-cell"><span>MOVE FUND</span><strong>' + money(state.savings) + '</strong></div>' +
+      '<div class="result-cell"><span>RESPONSE</span><strong>+' + result.points + ' pts</strong></div>' +
+    '</div>' +
+    '<p class="result-lesson">' + result.lesson + '</p>' +
+    '<p class="next-line">' + sourceNote + '</p>' +
+    '<button class="btn" type="button" data-action="continue">' + nextLabel + '</button>' +
+    '<p class="fine">The next small setback arrives after your next commit</p>'
+  );
+}
+
+function continueAfterEvent() {
+  if (state.phase !== 'eventResult') return false;
+  const nextIndex = state.monthIndex + 1;
+  if (nextIndex >= MONTHS.length) {
+    showFinal();
+    return true;
+  }
+  state.monthIndex = nextIndex;
+  state.phase = 'plan';
+  closeOverlay();
+  setNotice('New month, new split. Rebuild what the last setback used.', '');
+  renderAll();
+  els.planScroll.scrollTop = 0;
+  return true;
+}
+
+/* ---------- final report ---------- */
+function reportHeadline(score, goalsMet) {
+  if (score >= 900 && goalsMet) return ['A buffer,', 'not a gamble.'];
+  if (goalsMet && state.essentialsMet === MONTHS.length) return ['You made the move.', 'Keep the buffer.'];
+  if (goalsMet) return ['The keys are yours.', 'The margin is thin.'];
+  if (state.essentialsMet === MONTHS.length) return ['Steady bills.', 'Still short of home.'];
+  if (state.reserveCovered >= 4) return ['The reserve held.', 'Then it ran thin.'];
+  return ['The plan bent.', 'Move week waits.'];
+}
+
+function reportNarrative(score, goalsMet) {
+  const allEssentials = state.essentialsMet === MONTHS.length;
+  if (score >= 900 && goalsMet && allEssentials) {
+    return 'Every regular bill was funded, every ordinary setback was absorbed, and the move fund stayed intact. The point was never to predict one dramatic emergency. It was to survive seven unremarkable ones and still have a cushion at the door.';
+  }
+  if (goalsMet && allEssentials) {
+    return 'You reached the move with the regular bills paid. The cushion is doing part of its job; the rest is a matter of rebuilding the reserve so the first month in the apartment does not start on a knife edge.';
+  }
+  if (goalsMet) {
+    return 'The deposit and first month are covered, but at least one regular month had to be rescued from savings. Moving is not the finish line—the first utility bill will arrive whether or not the plan has recovered.';
+  }
+  if (allEssentials) {
+    return 'You kept every regular bill paid, which is the foundation. The move fund is still short, so the next step is not a clever trick; it is assigning more of the next paycheck to the goal.';
+  }
+  if (state.savingsWithdrawn > 0) {
+    return 'Setbacks and thin months pulled from the move fund, and it never fully recovered. The plan survived, but the next ordinary expense would have fewer places to go.';
+  }
+  return 'The regular bills and the move goal did not both fit. The reserve bought time, but time alone does not rebuild a deposit. The next run needs a wider essentials cushion or a smaller gap between the paycheck and the month.';
+}
+
+function showFinal() {
+  state.phase = 'final';
+  const score = computeScore();
+  const goalsMet = state.reserve >= RESERVE_GOAL && state.savings >= MOVE_GOAL;
+  const rank = rankFor(score.total);
+  const headline = reportHeadline(score.total, goalsMet);
+  const narrative = reportNarrative(score.total, goalsMet);
+  const rebuiltLabel = state.savingsWithdrawn > 0
+    ? money(state.savingsRecovered) + ' of ' + money(state.savingsWithdrawn) + ' withdrawn'
+    : 'Nothing withdrawn';
+  const rebuildLine = state.savingsWithdrawn > 0
+    ? money(state.savingsRecovered) + ' recovered · ' + money(Math.max(0, state.savingsWithdrawn - state.savingsRecovered)) + ' still missing'
+    : 'Move fund never raided';
+
+  const log = state.history.filter((record) => record.event).map((record) => {
+    const kindClass = record.event.kind === 'reserve' ? 'reserve' : record.event.kind === 'defer' ? 'defer' : '';
+    const effect = record.event.kind === 'reserve'
+      ? '−' + money(record.event.amount) + ' reserve'
+      : record.event.kind === 'savings'
+        ? '−' + money(record.event.amount) + ' move'
+        : '+' + money(record.event.extraDue) + ' next due';
+    return '<div class="log-row">' +
+      '<span>' + record.label.slice(0, 3) + '</span>' +
+      '<b>' + record.event.title + '</b>' +
+      '<em class="' + kindClass + '">' + effect + '</em>' +
+    '</div>';
+  }).join('');
+
+  renderAll();
+  showOverlay(
+    '<p class="eyebrow">EIGHT MONTHS LATER · MOVE WEEK</p>' +
+    '<h1 class="title" id="ovTitle">' + headline[0] + '<br><span class="accent">' + headline[1] + '</span></h1>' +
+    '<p class="rank">' + rank + ' · ' + score.total + ' / ' + MAX_SCORE + '</p>' +
+    '<div class="final-score"><span>FINAL SCORE</span><strong>' + score.total + '</strong><small>OUT OF ' + MAX_SCORE + ' POSSIBLE</small></div>' +
+    '<div class="report-grid">' +
+      '<div class="report-stat"><span>MONTHS COVERED</span><strong>' + state.essentialsMet + ' / ' + MONTHS.length + '</strong></div>' +
+      '<div class="report-stat"><span>SETBACKS FROM RESERVE</span><strong>' + state.reserveCovered + ' / ' + EVENTS.length + '</strong></div>' +
+      '<div class="report-stat"><span>RESERVE</span><strong>' + money(state.reserve) + '</strong></div>' +
+      '<div class="report-stat"><span>MOVE FUND</span><strong>' + money(state.savings) + '</strong></div>' +
+    '</div>' +
+    '<div class="breakdown">' +
+      '<div class="break-line"><span>Essentials maintained</span><b>' + score.essentials + ' / 320</b></div>' +
+      '<div class="break-line"><span>Reserve balance</span><b>' + score.reserveProgress + ' / 180</b></div>' +
+      '<div class="break-line"><span>Setbacks paid from reserve</span><b>' + score.reserveUse + ' / 100</b></div>' +
+      '<div class="break-line"><span>Move-fund progress</span><b>' + score.savingsProgress + ' / 160</b></div>' +
+      '<div class="break-line"><span>Move fund rebuilt</span><b>' + score.rebuild + ' / 100</b></div>' +
+      '<div class="break-line"><span>Setback responses</span><b>' + score.response + ' / 140</b></div>' +
+      '<div class="break-line total"><span>Total</span><b>' + score.total + ' / ' + MAX_SCORE + '</b></div>' +
+    '</div>' +
+    '<p class="rebuild-note">' + rebuildLine + ' · ' + rebuiltLabel + '</p>' +
+    '<p class="log-label">The seven small things</p>' +
+    '<div class="event-log">' + log + '</div>' +
+    '<p class="outro">' + narrative + '</p>' +
+    '<button class="btn" type="button" data-action="restart">Run it back</button>' +
+    '<p class="fine">Eight months · three sliders · seven ordinary setbacks</p>'
+  );
+}
+
+/* ---------- title and overlay ---------- */
+function showTitle() {
+  showOverlay(
+    '<p class="eyebrow">A STUDENT INDEPENDENT-LIVING GAME</p>' +
+    '<h1 class="title" id="ovTitle">Soft <span class="slash">/</span> <span class="accent">Landing</span></h1>' +
+    '<p class="lead">Eight paychecks stand between you and a shared apartment. You need <b>$2,400</b> in the move fund and a <b>$1,600</b> cash reserve. Seven small setbacks are waiting—not one dramatic emergency, just the ordinary kind that arrive one at a time.</p>' +
+    '<div class="rules">' +
+      '<div class="rule"><b>Split every paycheck.</b> Essentials pay the month. The reserve absorbs setbacks. The move fund buys the door.</div>' +
+      '<div class="rule"><b>Commit each month.</b> Regular bills come due. Underfund essentials and the reserve covers the gap before the move fund does.</div>' +
+      '<div class="rule"><b>Respond to setback cards.</b> Use the reserve, raid the move fund, or push the cost into next month.</div>' +
+      '<div class="rule"><b>Rebuild what you use.</b> Essentials points reward bills covered. Move-fund points reward money put back after a withdrawal.</div>' +
+    '</div>' +
+    '<div class="score-grid">' +
+      '<div class="score-cell"><span>ESSENTIALS</span><strong>320</strong></div>' +
+      '<div class="score-cell"><span>RESERVE</span><strong>280</strong></div>' +
+      '<div class="score-cell"><span>MOVE FUND</span><strong>260</strong></div>' +
+      '<div class="score-cell"><span>RESPONSES</span><strong>140</strong></div>' +
+    '</div>' +
+    '<button class="btn" type="button" data-action="start">Start June →</button>' +
+    '<p class="fine">8 months · $14,240 take-home · 7 setbacks · no timer</p>'
+  );
+}
+
+function showOverlay(html) {
+  els.panel.innerHTML = html;
+  els.overlay.hidden = false;
+  els.app.inert = true;
+  const focusTarget = els.panel.querySelector('[data-choice]:not(:disabled), [data-action], .btn');
+  if (focusTarget) {
+    window.setTimeout(() => focusTarget.focus({ preventScroll: true }), 30);
+  }
+}
+
+function closeOverlay() {
+  els.overlay.hidden = true;
+  els.panel.innerHTML = '';
+  els.app.inert = false;
+}
+
+function startGame() {
+  closeOverlay();
+  state = freshState();
+  state.phase = 'plan';
+  buildSliders();
+  setNotice('Eight months. Set a split that leaves room for an ordinary surprise.', '');
+  renderAll();
+  els.planScroll.scrollTop = 0;
+}
+
+function restartGame() {
+  startGame();
+}
+
+/* ---------- events ---------- */
+els.commitBtn.addEventListener('click', commitMonth);
+
+els.overlay.addEventListener('click', (event) => {
+  const choice = event.target.closest('[data-choice]');
+  if (choice && !choice.disabled) {
+    chooseEvent(choice.dataset.choice);
+    return;
+  }
+  const actionButton = event.target.closest('[data-action]');
+  if (!actionButton) return;
+  if (actionButton.dataset.action === 'start' || actionButton.dataset.action === 'restart') {
+    startGame();
+  } else if (actionButton.dataset.action === 'continue') {
+    continueAfterEvent();
+  }
+});
+
+/* ---------- boot ---------- */
+buildSliders();
+renderAll();
+showTitle();
+
+window.__SOFTLANDING__ = {
+  getState: () => JSON.parse(JSON.stringify(state)),
+  months: MONTHS,
+  events: EVENTS,
+  maxScore: MAX_SCORE,
+  reserveGoal: RESERVE_GOAL,
+  moveGoal: MOVE_GOAL,
+  start: startGame,
+  restart: restartGame,
+  setPlan,
+  planAmounts,
+  dueForMonth,
+  projectMonth,
+  commitMonth,
+  chooseEvent,
+  continueAfterEvent,
+  showFinal,
+  score: computeScore,
+  rankFor,
+  rebalancePlan,
+  showTitle
+};
+</script>
+</body>
+</html>

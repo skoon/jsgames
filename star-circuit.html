@@ -1,0 +1,1372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#080b12">
+<title>Star Circuit</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    background: radial-gradient(120% 85% at 50% 0%, #142a33 0%, #080d12 58%, #05080b 100%);
+    color: #eafcff;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    -webkit-user-select: none;
+    user-select: none;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+  #stage {
+    position: relative;
+    width: min(100%, calc((100dvh - 132px) * 0.75));
+    aspect-ratio: 3 / 4;
+    border-radius: 20px;
+    overflow: hidden;
+    background: #081017;
+    box-shadow:
+      0 30px 70px -28px rgba(0, 0, 0, 0.95),
+      0 0 0 1px rgba(255, 255, 255, 0.07),
+      inset 0 0 0 1px rgba(94, 231, 199, 0.08);
+    touch-action: none;
+  }
+  canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+  .controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+  .key {
+    width: 40px;
+    height: 38px;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(178, 247, 255, 0.16);
+    border-radius: 11px;
+    background: rgba(255, 255, 255, 0.035);
+    color: #bff9ec;
+    cursor: pointer;
+    font: inherit;
+    font-size: 16px;
+    line-height: 1;
+    transition: background 120ms ease, border-color 120ms ease, transform 100ms ease;
+  }
+  .key:hover:not(:disabled) { background: rgba(255, 255, 255, 0.08); border-color: rgba(178, 247, 255, 0.32); }
+  .key:active:not(:disabled) { transform: translateY(1px); }
+  .ghost {
+    height: 38px;
+    padding: 0 12px;
+    border: 1px solid rgba(178, 247, 255, 0.16);
+    border-radius: 11px;
+    background: rgba(255, 255, 255, 0.035);
+    color: rgba(234, 252, 255, 0.7);
+    cursor: pointer;
+    font: inherit;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    transition: background 120ms ease, border-color 120ms ease, transform 100ms ease;
+  }
+  .ghost:hover:not(:disabled) { background: rgba(255, 255, 255, 0.08); color: #fff; border-color: rgba(178, 247, 255, 0.3); }
+  .ghost:active:not(:disabled) { transform: translateY(1px); }
+  .run {
+    height: 38px;
+    padding: 0 15px;
+    border: 0;
+    border-radius: 11px;
+    background: linear-gradient(180deg, #7ff0d4, #46c8a9);
+    color: #06211c;
+    cursor: pointer;
+    font: inherit;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    box-shadow: 0 10px 22px -12px rgba(94, 231, 199, 0.9), inset 0 -2px 0 rgba(0, 0, 0, 0.16);
+    transition: filter 120ms ease, transform 100ms ease;
+  }
+  .run:hover:not(:disabled) { filter: brightness(1.06); }
+  .run:active:not(:disabled) { transform: translateY(1px) scale(0.99); }
+  .key:focus-visible, .ghost:focus-visible, .run:focus-visible, .btn:focus-visible {
+    outline: 2px solid #bff9ec;
+    outline-offset: 3px;
+  }
+  .key:disabled, .ghost:disabled, .run:disabled { opacity: 0.3; cursor: default; }
+  .hint {
+    margin: 0;
+    font-size: 9.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(234, 252, 255, 0.3);
+    white-space: nowrap;
+  }
+  .overlay {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: 22px;
+    background: rgba(4, 10, 13, 0.84);
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+    animation: fade-in 160ms ease-out;
+  }
+  .overlay[hidden] { display: none; }
+  @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+  .panel { width: 100%; max-width: 310px; text-align: center; }
+  .eyebrow {
+    margin: 0 0 4px;
+    font-size: 10px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: rgba(234, 252, 255, 0.4);
+  }
+  .title {
+    margin: 0 0 14px;
+    font-size: clamp(26px, 7vw, 34px);
+    letter-spacing: 0.01em;
+    color: #8fffdc;
+    text-shadow: 0 0 26px rgba(94, 231, 199, 0.35);
+  }
+  .label {
+    margin: 0;
+    font-size: 10px;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: rgba(234, 252, 255, 0.45);
+  }
+  .score {
+    margin: 2px 0 0;
+    font-size: 48px;
+    line-height: 1;
+    font-weight: 700;
+    color: #ffd166;
+    text-shadow: 0 0 30px rgba(255, 209, 102, 0.3);
+  }
+  .best {
+    margin: 12px 0 0;
+    font-size: 11px;
+    line-height: 1.6;
+    letter-spacing: 0.04em;
+    color: rgba(234, 252, 255, 0.58);
+  }
+  .btn {
+    margin-top: 20px;
+    padding: 14px 30px;
+    border: 0;
+    border-radius: 999px;
+    cursor: pointer;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: #06211c;
+    background: linear-gradient(180deg, #7ff0d4, #46c8a9);
+    box-shadow:
+      0 14px 30px -14px rgba(94, 231, 199, 0.95),
+      inset 0 -2px 0 rgba(0, 0, 0, 0.16);
+    transition: transform 100ms ease, filter 150ms ease;
+  }
+  .btn:hover { filter: brightness(1.06); }
+  .btn:active { transform: translateY(1px) scale(0.99); }
+  @media (prefers-reduced-motion: reduce) {
+    .overlay { animation: none; }
+  }
+</style>
+</head>
+<body>
+  <div id="stage">
+    <canvas id="game" width="480" height="640" aria-label="Star Circuit. Load a program of arrow commands, collect every star on the grid, then reach the portal."></canvas>
+    <div id="overlay" class="overlay" hidden>
+      <div class="panel">
+        <p class="eyebrow">Circuit complete</p>
+        <h1 class="title" id="ovTitle">First Spark</h1>
+        <p class="label">Arrows used</p>
+        <p class="score" id="ovScore">4</p>
+        <p class="best" id="ovSub">A clean line through the dark.</p>
+        <button type="button" id="ovBtn" class="btn">Next circuit</button>
+      </div>
+    </div>
+  </div>
+  <div class="controls">
+    <button type="button" class="key" data-dir="left" aria-label="Add left arrow">&#8592;</button>
+    <button type="button" class="key" data-dir="up" aria-label="Add up arrow">&#8593;</button>
+    <button type="button" class="key" data-dir="down" aria-label="Add down arrow">&#8595;</button>
+    <button type="button" class="key" data-dir="right" aria-label="Add right arrow">&#8594;</button>
+    <button type="button" id="undo" class="ghost">Undo</button>
+    <button type="button" id="run" class="run">Run</button>
+  </div>
+  <p class="hint">arrows add &middot; backspace undo &middot; enter run</p>
+
+<script>
+(() => {
+  'use strict';
+
+  const W = 480;
+  const H = 640;
+  const TAU = Math.PI * 2;
+  const CELL = 56;
+  const COLS = 7;
+  const ROWS = 7;
+  const BX = 44;
+  const BY = 108;
+  const BOARD = CELL * COLS;
+  const STORAGE_KEY = 'starcircuit.level.v1';
+  const MOVE_DUR = 0.22;
+  const STEP_GAP = 0.07;
+
+  const LEVELS = [
+    {
+      name: 'First Spark',
+      slots: 5,
+      note: 'A clean line through the dark.',
+      rows: [
+        '.......',
+        '.......',
+        '.......',
+        '.S.*.E.',
+        '.......',
+        '.......',
+        '.......',
+      ],
+    },
+    {
+      name: 'Two Beacons',
+      slots: 13,
+      note: 'Both signals answered.',
+      rows: [
+        '.......',
+        '...*...',
+        '.......',
+        '.S...E.',
+        '.......',
+        '...*...',
+        '.......',
+      ],
+    },
+    {
+      name: 'Block Party',
+      slots: 15,
+      note: 'Around the block, never through it.',
+      rows: [
+        '.......',
+        '.......',
+        '...*...',
+        '..##...',
+        '.S##.E.',
+        '.......',
+        '...*...',
+      ],
+    },
+    {
+      name: 'Split Rail',
+      slots: 15,
+      note: 'The long way around the gap.',
+      rows: [
+        '...#...',
+        '...#.*.',
+        '...#...',
+        '...#...',
+        '.S.#.E.',
+        '...#...',
+        '.*.....',
+      ],
+    },
+    {
+      name: 'Pocket',
+      slots: 17,
+      note: 'The pocket yields its light.',
+      rows: [
+        '...*...',
+        '.##.##.',
+        '.#...#.',
+        '.#.*.#.',
+        '.#...#.',
+        '.##.##.',
+        '.S...E.',
+      ],
+    },
+    {
+      name: 'Quadrants',
+      slots: 20,
+      note: 'Four corners, one tidy route.',
+      rows: [
+        '.......',
+        '..*.*..',
+        '.......',
+        '...#...',
+        '.S.#.E.',
+        '...#...',
+        '..*.*..',
+      ],
+    },
+    {
+      name: 'Spine',
+      slots: 18,
+      note: 'Up the spine and down the far side.',
+      rows: [
+        '...*...',
+        '..#.#..',
+        '..#.#..',
+        '.*...*.',
+        '..#.#..',
+        '..#.#..',
+        '.S...E.',
+      ],
+    },
+    {
+      name: 'Grand Circuit',
+      slots: 24,
+      note: 'The whole grid hums again.',
+      rows: [
+        '..*.*..',
+        '.......',
+        '.##.##.',
+        '.#...#.',
+        '.#.#.#.',
+        '...#...',
+        '.S.*.E.',
+      ],
+    },
+  ];
+
+  const DIRS = {
+    up: { x: 0, y: -1 },
+    right: { x: 1, y: 0 },
+    down: { x: 0, y: 1 },
+    left: { x: -1, y: 0 },
+  };
+
+  const KEYMAP = {
+    ArrowUp: 'up', w: 'up', W: 'up',
+    ArrowRight: 'right', d: 'right', D: 'right',
+    ArrowDown: 'down', s: 'down', S: 'down',
+    ArrowLeft: 'left', a: 'left', A: 'left',
+  };
+
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d', { alpha: false });
+  const overlay = document.getElementById('overlay');
+  const ovTitle = document.getElementById('ovTitle');
+  const ovScore = document.getElementById('ovScore');
+  const ovSub = document.getElementById('ovSub');
+  const ovBtn = document.getElementById('ovBtn');
+  const undoBtn = document.getElementById('undo');
+  const runBtn = document.getElementById('run');
+  const dirBtns = Array.from(document.querySelectorAll('[data-dir]'));
+
+  const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
+  const ease = (p) => p * p * (3 - 2 * p);
+  const key = (x, y) => x + ',' + y;
+  const cellX = (x) => BX + x * CELL + CELL / 2;
+  const cellY = (y) => BY + y * CELL + CELL / 2;
+
+  const state = {
+    level: 0,
+    mode: 'edit',
+    program: [],
+    walls: new Set(),
+    stars: [],
+    start: { x: 1, y: 6 },
+    exit: { x: 5, y: 6 },
+    robot: { x: 1, y: 6 },
+    from: { x: 1, y: 6 },
+    dir: 'right',
+    step: 0,
+    used: 0,
+    collected: 0,
+    animating: false,
+    moveT: 1,
+    moveDur: MOVE_DUR,
+    runDelay: 0,
+    lastStepWin: false,
+    bumpT: 0,
+    bumpDir: 'right',
+    failT: 0,
+    winT: 0,
+    winDelay: 0,
+    overlayShown: false,
+    toast: '',
+    toastT: 0,
+    trail: [],
+    parts: [],
+    slotRects: [],
+    t: 0,
+  };
+
+  const dust = [];
+  for (let i = 0; i < 42; i++) {
+    dust.push({
+      x: Math.random() * W,
+      y: Math.random() * H,
+      r: 0.5 + Math.random() * 1.4,
+      p: Math.random() * TAU,
+      s: 0.3 + Math.random() * 0.7,
+    });
+  }
+
+  /* ---------- progress ---------- */
+  function readSavedLevel() {
+    try {
+      const n = Number(window.localStorage.getItem(STORAGE_KEY));
+      return Number.isInteger(n) && n >= 0 && n < LEVELS.length ? n : 0;
+    } catch (err) {
+      return 0;
+    }
+  }
+
+  function saveLevel(index) {
+    try {
+      window.localStorage.setItem(STORAGE_KEY, String(index));
+    } catch (err) {
+      /* storage can be unavailable on file:// or in private mode */
+    }
+  }
+
+  /* ---------- canvas sizing ---------- */
+  function sizeCanvas() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+  }
+
+  sizeCanvas();
+  window.addEventListener('resize', sizeCanvas);
+
+  /* ---------- levels and board state ---------- */
+  function parseLevel(index) {
+    const level = LEVELS[index];
+    state.level = index;
+    state.walls = new Set();
+    state.stars = [];
+    state.start = { x: 1, y: 6 };
+    state.exit = { x: 5, y: 6 };
+
+    level.rows.forEach((row, y) => {
+      for (let x = 0; x < COLS; x++) {
+        const ch = row[x];
+        if (ch === '#') state.walls.add(key(x, y));
+        else if (ch === 'S') state.start = { x, y };
+        else if (ch === 'E') state.exit = { x, y };
+        else if (ch === '*') state.stars.push({ x, y, got: false, pop: 0 });
+      }
+    });
+  }
+
+  function resetBoard() {
+    state.robot = { x: state.start.x, y: state.start.y };
+    state.from = { x: state.start.x, y: state.start.y };
+    state.dir = 'right';
+    state.step = 0;
+    state.used = 0;
+    state.collected = 0;
+    state.animating = false;
+    state.moveT = 1;
+    state.moveDur = MOVE_DUR;
+    state.runDelay = 0;
+    state.lastStepWin = false;
+    state.bumpT = 0;
+    state.failT = 0;
+    state.winT = 0;
+    state.winDelay = 0;
+    state.trail = [];
+    state.stars.forEach((star) => { star.got = false; star.pop = 0; });
+    hideOverlay();
+    syncButtons();
+  }
+
+  function loadLevel(index) {
+    parseLevel(index);
+    state.program = [];
+    resetBoard();
+    state.mode = 'edit';
+    state.toastT = 0;
+    syncButtons();
+  }
+
+  /* ---------- controls ---------- */
+  function syncButtons() {
+    const edit = state.mode === 'edit' && overlay.hidden;
+    const full = state.program.length >= LEVELS[state.level].slots;
+    undoBtn.disabled = !(edit && state.program.length > 0);
+    runBtn.disabled = !(edit && state.program.length > 0);
+    dirBtns.forEach((btn) => { btn.disabled = !(edit && !full); });
+  }
+
+  function toast(message) {
+    state.toast = message;
+    state.toastT = 1.7;
+  }
+
+  function addCommand(dir) {
+    if (state.mode !== 'edit' || !overlay.hidden) return;
+    if (state.program.length >= LEVELS[state.level].slots) {
+      toast('MEMORY FULL - UNDO AN ARROW');
+      return;
+    }
+    state.program.push(dir);
+    syncButtons();
+  }
+
+  function undoCommand() {
+    if (state.mode !== 'edit' || !overlay.hidden) return;
+    if (!state.program.length) return;
+    state.program.pop();
+    syncButtons();
+  }
+
+  function startRun() {
+    if (state.mode !== 'edit' || !overlay.hidden || !state.program.length) return;
+    resetBoard();
+    state.mode = 'run';
+    state.runDelay = 0.18;
+    state.toastT = 0;
+    syncButtons();
+  }
+
+  function hideOverlay() {
+    overlay.hidden = true;
+    state.overlayShown = false;
+  }
+
+  function showOverlay() {
+    state.overlayShown = true;
+    const level = LEVELS[state.level];
+    ovTitle.textContent = level.name;
+    ovScore.textContent = String(state.used);
+    ovSub.textContent = level.note;
+    ovBtn.textContent = state.level >= LEVELS.length - 1 ? 'Replay circuits' : 'Next circuit';
+    overlay.hidden = false;
+    try { ovBtn.focus({ preventScroll: true }); } catch (err) { ovBtn.focus(); }
+  }
+
+  function advance() {
+    if (state.mode !== 'win') return;
+    if (state.level >= LEVELS.length - 1) {
+      saveLevel(0);
+      loadLevel(0);
+    } else {
+      const next = state.level + 1;
+      saveLevel(next);
+      loadLevel(next);
+    }
+  }
+
+  /* ---------- execution ---------- */
+  function execNext() {
+    if (state.step >= state.program.length) {
+      beginFail();
+      return;
+    }
+    const dir = state.program[state.step++];
+    const d = DIRS[dir];
+    state.dir = dir;
+    state.used = state.step;
+    state.from = { x: state.robot.x, y: state.robot.y };
+    state.moveT = 0;
+    state.animating = true;
+    state.lastStepWin = false;
+
+    const nx = state.robot.x + d.x;
+    const ny = state.robot.y + d.y;
+    const blocked =
+      nx < 0 || ny < 0 || nx >= COLS || ny >= ROWS || state.walls.has(key(nx, ny));
+
+    if (blocked) {
+      state.bumpT = 1;
+      state.bumpDir = dir;
+      state.moveDur = 0.26;
+      spawnBump(cellX(state.robot.x) + d.x * 16, cellY(state.robot.y) + d.y * 16);
+      return;
+    }
+
+    state.robot = { x: nx, y: ny };
+    state.moveDur = MOVE_DUR;
+    state.trail.push({ x: nx, y: ny, life: 1 });
+
+    const star = state.stars.find((s) => s.x === nx && s.y === ny && !s.got);
+    if (star) {
+      star.got = true;
+      star.pop = 1;
+      state.collected++;
+      spawnBurst(cellX(nx), cellY(ny), '#ffd166', 13, 105);
+    }
+
+    state.lastStepWin =
+      nx === state.exit.x &&
+      ny === state.exit.y &&
+      state.collected === state.stars.length;
+  }
+
+  function finishStep() {
+    state.animating = false;
+    if (state.lastStepWin) {
+      winLevel();
+      return;
+    }
+    if (state.step >= state.program.length) {
+      beginFail();
+      return;
+    }
+    state.runDelay = STEP_GAP;
+  }
+
+  function beginFail() {
+    const atExit = state.robot.x === state.exit.x && state.robot.y === state.exit.y;
+    state.mode = 'failed';
+    state.failT = 0.9;
+    toast(atExit ? 'PORT LOCKED - COLLECT EVERY STAR' : 'OUT OF ARROWS - EDIT THE PROGRAM');
+    syncButtons();
+  }
+
+  function winLevel() {
+    state.mode = 'win';
+    state.winT = 0;
+    state.winDelay = 0.5;
+    state.overlayShown = false;
+    spawnBurst(cellX(state.exit.x), cellY(state.exit.y), '#5ee7c7', 26, 170);
+    spawnBurst(cellX(state.robot.x), cellY(state.robot.y), '#ffd166', 10, 90);
+    saveLevel(state.level < LEVELS.length - 1 ? state.level + 1 : 0);
+    syncButtons();
+  }
+
+  /* ---------- particles ---------- */
+  function spawnBurst(x, y, color, count, speed) {
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * TAU;
+      const v = speed * (0.3 + Math.random() * 0.7);
+      const life = 0.35 + Math.random() * 0.45;
+      state.parts.push({
+        x, y,
+        vx: Math.cos(angle) * v,
+        vy: Math.sin(angle) * v,
+        life,
+        max: life,
+        size: 1.1 + Math.random() * 2,
+        color,
+        g: 95,
+      });
+    }
+  }
+
+  function spawnBump(x, y) {
+    for (let i = 0; i < 5; i++) {
+      const angle = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI;
+      const life = 0.18 + Math.random() * 0.18;
+      state.parts.push({
+        x, y,
+        vx: Math.cos(angle) * 40,
+        vy: Math.sin(angle) * 40 - 15,
+        life,
+        max: life,
+        size: 1 + Math.random() * 1.4,
+        color: '#9fb6c0',
+        g: 120,
+      });
+    }
+  }
+
+  /* ---------- update ---------- */
+  function update(dt) {
+    state.t += dt;
+
+    if (state.toastT > 0) state.toastT = Math.max(0, state.toastT - dt);
+    if (state.bumpT > 0) state.bumpT = Math.max(0, state.bumpT - dt * 4.2);
+
+    state.stars.forEach((star) => {
+      if (star.pop > 0) star.pop = Math.max(0, star.pop - dt * 2.3);
+    });
+
+    for (let i = state.trail.length - 1; i >= 0; i--) {
+      state.trail[i].life -= dt * 0.85;
+      if (state.trail[i].life <= 0) state.trail.splice(i, 1);
+    }
+
+    for (let i = state.parts.length - 1; i >= 0; i--) {
+      const p = state.parts[i];
+      p.life -= dt;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.vy += p.g * dt;
+      p.vx *= 0.985;
+      if (p.life <= 0) state.parts.splice(i, 1);
+    }
+
+    if (state.mode === 'run') {
+      if (state.animating) {
+        state.moveT += dt / state.moveDur;
+        if (state.moveT >= 1) {
+          state.moveT = 1;
+          finishStep();
+        }
+      } else {
+        state.runDelay -= dt;
+        if (state.runDelay <= 0) execNext();
+      }
+    } else if (state.mode === 'failed') {
+      state.failT -= dt;
+      if (state.failT <= 0) {
+        state.mode = 'edit';
+        resetBoard();
+      }
+    } else if (state.mode === 'win') {
+      state.winT += dt;
+      if (!state.overlayShown) {
+        state.winDelay -= dt;
+        if (state.winDelay <= 0) showOverlay();
+      }
+    }
+  }
+
+  /* ---------- drawing helpers ---------- */
+  function rr(x, y, w, h, radius) {
+    const r = Math.min(radius, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function starPath(cx, cy, outer, inner, rot) {
+    ctx.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const angle = (rot || 0) - Math.PI / 2 + (i * Math.PI) / 5;
+      const radius = i % 2 ? inner : outer;
+      const x = cx + Math.cos(angle) * radius;
+      const y = cy + Math.sin(angle) * radius;
+      if (i) ctx.lineTo(x, y);
+      else ctx.moveTo(x, y);
+    }
+    ctx.closePath();
+  }
+
+  function drawText(str, x, y, opts) {
+    const o = opts || {};
+    const size = o.size || 10;
+    const weight = o.weight || 400;
+    const color = o.color || '#eafcff';
+    const track = o.track || 0;
+    const align = o.align || 'left';
+    ctx.save();
+    ctx.font = weight + ' ' + size + 'px ui-monospace, "SF Mono", Menlo, Consolas, monospace';
+    ctx.fillStyle = color;
+    ctx.textBaseline = 'alphabetic';
+    if (track) {
+      const chars = Array.from(str);
+      const widths = chars.map((ch) => ctx.measureText(ch).width);
+      const total = widths.reduce((sum, w) => sum + w, 0) + track * (chars.length - 1);
+      let cx = align === 'right' ? x - total : align === 'center' ? x - total / 2 : x;
+      chars.forEach((ch, i) => {
+        ctx.fillText(ch, cx, y);
+        cx += widths[i] + track;
+      });
+    } else {
+      ctx.textAlign = align;
+      ctx.fillText(str, x, y);
+    }
+    ctx.restore();
+  }
+
+  function drawArrow(cx, cy, size, dir, color) {
+    const v = DIRS[dir];
+    const tx = cx + v.x * size * 0.62;
+    const ty = cy + v.y * size * 0.62;
+    const bx = cx - v.x * size * 0.5;
+    const by = cy - v.y * size * 0.5;
+    const px = -v.y;
+    const py = v.x;
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = Math.max(1.7, size * 0.2);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(bx, by);
+    ctx.lineTo(tx, ty);
+    ctx.moveTo(tx, ty);
+    ctx.lineTo(
+      tx - v.x * size * 0.48 + px * size * 0.4,
+      ty - v.y * size * 0.48 + py * size * 0.4
+    );
+    ctx.moveTo(tx, ty);
+    ctx.lineTo(
+      tx - v.x * size * 0.48 - px * size * 0.4,
+      ty - v.y * size * 0.48 - py * size * 0.4
+    );
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  /* ---------- drawing: background and header ---------- */
+  function drawBackground() {
+    const grad = ctx.createRadialGradient(W / 2, 40, 30, W / 2, 160, 680);
+    grad.addColorStop(0, '#12262d');
+    grad.addColorStop(0.55, '#0a141a');
+    grad.addColorStop(1, '#070c10');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+
+    for (const d of dust) {
+      const alpha = 0.05 + 0.1 * (0.5 + 0.5 * Math.sin(state.t * d.s + d.p));
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = '#9fe8dc';
+      ctx.beginPath();
+      ctx.arc(d.x, d.y, d.r, 0, TAU);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawHeader() {
+    drawText('STAR CIRCUIT', 30, 31, { size: 10, weight: 700, color: '#6ce9cd', track: 3 });
+    drawText(
+      'LEVEL ' + String(state.level + 1).padStart(2, '0') + ' / ' + String(LEVELS.length).padStart(2, '0'),
+      450, 31,
+      { size: 9, color: 'rgba(234,252,255,0.38)', align: 'right', track: 1 }
+    );
+    drawText(LEVELS[state.level].name.toUpperCase(), 30, 63, {
+      size: 21,
+      weight: 700,
+      color: '#eafcff',
+      track: 0.5,
+    });
+
+    const total = state.stars.length;
+    let px = 450;
+    for (let i = total - 1; i >= 0; i--) {
+      drawHudStar(px - 6, 58, 6, state.stars[i].got);
+      px -= 17;
+    }
+
+    drawText('COLLECT ALL STARS, THEN REACH THE PORT', 30, 87, {
+      size: 8,
+      color: 'rgba(234,252,255,0.27)',
+      track: 1.1,
+    });
+  }
+
+  function drawHudStar(cx, cy, radius, on) {
+    ctx.save();
+    starPath(cx, cy, radius, radius * 0.45, 0);
+    if (on) {
+      ctx.fillStyle = '#ffd166';
+      ctx.shadowColor = '#ffd166';
+      ctx.shadowBlur = 8;
+      ctx.fill();
+    } else {
+      ctx.strokeStyle = 'rgba(255,209,102,0.3)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  /* ---------- drawing: board ---------- */
+  function drawBoard() {
+    rr(BX - 10, BY - 10, BOARD + 20, BOARD + 20, 18);
+    ctx.fillStyle = 'rgba(255,255,255,0.018)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(94,231,199,0.1)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    for (let y = 0; y < ROWS; y++) {
+      for (let x = 0; x < COLS; x++) {
+        const px = BX + x * CELL;
+        const py = BY + y * CELL;
+        rr(px + 3, py + 3, CELL - 6, CELL - 6, 9);
+        ctx.fillStyle = (x + y) % 2 ? '#0d1a22' : '#0f1d26';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(140,220,230,0.045)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+    }
+
+    for (let y = 0; y < ROWS; y++) {
+      for (let x = 0; x < COLS; x++) {
+        if (state.walls.has(key(x, y))) drawWall(x, y);
+      }
+    }
+
+    drawExit();
+    state.stars.forEach((star) => {
+      if (!star.got) drawStar(star);
+      else if (star.pop > 0) drawStarPop(star);
+    });
+
+    for (const tr of state.trail) {
+      ctx.globalAlpha = tr.life * 0.22;
+      ctx.fillStyle = '#5ee7c7';
+      ctx.beginPath();
+      ctx.arc(cellX(tr.x), cellY(tr.y), 4, 0, TAU);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    drawRobotFigure();
+  }
+
+  function drawWall(x, y) {
+    const px = BX + x * CELL;
+    const py = BY + y * CELL;
+    rr(px + 3.5, py + 3.5, CELL - 7, CELL - 7, 9);
+    ctx.fillStyle = '#1a2b34';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(150,215,225,0.16)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(px + 12, py + 9);
+    ctx.lineTo(px + CELL - 12, py + 9);
+    ctx.strokeStyle = 'rgba(127,240,212,0.16)';
+    ctx.lineWidth = 1.4;
+    ctx.stroke();
+
+    ctx.fillStyle = 'rgba(127,240,212,0.18)';
+    ctx.beginPath();
+    ctx.arc(px + CELL / 2, py + CELL / 2 + 2, 2, 0, TAU);
+    ctx.fill();
+  }
+
+  function drawExit() {
+    const cx = cellX(state.exit.x);
+    const cy = cellY(state.exit.y);
+    const open = state.collected === state.stars.length;
+    const color = open ? '#5ee7c7' : '#ff9f6e';
+    const pulse = 0.5 + 0.5 * Math.sin(state.t * (open ? 4 : 2.2));
+
+    const glow = ctx.createRadialGradient(cx, cy, 2, cx, cy, 24);
+    glow.addColorStop(0, open ? 'rgba(94,231,199,0.24)' : 'rgba(255,159,110,0.16)');
+    glow.addColorStop(1, 'rgba(94,231,199,0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 24, 0, TAU);
+    ctx.fill();
+
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.globalAlpha = 0.55 + pulse * 0.35;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(0, 0, 17, 0, TAU);
+    ctx.stroke();
+
+    ctx.globalAlpha = 0.3 + pulse * 0.25;
+    ctx.setLineDash([4, 5]);
+    ctx.lineDashOffset = -state.t * 14;
+    ctx.beginPath();
+    ctx.arc(0, 0, 13, 0, TAU);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.globalAlpha = 1;
+    if (open) {
+      starPath(0, 0, 7, 3, state.t * 0.5);
+      ctx.fillStyle = color;
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 12;
+      ctx.fill();
+    } else {
+      starPath(0, 0, 6, 2.6, 0);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawStar(star) {
+    const cx = cellX(star.x);
+    const cy = cellY(star.y) + Math.sin(state.t * 2 + star.x * 1.3 + star.y) * 1.6;
+    ctx.save();
+    ctx.shadowColor = '#ffd166';
+    ctx.shadowBlur = 12;
+    starPath(cx, cy, 10, 4.4, Math.sin(state.t * 0.8 + star.x) * 0.14);
+    ctx.fillStyle = '#ffd166';
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(255,245,200,0.8)';
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawStarPop(star) {
+    const cx = cellX(star.x);
+    const cy = cellY(star.y);
+    const r = 8 + (1 - star.pop) * 18;
+    ctx.globalAlpha = star.pop;
+    ctx.strokeStyle = '#ffd166';
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, TAU);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
+  /* ---------- drawing: robot ---------- */
+  function drawRobotFigure() {
+    let gx = state.robot.x;
+    let gy = state.robot.y;
+    if (state.animating) {
+      const p = ease(clamp(state.moveT, 0, 1));
+      gx = state.from.x + (state.robot.x - state.from.x) * p;
+      gy = state.from.y + (state.robot.y - state.from.y) * p;
+    }
+
+    if (state.bumpT > 0) {
+      const off = Math.sin((1 - state.bumpT) * Math.PI) * 6;
+      gx += (DIRS[state.bumpDir].x * off) / CELL;
+      gy += (DIRS[state.bumpDir].y * off) / CELL;
+    }
+
+    let px = BX + gx * CELL + CELL / 2;
+    let py = BY + gy * CELL + CELL / 2;
+    if (state.mode === 'failed') px += Math.sin(state.t * 55) * 1.3;
+    const bob = state.mode === 'edit' ? Math.sin(state.t * 3) * 1.1 : 0;
+    py += bob;
+
+    ctx.fillStyle = 'rgba(0,0,0,0.32)';
+    ctx.beginPath();
+    ctx.ellipse(px, py + 17, 13, 4, 0, 0, TAU);
+    ctx.fill();
+
+    ctx.fillStyle = '#1c3a40';
+    rr(px - 16, py + 1, 5, 13, 2);
+    ctx.fill();
+    rr(px + 11, py + 1, 5, 13, 2);
+    ctx.fill();
+
+    const body = ctx.createLinearGradient(px, py - 15, px, py + 14);
+    body.addColorStop(0, '#a8ffe9');
+    body.addColorStop(0.5, '#5ee7c7');
+    body.addColorStop(1, '#37a88d');
+    ctx.fillStyle = body;
+    rr(px - 12, py - 14, 24, 27, 8);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(6,33,28,0.6)';
+    ctx.lineWidth = 1.4;
+    ctx.stroke();
+
+    ctx.fillStyle = '#3fae94';
+    rr(px - 16, py - 2, 4, 8, 2);
+    ctx.fill();
+    rr(px + 12, py - 2, 4, 8, 2);
+    ctx.fill();
+
+    ctx.strokeStyle = '#2f7a6b';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(px, py - 14);
+    ctx.lineTo(px + 4, py - 20);
+    ctx.stroke();
+    const antennaOn = state.mode === 'run' || state.mode === 'win' || state.mode === 'failed';
+    ctx.fillStyle = antennaOn ? '#ffd166' : '#5ee7c7';
+    ctx.shadowColor = ctx.fillStyle;
+    ctx.shadowBlur = 7;
+    ctx.beginPath();
+    ctx.arc(px + 4, py - 21, 2.2, 0, TAU);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    ctx.fillStyle = '#07161a';
+    rr(px - 8, py - 9, 16, 11, 3.5);
+    ctx.fill();
+
+    const ex = state.dir === 'left' ? -1.6 : state.dir === 'right' ? 1.6 : 0;
+    const ey = state.dir === 'up' ? -0.9 : state.dir === 'down' ? 0.9 : 0;
+    const blink = (state.t * 0.9 + 2.3) % 4 > 3.86;
+
+    if (state.mode === 'failed') {
+      ctx.strokeStyle = '#ff9f6e';
+      ctx.lineWidth = 1.2;
+      const e1 = px - 4 + ex;
+      const e2 = px + 4 + ex;
+      const ek = py - 3.5 + ey;
+      ctx.beginPath();
+      ctx.moveTo(e1 - 1.4, ek - 1.4); ctx.lineTo(e1 + 1.4, ek + 1.4);
+      ctx.moveTo(e1 + 1.4, ek - 1.4); ctx.lineTo(e1 - 1.4, ek + 1.4);
+      ctx.moveTo(e2 - 1.4, ek - 1.4); ctx.lineTo(e2 + 1.4, ek + 1.4);
+      ctx.moveTo(e2 + 1.4, ek - 1.4); ctx.lineTo(e2 - 1.4, ek + 1.4);
+      ctx.stroke();
+    } else if (state.mode === 'win') {
+      ctx.strokeStyle = '#d6fff5';
+      ctx.lineWidth = 1.3;
+      ctx.beginPath();
+      ctx.arc(px - 4 + ex, py - 3.5 + ey, 2, Math.PI * 1.05, Math.PI * 1.95);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(px + 4 + ex, py - 3.5 + ey, 2, Math.PI * 1.05, Math.PI * 1.95);
+      ctx.stroke();
+    } else if (!blink) {
+      ctx.fillStyle = '#d6fff5';
+      ctx.beginPath();
+      ctx.arc(px - 4 + ex, py - 3.5 + ey, 1.5, 0, TAU);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(px + 4 + ex, py - 3.5 + ey, 1.5, 0, TAU);
+      ctx.fill();
+    } else {
+      ctx.strokeStyle = '#d6fff5';
+      ctx.lineWidth = 1.1;
+      ctx.beginPath();
+      ctx.moveTo(px - 5.5 + ex, py - 3.5 + ey);
+      ctx.lineTo(px - 2.5 + ex, py - 3.5 + ey);
+      ctx.moveTo(px + 2.5 + ex, py - 3.5 + ey);
+      ctx.lineTo(px + 5.5 + ex, py - 3.5 + ey);
+      ctx.stroke();
+    }
+
+    ctx.strokeStyle = 'rgba(214,255,245,0.7)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    if (state.mode === 'win') {
+      ctx.arc(px, py + 0.5, 2.6, 0, Math.PI);
+    } else {
+      ctx.moveTo(px - 2, py + 1);
+      ctx.lineTo(px + 2, py + 1);
+    }
+    ctx.stroke();
+
+    ctx.fillStyle = state.mode === 'run' ? '#ffd166' : '#5ee7c7';
+    ctx.beginPath();
+    ctx.arc(px, py + 6, 2, 0, TAU);
+    ctx.fill();
+  }
+
+  /* ---------- drawing: particles ---------- */
+  function drawParticles() {
+    for (const p of state.parts) {
+      ctx.globalAlpha = clamp(p.life / p.max, 0, 1);
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size, 0, TAU);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  /* ---------- drawing: program tray ---------- */
+  function drawTray() {
+    rr(28, 516, 424, 112, 16);
+    ctx.fillStyle = 'rgba(10,20,27,0.94)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(94,231,199,0.11)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    const level = LEVELS[state.level];
+    const used = state.program.length;
+    const full = used === level.slots;
+
+    drawText('PROGRAM', 42, 535, { size: 9, weight: 700, color: 'rgba(234,252,255,0.42)', track: 2 });
+    drawText(
+      String(used).padStart(2, '0') + ' / ' + String(level.slots).padStart(2, '0'),
+      438, 535,
+      {
+        size: 9,
+        weight: 700,
+        color: full ? '#ffd166' : 'rgba(234,252,255,0.42)',
+        align: 'right',
+        track: 1,
+      }
+    );
+
+    const slots = level.slots;
+    const rowCount = slots > 12 ? 2 : 1;
+    const perRow = Math.ceil(slots / rowCount);
+    const gap = 5;
+    const slotW = Math.min(38, (392 - gap * (perRow - 1)) / perRow);
+    const slotH = rowCount === 1 ? 42 : 29;
+    const gapY = 9;
+    const totalH = rowCount * slotH + (rowCount - 1) * gapY;
+    const top = 542 + (76 - totalH) / 2;
+    state.slotRects = [];
+
+    for (let i = 0; i < slots; i++) {
+      const row = Math.floor(i / perRow);
+      const col = i % perRow;
+      const countInRow = Math.min(perRow, slots - row * perRow);
+      const rowW = countInRow * slotW + (countInRow - 1) * gap;
+      const startX = W / 2 - rowW / 2;
+      const x = startX + col * (slotW + gap);
+      const y = top + row * (slotH + gapY);
+      const filled = i < used;
+      const active = state.mode === 'run' && i === state.step - 1;
+
+      state.slotRects.push({ x, y, w: slotW, h: slotH, i });
+
+      rr(x, y, slotW, slotH, Math.min(8, slotW / 3));
+      if (active) {
+        ctx.fillStyle = 'rgba(255,209,102,0.16)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255,209,102,0.85)';
+      } else {
+        ctx.fillStyle = filled ? 'rgba(94,231,199,0.09)' : 'rgba(255,255,255,0.022)';
+        ctx.fill();
+        ctx.strokeStyle = filled ? 'rgba(94,231,199,0.38)' : 'rgba(180,240,255,0.09)';
+      }
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      if (filled) {
+        drawArrow(
+          x + slotW / 2,
+          y + slotH / 2,
+          Math.min(slotW, slotH) * 0.42,
+          state.program[i],
+          active ? '#ffd166' : '#8fffdc'
+        );
+      } else {
+        ctx.fillStyle = 'rgba(180,240,255,0.12)';
+        ctx.beginPath();
+        ctx.arc(x + slotW / 2, y + slotH / 2, 1.5, 0, TAU);
+        ctx.fill();
+      }
+    }
+  }
+
+  function drawToast() {
+    if (state.toastT <= 0) return;
+    const alpha = Math.min(1, state.toastT * 2.2);
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.font = '700 8.5px ui-monospace, "SF Mono", Menlo, Consolas, monospace';
+    const tw = ctx.measureText(state.toast).width;
+    const w = tw + 26;
+    const h = 23;
+    const x = W / 2 - w / 2;
+    const y = 511;
+    rr(x, y, w, h, 11);
+    ctx.fillStyle = 'rgba(7,14,19,0.95)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,209,102,0.4)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    drawText(state.toast, W / 2, y + 15, {
+      size: 8.5,
+      weight: 700,
+      color: '#ffd166',
+      align: 'center',
+      track: 0.7,
+    });
+    ctx.restore();
+  }
+
+  /* ---------- render ---------- */
+  function render() {
+    drawBackground();
+    drawHeader();
+    drawBoard();
+    drawParticles();
+    drawTray();
+    drawToast();
+  }
+
+  /* ---------- input ---------- */
+  function handleKey(e) {
+    const k = e.key;
+    if (!overlay.hidden) {
+      if (k === 'Enter' || k === ' ') {
+        e.preventDefault();
+        ovBtn.click();
+      }
+      return;
+    }
+    if (k === 'Enter' || k === ' ') {
+      e.preventDefault();
+      startRun();
+      return;
+    }
+    if (k === 'Backspace' || k === 'Delete') {
+      e.preventDefault();
+      undoCommand();
+      return;
+    }
+    const dir = KEYMAP[k];
+    if (dir) {
+      e.preventDefault();
+      addCommand(dir);
+    }
+  }
+
+  function canvasPoint(e) {
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: ((e.clientX - rect.left) / rect.width) * W,
+      y: ((e.clientY - rect.top) / rect.height) * H,
+    };
+  }
+
+  canvas.addEventListener('pointerdown', (e) => {
+    if (state.mode !== 'edit' || !overlay.hidden) return;
+    const p = canvasPoint(e);
+    for (const slot of state.slotRects) {
+      if (p.x >= slot.x && p.x <= slot.x + slot.w && p.y >= slot.y && p.y <= slot.y + slot.h) {
+        if (slot.i < state.program.length) {
+          state.program.splice(slot.i, 1);
+          syncButtons();
+          e.preventDefault();
+        }
+        return;
+      }
+    }
+  });
+
+  canvas.addEventListener('pointermove', (e) => {
+    if (state.mode !== 'edit' || !overlay.hidden) {
+      canvas.style.cursor = 'default';
+      return;
+    }
+    const p = canvasPoint(e);
+    const hit = state.slotRects.some(
+      (slot) => slot.i < state.program.length &&
+        p.x >= slot.x && p.x <= slot.x + slot.w &&
+        p.y >= slot.y && p.y <= slot.y + slot.h
+    );
+    canvas.style.cursor = hit ? 'pointer' : 'default';
+  });
+
+  dirBtns.forEach((btn) => {
+    btn.addEventListener('click', () => addCommand(btn.dataset.dir));
+  });
+  undoBtn.addEventListener('click', undoCommand);
+  runBtn.addEventListener('click', startRun);
+  ovBtn.addEventListener('click', advance);
+  window.addEventListener('keydown', handleKey);
+
+  /* ---------- boot ---------- */
+  loadLevel(readSavedLevel());
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min((now - last) / 1000, 0.05);
+    last = now;
+    update(dt);
+    render();
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

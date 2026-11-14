@@ -1,0 +1,1268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#080b12">
+<title>Magma Vault</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    background: radial-gradient(120% 85% at 50% 0%, #2a1a2c 0%, #0c0a12 58%, #070609 100%);
+    color: #f3ecff;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    -webkit-user-select: none;
+    user-select: none;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+  #stage {
+    position: relative;
+    width: min(100%, calc((100dvh - 112px) * 0.75));
+    aspect-ratio: 3 / 4;
+    border-radius: 20px;
+    overflow: hidden;
+    background: #0b0d14;
+    box-shadow:
+      0 30px 70px -28px rgba(0, 0, 0, 0.95),
+      0 0 0 1px rgba(255, 255, 255, 0.07),
+      inset 0 0 0 1px rgba(255, 138, 92, 0.08);
+    touch-action: none;
+  }
+  canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+  .controls { display: flex; gap: 8px; }
+  .ghost {
+    padding: 9px 22px;
+    border: 1px solid rgba(243, 236, 255, 0.16);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.035);
+    color: rgba(243, 236, 255, 0.7);
+    cursor: pointer;
+    font: inherit;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    transition: background 120ms ease, color 120ms ease, border-color 120ms ease, transform 100ms ease;
+  }
+  .ghost:hover { background: rgba(255, 255, 255, 0.08); color: #fff; border-color: rgba(243, 236, 255, 0.28); }
+  .ghost:active { transform: translateY(1px); }
+  .ghost:focus-visible { outline: 2px solid #ffd166; outline-offset: 3px; }
+  .hint {
+    margin: 0;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: rgba(243, 236, 255, 0.32);
+    white-space: nowrap;
+  }
+  .overlay {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: 22px;
+    background: rgba(6, 7, 11, 0.84);
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+    animation: fade-in 160ms ease-out;
+  }
+  .overlay[hidden] { display: none; }
+  @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+  .panel { width: 100%; max-width: 300px; text-align: center; }
+  .eyebrow {
+    margin: 0 0 4px;
+    font-size: 10px;
+    letter-spacing: 0.34em;
+    text-transform: uppercase;
+    color: rgba(243, 236, 255, 0.4);
+  }
+  .title {
+    margin: 0 0 18px;
+    font-size: clamp(26px, 7.5vw, 36px);
+    letter-spacing: 0.02em;
+    color: #ffb703;
+    text-shadow: 0 0 26px rgba(255, 183, 3, 0.3);
+  }
+  .overlay.dead .title { color: #ff7a4d; text-shadow: 0 0 26px rgba(255, 90, 40, 0.35); }
+  .overlay.won .title { color: #5ee7c7; text-shadow: 0 0 26px rgba(94, 231, 199, 0.35); }
+  .label {
+    margin: 0;
+    font-size: 10px;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: rgba(243, 236, 255, 0.45);
+  }
+  .score {
+    margin: 2px 0 0;
+    font-size: 54px;
+    line-height: 1;
+    font-weight: 700;
+    color: #ffb703;
+    text-shadow: 0 0 30px rgba(255, 183, 3, 0.3);
+  }
+  .overlay.won .score { color: #5ee7c7; text-shadow: 0 0 30px rgba(94, 231, 199, 0.35); }
+  .best {
+    margin: 10px 0 0;
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    color: rgba(243, 236, 255, 0.5);
+  }
+  .btn {
+    margin-top: 22px;
+    padding: 15px 32px;
+    border: 0;
+    border-radius: 999px;
+    cursor: pointer;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: #241104;
+    background: linear-gradient(180deg, #ffd27a, #ff9f43);
+    box-shadow:
+      0 14px 30px -14px rgba(255, 159, 67, 0.9),
+      inset 0 -2px 0 rgba(0, 0, 0, 0.16);
+    transition: transform 100ms ease, filter 150ms ease;
+  }
+  .overlay.won .btn {
+    color: #06211c;
+    background: linear-gradient(180deg, #7ff0d4, #46c8a9);
+    box-shadow: 0 14px 30px -14px rgba(94, 231, 199, 0.95), inset 0 -2px 0 rgba(0, 0, 0, 0.16);
+  }
+  .btn:hover { filter: brightness(1.06); }
+  .btn:active { transform: translateY(1px) scale(0.99); }
+  .btn:focus-visible { outline: 2px solid #bff9ec; outline-offset: 3px; }
+  @media (prefers-reduced-motion: reduce) {
+    .overlay { animation: none; }
+  }
+</style>
+</head>
+<body>
+  <div id="stage">
+    <canvas id="game" width="480" height="640" aria-label="Magma Vault. Move with arrow keys, swipe, or tap an adjacent tile. Keys open gates. Reach the safe zone before the lava rises."></canvas>
+    <div id="overlay" class="overlay" hidden>
+      <div class="panel">
+        <p class="eyebrow">Magma Vault</p>
+        <h1 class="title" id="ovTitle">Consumed</h1>
+        <p class="label">Level</p>
+        <p class="score" id="ovScore">1</p>
+        <p class="best" id="ovSub">The lava took you.</p>
+        <button type="button" id="ovBtn" class="btn">Retry</button>
+      </div>
+    </div>
+  </div>
+  <div class="controls">
+    <button type="button" id="retry" class="ghost" title="Retry (R)">Retry</button>
+  </div>
+  <p class="hint">arrows / WASD / swipe &middot; keys open gates &middot; reach the safe zone</p>
+
+<script>
+(() => {
+  'use strict';
+
+  const W = 480;
+  const H = 640;
+  const STORAGE_KEY = 'magmavault.level.v1';
+  const HEADER = 96;
+
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d', { alpha: false });
+  const overlay = document.getElementById('overlay');
+  const ovTitle = document.getElementById('ovTitle');
+  const ovScore = document.getElementById('ovScore');
+  const ovSub = document.getElementById('ovSub');
+  const ovBtn = document.getElementById('ovBtn');
+  const retryBtn = document.getElementById('retry');
+
+  const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
+  const rand = (lo, hi) => lo + Math.random() * (hi - lo);
+
+  /* ---------- level data ---------- */
+  const LEVELS = [
+    {
+      name: 'Embers',
+      speed: 3,
+      rows: [
+        '#######',
+        '###S###',
+        '#..A..#',
+        '#.....#',
+        '#.P..a#',
+        '#.....#',
+        '#.....#',
+        '#######',
+      ],
+    },
+    {
+      name: 'Shove',
+      speed: 3,
+      rows: [
+        '#######',
+        '###S###',
+        '#.#A#.#',
+        '#.....#',
+        '#.a...#',
+        '#.#X#.#',
+        '#.#P#.#',
+        '#######',
+      ],
+    },
+    {
+      name: 'Shaft',
+      speed: 3,
+      rows: [
+        '#######',
+        '###S###',
+        '##.A.##',
+        '#.....#',
+        '##.#.a#',
+        '##X#..#',
+        '##P#..#',
+        '#######',
+      ],
+    },
+    {
+      name: 'Pocket',
+      speed: 3,
+      rows: [
+        '#######',
+        '###S###',
+        '#..A..#',
+        '#.....#',
+        '##....#',
+        '#PX..a#',
+        '##....#',
+        '#######',
+      ],
+    },
+    {
+      name: 'Overflow',
+      speed: 2,
+      rows: [
+        '#######',
+        '###S###',
+        '#.#A#.#',
+        '#.....#',
+        '#...a.#',
+        '#.#X#.#',
+        '#.#P#.#',
+        '#######',
+      ],
+    },
+    {
+      name: 'Last Light',
+      speed: 2,
+      rows: [
+        '#######',
+        '###S###',
+        '#.#A#.#',
+        '#a....#',
+        '#.....#',
+        '#.#X#.#',
+        '#.#P#.#',
+        '#######',
+      ],
+    },
+  ];
+
+  /* ---------- palette ---------- */
+  const KEY_COLORS = [
+    { base: '#ffca4a', light: '#fff0b8', deep: '#a06d10' },
+    { base: '#4cc9f0', light: '#c4f0ff', deep: '#1f7090' },
+    { base: '#b388ff', light: '#e6d6ff', deep: '#6c48b8' },
+  ];
+
+  function hexA(hex, a) {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return 'rgba(' + r + ', ' + g + ', ' + b + ', ' + a + ')';
+  }
+
+  /* ---------- persistence ---------- */
+  function readLevelIndex() {
+    try {
+      const v = Number(window.localStorage.getItem(STORAGE_KEY));
+      if (!Number.isFinite(v)) return 0;
+      return clamp(Math.floor(v), 0, LEVELS.length - 1);
+    } catch (err) {
+      return 0;
+    }
+  }
+
+  function writeLevelIndex(v) {
+    try {
+      window.localStorage.setItem(STORAGE_KEY, String(v));
+    } catch (err) {
+      /* ignore */
+    }
+  }
+
+  /* ---------- canvas setup ---------- */
+  let bgGradient = null;
+
+  function sizeCanvas() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    bgGradient = null;
+  }
+
+  /* ---------- state ---------- */
+  const state = {
+    index: 0,
+    name: '',
+    rows: 8,
+    cols: 7,
+    count: 56,
+    speed: 3,
+    walls: null,
+    safe: null,
+    gateAt: null,
+    keyAt: null,
+    keyCount: 1,
+    keys: [false, false, false],
+    gates: [false, false, false],
+    gateOpen: [0, 0, 0],
+    crates: [],
+    player: { r: 0, c: 0, rr: 0, rc: 0 },
+    facing: 0, // 0 up, 1 right, 2 down, 3 left
+    moves: 0,
+    lavaRows: 0,
+    lavaDraw: 0,
+    mode: 'playing',
+    hover: -1,
+    particles: [],
+    shake: 0,
+    timer: 0,
+    t: 0,
+  };
+
+  let cell = 60;
+  let boardX = 0;
+  let boardY = 0;
+  let boardW = 0;
+  let boardH = 0;
+
+  const stars = [];
+  for (let i = 0; i < 26; i++) {
+    stars.push({ x: rand(0, W), y: rand(0, H), r: rand(0.5, 1.4), p: rand(0, Math.PI * 2) });
+  }
+
+  function computeLayout() {
+    const pad = 20;
+    const bottom = 24;
+    const availW = W - pad * 2;
+    const availH = H - HEADER - bottom;
+    cell = Math.min(availW / state.cols, availH / state.rows);
+    boardW = cell * state.cols;
+    boardH = cell * state.rows;
+    boardX = (W - boardW) / 2;
+    boardY = HEADER + (availH - boardH) / 2;
+  }
+
+  const cellCenter = (r, c) => ({
+    x: boardX + (c + 0.5) * cell,
+    y: boardY + (r + 0.5) * cell,
+  });
+
+  function cellAt(clientX, clientY) {
+    const rect = canvas.getBoundingClientRect();
+    const x = ((clientX - rect.left) / rect.width) * W;
+    const y = ((clientY - rect.top) / rect.height) * H;
+    const c = Math.floor((x - boardX) / cell);
+    const r = Math.floor((y - boardY) / cell);
+    if (c < 0 || c >= state.cols || r < 0 || r >= state.rows) return -1;
+    return r * state.cols + c;
+  }
+
+  /* ---------- level loading ---------- */
+  function startLevel(index) {
+    state.index = clamp(index, 0, LEVELS.length - 1);
+    const level = LEVELS[state.index];
+    state.name = level.name;
+    state.speed = level.speed;
+    state.rows = level.rows.length;
+    state.cols = level.rows[0].length;
+    state.count = state.rows * state.cols;
+    state.walls = new Uint8Array(state.count);
+    state.safe = new Uint8Array(state.count);
+    state.gateAt = new Int8Array(state.count).fill(-1);
+    state.keyAt = new Int8Array(state.count).fill(-1);
+    state.keys = [false, false, false];
+    state.gates = [false, false, false];
+    state.gateOpen = [0, 0, 0];
+    state.crates = [];
+    state.keyCount = 0;
+
+    for (let r = 0; r < state.rows; r++) {
+      const row = level.rows[r];
+      for (let c = 0; c < state.cols; c++) {
+        const ch = row.charAt(c);
+        const i = r * state.cols + c;
+        if (ch === '#') state.walls[i] = 1;
+        else if (ch === 'S') state.safe[i] = 1;
+        else if (ch === 'P') {
+          state.player.r = r;
+          state.player.c = c;
+          state.player.rr = r;
+          state.player.rc = c;
+        } else if (ch === 'X') {
+          state.crates.push({ r, c, rr: r, rc: c });
+        } else if (ch >= 'a' && ch <= 'c') {
+          const k = ch.charCodeAt(0) - 97;
+          state.keyAt[i] = k;
+          state.keyCount = Math.max(state.keyCount, k + 1);
+        } else if (ch >= 'A' && ch <= 'C') {
+          state.gateAt[i] = ch.charCodeAt(0) - 65;
+          state.keyCount = Math.max(state.keyCount, ch.charCodeAt(0) - 64);
+        }
+      }
+    }
+
+    state.moves = 0;
+    state.lavaRows = 0;
+    state.lavaDraw = 0;
+    state.facing = 0;
+    state.mode = 'playing';
+    state.hover = -1;
+    state.particles.length = 0;
+    state.shake = 0;
+    state.timer = 0;
+    state.t = 0;
+
+    computeLayout();
+    overlay.hidden = true;
+    overlay.className = 'overlay';
+  }
+
+  function retryLevel() {
+    startLevel(state.index);
+  }
+
+  /* ---------- rules ---------- */
+  function crateAt(r, c) {
+    for (let i = 0; i < state.crates.length; i++) {
+      if (state.crates[i].r === r && state.crates[i].c === c) return i;
+    }
+    return -1;
+  }
+
+  function submerged(r) {
+    return r >= state.rows - state.lavaRows;
+  }
+
+  function canCrateEnter(r, c) {
+    if (r < 0 || r >= state.rows || c < 0 || c >= state.cols) return false;
+    const i = r * state.cols + c;
+    if (state.walls[i] || state.safe[i]) return false;
+    if (state.gateAt[i] >= 0) return false;
+    if (state.keyAt[i] >= 0) return false;
+    if (crateAt(r, c) >= 0) return false;
+    if (submerged(r)) return false;
+    return true;
+  }
+
+  function tryMove(dr, dc) {
+    if (state.mode !== 'playing') return false;
+    const p = state.player;
+    const nr = p.r + dr;
+    const nc = p.c + dc;
+
+    if (nr < 0 || nr >= state.rows || nc < 0 || nc >= state.cols) return false;
+    const ni = nr * state.cols + nc;
+    if (state.walls[ni]) return false;
+    if (submerged(nr)) return false;
+
+    if (dr < 0) state.facing = 0;
+    else if (dc > 0) state.facing = 1;
+    else if (dr > 0) state.facing = 2;
+    else state.facing = 3;
+
+    const ci = crateAt(nr, nc);
+    if (ci >= 0) {
+      let cr = nr;
+      let cc = nc;
+      for (let guard = 0; guard < 64; guard++) {
+        const tr = cr + dr;
+        const tc = cc + dc;
+        if (!canCrateEnter(tr, tc)) break;
+        cr = tr;
+        cc = tc;
+      }
+      if (cr === nr && cc === nc) return false;
+      const crate = state.crates[ci];
+      crate.r = cr;
+      crate.c = cc;
+    } else {
+      const gate = state.gateAt[ni];
+      if (gate >= 0 && !state.gates[gate]) {
+        if (!state.keys[gate]) return false;
+        state.keys[gate] = false;
+        state.gates[gate] = true;
+        const c = cellCenter(nr, nc);
+        burst(c.x, c.y, KEY_COLORS[gate].base, 16, 220);
+        state.shake = 7;
+      }
+      const key = state.keyAt[ni];
+      if (key >= 0) {
+        state.keys[key] = true;
+        state.keyAt[ni] = -1;
+        const c = cellCenter(nr, nc);
+        burst(c.x, c.y, KEY_COLORS[key].base, 14, 190);
+      }
+    }
+
+    p.r = nr;
+    p.c = nc;
+    state.moves++;
+
+    if (state.moves % state.speed === 0 && state.lavaRows < state.rows) {
+      state.lavaRows++;
+      state.shake = 9;
+      for (let i = 0; i < 8; i++) {
+        state.particles.push({
+          x: boardX + rand(0, boardW),
+          y: boardY + (state.rows - state.lavaRows + 1) * cell,
+          vx: rand(-40, 40),
+          vy: rand(-190, -70),
+          life: rand(0.4, 0.9),
+          max: 0.9,
+          size: rand(2, 5),
+          color: i % 2 ? '#ffd166' : '#ff8a3d',
+        });
+      }
+    }
+
+    if (state.safe[ni]) {
+      winLevel();
+      return true;
+    }
+    if (submerged(p.r)) {
+      die();
+      return true;
+    }
+    return true;
+  }
+
+  /* ---------- flow ---------- */
+  function winLevel() {
+    state.mode = 'won';
+    state.timer = 0.5;
+    const next = state.index + 1;
+    if (next < LEVELS.length) writeLevelIndex(next);
+    else writeLevelIndex(0);
+    const c = cellCenter(state.player.r, state.player.c);
+    burst(c.x, c.y, '#5ee7c7', 26, 300);
+    burst(c.x, c.y, '#ffd166', 14, 220);
+  }
+
+  function die() {
+    state.mode = 'dead';
+    state.timer = 0.55;
+    const c = cellCenter(state.player.r, state.player.c);
+    burst(c.x, c.y, '#ff7a4d', 26, 320);
+    burst(c.x, c.y, '#ffd166', 10, 180);
+    state.shake = 14;
+  }
+
+  function showOverlay() {
+    const won = state.mode === 'won';
+    overlay.className = 'overlay ' + (won ? 'won' : 'dead');
+    overlay.hidden = false;
+    ovTitle.textContent = won ? 'Safe' : 'Consumed';
+    ovScore.textContent = String(state.index + 1).padStart(2, '0');
+    if (won) {
+      if (state.index + 1 < LEVELS.length) {
+        ovSub.textContent = 'Level ' + (state.index + 1) + ' cleared · ' + state.name;
+        ovBtn.textContent = 'Next level';
+      } else {
+        ovSub.textContent = 'The vault is quiet again.';
+        ovBtn.textContent = 'Play again';
+      }
+    } else {
+      ovSub.textContent = 'The lava took you in ' + state.moves + ' moves.';
+      ovBtn.textContent = 'Retry';
+    }
+    try {
+      ovBtn.focus({ preventScroll: true });
+    } catch (err) {
+      ovBtn.focus();
+    }
+  }
+
+  function overlayAction() {
+    if (state.mode === 'won') {
+      startLevel(state.index + 1 < LEVELS.length ? state.index + 1 : 0);
+    } else if (state.mode === 'dead') {
+      retryLevel();
+    }
+  }
+
+  /* ---------- effects ---------- */
+  function burst(x, y, color, count, power) {
+    for (let i = 0; i < count; i++) {
+      const a = rand(0, Math.PI * 2);
+      const sp = rand(power * 0.3, power);
+      const life = rand(0.35, 0.8);
+      state.particles.push({
+        x,
+        y,
+        vx: Math.cos(a) * sp,
+        vy: Math.sin(a) * sp - 70,
+        life,
+        max: life,
+        size: rand(2, 4.5),
+        color,
+      });
+    }
+  }
+
+  function updateParticles(dt) {
+    for (let i = state.particles.length - 1; i >= 0; i--) {
+      const p = state.particles[i];
+      p.life -= dt;
+      if (p.life <= 0) {
+        state.particles.splice(i, 1);
+        continue;
+      }
+      p.vy += 460 * dt;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+    }
+  }
+
+  /* ---------- update ---------- */
+  function update(dt) {
+    state.t += dt;
+    updateParticles(dt);
+    state.shake = Math.max(0, state.shake - dt * 40);
+
+    const p = state.player;
+    const ease = 1 - Math.exp(-dt * 22);
+    p.rr += (p.r - p.rr) * ease;
+    p.rc += (p.c - p.rc) * ease;
+
+    for (const crate of state.crates) {
+      crate.rr += (crate.r - crate.rr) * ease;
+      crate.rc += (crate.c - crate.rc) * ease;
+    }
+
+    for (let i = 0; i < 3; i++) {
+      state.gateOpen[i] += ((state.gates[i] ? 1 : 0) - state.gateOpen[i]) * Math.min(1, dt * 9);
+    }
+    state.lavaDraw += (state.lavaRows - state.lavaDraw) * Math.min(1, dt * 7);
+
+    if (state.mode !== 'playing' && state.timer > 0) {
+      state.timer -= dt;
+      if (state.timer <= 0) {
+        state.timer = 0;
+        showOverlay();
+      }
+    }
+  }
+
+  /* ---------- drawing helpers ---------- */
+  function roundRect(x, y, w, h, r) {
+    const rr = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + rr, y);
+    ctx.arcTo(x + w, y, x + w, y + h, rr);
+    ctx.arcTo(x + w, y + h, x, y + h, rr);
+    ctx.arcTo(x, y + h, x, y, rr);
+    ctx.arcTo(x, y, x + w, y, rr);
+    ctx.closePath();
+  }
+
+  function drawBackground(t) {
+    if (!bgGradient) {
+      bgGradient = ctx.createLinearGradient(0, 0, 0, H);
+      bgGradient.addColorStop(0, '#1a1420');
+      bgGradient.addColorStop(0.55, '#0d0b12');
+      bgGradient.addColorStop(1, '#08070b');
+    }
+    ctx.fillStyle = bgGradient;
+    ctx.fillRect(0, 0, W, H);
+
+    for (const s of stars) {
+      ctx.globalAlpha = 0.08 + 0.14 * (0.5 + 0.5 * Math.sin(t * 1.2 + s.p));
+      ctx.fillStyle = '#ffe9d6';
+      ctx.fillRect(s.x, s.y, s.r, s.r);
+    }
+    ctx.globalAlpha = 1;
+
+    const vg = ctx.createRadialGradient(W / 2, H * 0.42, 100, W / 2, H * 0.42, 440);
+    vg.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    vg.addColorStop(1, 'rgba(0, 0, 0, 0.6)');
+    ctx.fillStyle = vg;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  function drawFloor(x, y, i, r, c) {
+    roundRect(x + 1.5, y + 1.5, cell - 3, cell - 3, cell * 0.12);
+    ctx.fillStyle = (r + c) % 2 === 0 ? '#232a3b' : '#1d2433';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.045)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.03)';
+    ctx.fillRect(x + cell * 0.22, y + cell * 0.2, cell * 0.12, 2);
+    ctx.fillRect(x + cell * 0.6, y + cell * 0.66, cell * 0.16, 2);
+  }
+
+  function drawWall(x, y, r, c) {
+    const inset = 1.5;
+    roundRect(x + inset, y + inset, cell - inset * 2, cell - inset * 2, cell * 0.1);
+    const grd = ctx.createLinearGradient(x, y, x, y + cell);
+    grd.addColorStop(0, '#3b4359');
+    grd.addColorStop(0.5, '#2b3244');
+    grd.addColorStop(1, '#1a1f2b');
+    ctx.fillStyle = grd;
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.45)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+    ctx.fillRect(x + cell * 0.16, y + cell * 0.14, cell * 0.68, 2);
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+    ctx.fillRect(x + cell * 0.16, y + cell * 0.84, cell * 0.68, 2);
+
+    if ((r * 7 + c * 3) % 5 === 0) {
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.28)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(x + cell * 0.28, y + cell * 0.3);
+      ctx.lineTo(x + cell * 0.42, y + cell * 0.5);
+      ctx.lineTo(x + cell * 0.36, y + cell * 0.68);
+      ctx.stroke();
+    }
+  }
+
+  function drawSafe(x, y, t) {
+    roundRect(x + 3, y + 3, cell - 6, cell - 6, cell * 0.14);
+    const grd = ctx.createLinearGradient(x, y, x, y + cell);
+    grd.addColorStop(0, '#2f6f66');
+    grd.addColorStop(1, '#1a443f');
+    ctx.fillStyle = grd;
+    ctx.fill();
+    ctx.strokeStyle = hexA('#5ee7c7', 0.55 + 0.12 * Math.sin(t * 2.4));
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.strokeStyle = hexA('#bff9ec', 0.5);
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.arc(x + cell / 2, y + cell / 2, cell * 0.17, 0, Math.PI * 2);
+    ctx.stroke();
+
+    const glow = ctx.createRadialGradient(x + cell / 2, y + cell / 2, cell * 0.1, x + cell / 2, y + cell / 2, cell * 0.8);
+    glow.addColorStop(0, 'rgba(94, 231, 199, 0.18)');
+    glow.addColorStop(1, 'rgba(94, 231, 199, 0)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(x, y, cell, cell);
+  }
+
+  function drawGate(x, y, id, open) {
+    const col = KEY_COLORS[id];
+    ctx.save();
+    ctx.translate(x, y);
+    roundRect(3, 3, cell - 6, cell - 6, cell * 0.1);
+    ctx.fillStyle = 'rgba(12, 14, 20, 0.55)';
+    ctx.fill();
+
+    const bars = 3;
+    const barW = cell * 0.1;
+    const lift = open * cell * 0.72;
+    for (let i = 0; i < bars; i++) {
+      const bx = cell * 0.2 + i * (cell * 0.24);
+      ctx.fillStyle = col.deep;
+      roundRect(bx, 0.1 * cell - lift, barW, cell * 0.86, barW / 2);
+      ctx.fill();
+      ctx.fillStyle = col.base;
+      roundRect(bx + barW * 0.25, 0.12 * cell - lift, barW * 0.5, cell * 0.8, barW / 4);
+      ctx.fill();
+    }
+    if (open < 0.9) {
+      ctx.globalAlpha = 1 - open;
+      ctx.fillStyle = 'rgba(12, 14, 20, 0.4)';
+      roundRect(cell * 0.12, cell * 0.42, cell * 0.76, cell * 0.16, cell * 0.08);
+      ctx.fill();
+      ctx.strokeStyle = hexA(col.light, 0.85);
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(cell / 2, cell * 0.5, cell * 0.09, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = hexA(col.light, 0.85);
+      ctx.fillRect(cell / 2 - 1, cell * 0.5, 2, cell * 0.09);
+    }
+    ctx.restore();
+  }
+
+  function drawKey(x, y, id, t) {
+    const col = KEY_COLORS[id];
+    const bob = Math.sin(t * 2.6 + id) * cell * 0.025;
+    ctx.save();
+    ctx.translate(x + cell / 2, y + cell / 2 + bob);
+    ctx.rotate(-0.6);
+
+    const glow = ctx.createRadialGradient(0, 0, 2, 0, 0, cell * 0.38);
+    glow.addColorStop(0, hexA(col.base, 0.4));
+    glow.addColorStop(1, hexA(col.base, 0));
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(0, 0, cell * 0.38, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = hexA(col.light, 0.9);
+    ctx.lineWidth = Math.max(2, cell * 0.05);
+    ctx.beginPath();
+    ctx.arc(-cell * 0.08, 0, cell * 0.1, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.fillStyle = col.base;
+    roundRect(-cell * 0.02, -cell * 0.035, cell * 0.3, cell * 0.07, cell * 0.035);
+    ctx.fill();
+    ctx.fillRect(cell * 0.16, 0, cell * 0.05, cell * 0.11);
+    ctx.fillRect(cell * 0.08, 0, cell * 0.05, cell * 0.09);
+    ctx.restore();
+  }
+
+  function drawCrate(crate) {
+    const p = cellCenter(crate.rr, crate.rc);
+    const s = cell * 0.72;
+    ctx.save();
+    ctx.translate(p.x, p.y);
+
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+    roundRect(-s * 0.48, -s * 0.4, s * 0.98, s * 0.98, s * 0.14);
+    ctx.fill();
+
+    roundRect(-s / 2, -s / 2, s, s, s * 0.14);
+    const grd = ctx.createLinearGradient(-s / 2, -s / 2, s / 2, s / 2);
+    grd.addColorStop(0, '#6c5a4a');
+    grd.addColorStop(0.5, '#514237');
+    grd.addColorStop(1, '#32291f');
+    ctx.fillStyle = grd;
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255, 219, 172, 0.25)';
+    ctx.lineWidth = 1.6;
+    ctx.stroke();
+
+    ctx.strokeStyle = 'rgba(24, 18, 12, 0.55)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(-s * 0.34, -s * 0.1);
+    ctx.lineTo(-s * 0.1, s * 0.08);
+    ctx.lineTo(s * 0.12, -s * 0.2);
+    ctx.lineTo(s * 0.3, s * 0.18);
+    ctx.stroke();
+
+    ctx.fillStyle = 'rgba(255, 209, 102, 0.55)';
+    ctx.beginPath();
+    ctx.arc(0, s * 0.28, s * 0.05, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  function drawPlayer(t) {
+    const p = state.player;
+    const pos = cellCenter(p.rr, p.rc);
+    const dead = state.mode === 'dead';
+    const bob = state.mode === 'playing' && state.timer === 0 ? Math.sin(t * 3) * 1.4 : 0;
+    const r = cell * 0.24;
+
+    ctx.save();
+    ctx.translate(pos.x, pos.y + bob);
+
+    const light = ctx.createRadialGradient(0, 0, r * 0.4, 0, 0, cell * 0.72);
+    light.addColorStop(0, dead ? 'rgba(255, 122, 77, 0.22)' : 'rgba(255, 214, 153, 0.18)');
+    light.addColorStop(1, 'rgba(255, 214, 153, 0)');
+    ctx.fillStyle = light;
+    ctx.beginPath();
+    ctx.arc(0, 0, cell * 0.72, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+    ctx.beginPath();
+    ctx.ellipse(0, r * 1.05, r * 0.95, r * 0.34, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // cloak
+    ctx.fillStyle = dead ? '#7a3b2c' : '#2f7f74';
+    ctx.beginPath();
+    ctx.moveTo(0, -r * 1.2);
+    ctx.quadraticCurveTo(r * 1.25, -r * 0.3, r * 0.95, r * 0.95);
+    ctx.quadraticCurveTo(0, r * 1.25, -r * 0.95, r * 0.95);
+    ctx.quadraticCurveTo(-r * 1.25, -r * 0.3, 0, -r * 1.2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    // hood
+    ctx.fillStyle = dead ? '#a85434' : '#48c2ae';
+    ctx.beginPath();
+    ctx.arc(0, -r * 0.34, r * 0.72, 0, Math.PI * 2);
+    ctx.fill();
+
+    // face
+    ctx.fillStyle = '#f6d7b0';
+    ctx.beginPath();
+    ctx.arc(0, -r * 0.26, r * 0.48, 0, Math.PI * 2);
+    ctx.fill();
+
+    // eyes follow facing
+    const ox = state.facing === 1 ? r * 0.11 : state.facing === 3 ? -r * 0.11 : 0;
+    const oy = state.facing === 0 ? -r * 0.05 : state.facing === 2 ? r * 0.07 : 0;
+    ctx.fillStyle = dead ? '#3a0b06' : '#16232b';
+    ctx.beginPath();
+    ctx.arc(-r * 0.18 + ox, -r * 0.3 + oy, r * 0.075, 0, Math.PI * 2);
+    ctx.arc(r * 0.18 + ox, -r * 0.3 + oy, r * 0.075, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  const bubbles = [];
+  for (let i = 0; i < 26; i++) {
+    bubbles.push({ x: rand(0.03, 0.97), y: rand(0, 1), r: rand(1.5, 5), sp: rand(0.2, 0.7), p: rand(0, 6.28) });
+  }
+
+  function drawLava(t) {
+    const rowsCovered = state.lavaDraw;
+    if (rowsCovered <= 0.001) return;
+    const surfaceY = boardY + (state.rows - rowsCovered) * cell;
+    const bottomY = boardY + boardH;
+    if (surfaceY >= bottomY) return;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(boardX, surfaceY, boardW, bottomY - surfaceY);
+    ctx.clip();
+
+    const grd = ctx.createLinearGradient(0, surfaceY, 0, bottomY);
+    grd.addColorStop(0, '#ffb347');
+    grd.addColorStop(0.16, '#ff7a2f');
+    grd.addColorStop(0.55, '#c92f14');
+    grd.addColorStop(1, '#45100a');
+    ctx.fillStyle = grd;
+    ctx.fillRect(boardX, surfaceY, boardW, bottomY - surfaceY);
+
+    for (const b of bubbles) {
+      const travel = (t * b.sp + b.y) % 1;
+      const by = bottomY - travel * (bottomY - surfaceY);
+      const bx = boardX + b.x * boardW + Math.sin(t * 1.6 + b.p) * 4;
+      ctx.globalAlpha = 0.18 + 0.3 * (1 - travel);
+      ctx.fillStyle = '#ffd166';
+      ctx.beginPath();
+      ctx.arc(bx, by, b.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    ctx.fillStyle = 'rgba(255, 209, 102, 0.28)';
+    for (let x = boardX; x < boardX + boardW; x += 14) {
+      const h = 3 + Math.sin(t * 2.4 + x * 0.08) * 2;
+      ctx.fillRect(x, surfaceY - h * 0.5, 9, h);
+    }
+    ctx.restore();
+
+    const surf = ctx.createLinearGradient(0, surfaceY - cell * 0.55, 0, surfaceY);
+    surf.addColorStop(0, 'rgba(255, 138, 61, 0)');
+    surf.addColorStop(1, 'rgba(255, 138, 61, 0.24)');
+    ctx.fillStyle = surf;
+    ctx.fillRect(boardX, surfaceY - cell * 0.55, boardW, cell * 0.55);
+
+    ctx.fillStyle = '#ffe0a3';
+    ctx.fillRect(boardX, surfaceY - 1.5, boardW, 3);
+    ctx.shadowColor = 'rgba(255, 138, 61, 0.9)';
+    ctx.shadowBlur = 18;
+    ctx.fillRect(boardX, surfaceY - 1.5, boardW, 3);
+    ctx.shadowBlur = 0;
+  }
+
+  function drawBoard(t) {
+    ctx.save();
+    roundRect(boardX - 8, boardY - 8, boardW + 16, boardH + 16, 16);
+    ctx.fillStyle = 'rgba(7, 9, 14, 0.7)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.restore();
+
+    for (let r = 0; r < state.rows; r++) {
+      for (let c = 0; c < state.cols; c++) {
+        const i = r * state.cols + c;
+        const x = boardX + c * cell;
+        const y = boardY + r * cell;
+        if (state.walls[i]) {
+          drawWall(x, y, r, c);
+        } else {
+          drawFloor(x, y, i, r, c);
+          if (state.safe[i]) drawSafe(x, y, t);
+          if (state.gateAt[i] >= 0) drawGate(x, y, state.gateAt[i], state.gateOpen[state.gateAt[i]]);
+          if (state.keyAt[i] >= 0) drawKey(x, y, state.keyAt[i], t);
+          if (state.hover === i && state.mode === 'playing') {
+            roundRect(x + 4, y + 4, cell - 8, cell - 8, cell * 0.1);
+            ctx.strokeStyle = 'rgba(255, 209, 102, 0.35)';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+          }
+        }
+      }
+    }
+
+    for (const crate of state.crates) drawCrate(crate);
+    drawPlayer(t);
+    drawLava(t);
+
+    for (const p of state.particles) {
+      ctx.globalAlpha = clamp(p.life / p.max, 0, 1);
+      ctx.fillStyle = p.color;
+      ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawKeyIcon(x, y, id, collected, scale) {
+    const col = KEY_COLORS[id];
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(scale, scale);
+    ctx.strokeStyle = collected ? col.base : 'rgba(243, 236, 255, 0.22)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(-5, 0, 4.5, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = collected ? col.base : 'rgba(243, 236, 255, 0.22)';
+    ctx.fillRect(-1, -1.4, 14, 2.8);
+    ctx.fillRect(8, 0, 3, 5);
+    ctx.fillRect(4, 0, 3, 4);
+    ctx.restore();
+  }
+
+  function drawHud(t) {
+    const scrim = ctx.createLinearGradient(0, 0, 0, HEADER + 8);
+    scrim.addColorStop(0, 'rgba(7, 8, 13, 0.82)');
+    scrim.addColorStop(1, 'rgba(7, 8, 13, 0)');
+    ctx.fillStyle = scrim;
+    ctx.fillRect(0, 0, W, HEADER + 8);
+
+    ctx.textBaseline = 'alphabetic';
+
+    ctx.textAlign = 'left';
+    ctx.fillStyle = 'rgba(243, 236, 255, 0.45)';
+    ctx.font = '700 10px ui-monospace, Menlo, monospace';
+    ctx.fillText('LEVEL', 22, 24);
+    ctx.fillStyle = '#f3ecff';
+    ctx.font = '700 26px ui-monospace, Menlo, monospace';
+    ctx.fillText(String(state.index + 1).padStart(2, '0'), 22, 52);
+
+    ctx.textAlign = 'right';
+    ctx.fillStyle = 'rgba(243, 236, 255, 0.45)';
+    ctx.font = '700 10px ui-monospace, Menlo, monospace';
+    ctx.fillText('MOVES', W - 22, 24);
+    ctx.fillStyle = '#f3ecff';
+    ctx.font = '700 26px ui-monospace, Menlo, monospace';
+    ctx.fillText(String(state.moves).padStart(2, '0'), W - 22, 52);
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(243, 236, 255, 0.45)';
+    ctx.font = '700 10px ui-monospace, Menlo, monospace';
+    ctx.fillText('KEYS', W / 2, 24);
+    const total = state.keyCount;
+    const startX = W / 2 - (total - 1) * 13;
+    for (let i = 0; i < total; i++) {
+      drawKeyIcon(startX + i * 26, 43, i, state.keys[i], 1);
+    }
+
+    // lava meter
+    const bw = W - 44;
+    const bx = 22;
+    const by = 68;
+    const bh = 7;
+    const filled = state.lavaRows / state.rows;
+    roundRect(bx, by, bw, bh, bh / 2);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.09)';
+    ctx.fill();
+    if (filled > 0) {
+      roundRect(bx, by, Math.max(bh, bw * filled), bh, bh / 2);
+      const grd = ctx.createLinearGradient(bx, 0, bx + bw, 0);
+      grd.addColorStop(0, '#ffd166');
+      grd.addColorStop(1, '#ff5a28');
+      ctx.fillStyle = grd;
+      ctx.fill();
+    }
+    const toSurge = state.speed - (state.moves % state.speed);
+    // at zero moves this is the full interval until the first rise
+    ctx.textAlign = 'left';
+    ctx.fillStyle = 'rgba(255, 183, 3, 0.7)';
+    ctx.font = '700 8px ui-monospace, Menlo, monospace';
+    ctx.fillText('LAVA ' + state.lavaRows, bx, 64);
+    ctx.textAlign = 'right';
+    ctx.fillStyle = 'rgba(243, 236, 255, 0.4)';
+    ctx.fillText('SURGE IN ' + toSurge, bx + bw, 64);
+  }
+
+  function render() {
+    const t = state.t;
+    drawBackground(t);
+
+    ctx.save();
+    if (state.shake > 0.4) {
+      ctx.translate(rand(-state.shake, state.shake) * 0.4, rand(-state.shake, state.shake) * 0.4);
+    }
+    drawBoard(t);
+    ctx.restore();
+
+    drawHud(t);
+  }
+
+  /* ---------- input ---------- */
+  const DIRECTIONS = {
+    up: [-1, 0],
+    right: [0, 1],
+    down: [1, 0],
+    left: [0, -1],
+  };
+
+  function move(dir) {
+    const d = DIRECTIONS[dir];
+    if (!d) return;
+    tryMove(d[0], d[1]);
+  }
+
+  window.addEventListener('keydown', (e) => {
+    if (e.repeat) return;
+    const k = e.key;
+    if (k === 'ArrowUp' || k === 'w' || k === 'W') {
+      e.preventDefault();
+      move('up');
+    } else if (k === 'ArrowRight' || k === 'd' || k === 'D') {
+      e.preventDefault();
+      move('right');
+    } else if (k === 'ArrowDown' || k === 's' || k === 'S') {
+      e.preventDefault();
+      move('down');
+    } else if (k === 'ArrowLeft' || k === 'a' || k === 'A') {
+      e.preventDefault();
+      move('left');
+    } else if (k === 'r' || k === 'R') {
+      e.preventDefault();
+      if (state.mode === 'playing') retryLevel();
+    } else if (k === 'Enter' || k === ' ') {
+      if (!overlay.hidden) {
+        e.preventDefault();
+        overlayAction();
+      }
+    }
+  });
+
+  let downX = 0;
+  let downY = 0;
+  let downCell = -1;
+
+  canvas.addEventListener('pointerdown', (e) => {
+    downX = e.clientX;
+    downY = e.clientY;
+    downCell = cellAt(e.clientX, e.clientY);
+    try {
+      canvas.setPointerCapture(e.pointerId);
+    } catch (err) {
+      /* ignore */
+    }
+    if (e.cancelable) e.preventDefault();
+  });
+
+  canvas.addEventListener('pointermove', (e) => {
+    if (e.pointerType === 'mouse' && e.buttons === 0) {
+      state.hover = cellAt(e.clientX, e.clientY);
+    }
+  });
+
+  canvas.addEventListener('pointerleave', () => {
+    state.hover = -1;
+  });
+
+  window.addEventListener('pointerup', (e) => {
+    if (state.mode !== 'playing') return;
+    const dx = e.clientX - downX;
+    const dy = e.clientY - downY;
+    const dist = Math.hypot(dx, dy);
+
+    if (dist > 24) {
+      if (Math.abs(dx) > Math.abs(dy)) move(dx > 0 ? 'right' : 'left');
+      else move(dy > 0 ? 'down' : 'up');
+    } else {
+      const c = cellAt(e.clientX, e.clientY);
+      if (c < 0) return;
+      const r = Math.floor(c / state.cols);
+      const cc = c % state.cols;
+      const dr = r - state.player.r;
+      const dc = cc - state.player.c;
+      if (Math.abs(dr) + Math.abs(dc) === 1) {
+        if (dr === -1) move('up');
+        else if (dr === 1) move('down');
+        else if (dc === 1) move('right');
+        else move('left');
+      }
+    }
+    downCell = -1;
+  });
+
+  window.addEventListener('pointercancel', () => {
+    downCell = -1;
+  });
+
+  window.addEventListener('blur', () => {
+    state.hover = -1;
+  });
+
+  ovBtn.addEventListener('click', overlayAction);
+  retryBtn.addEventListener('click', () => {
+    if (state.mode === 'playing') retryLevel();
+    canvas.focus({ preventScroll: true });
+  });
+
+  /* ---------- loop ---------- */
+  sizeCanvas();
+  startLevel(readLevelIndex());
+
+  window.addEventListener('resize', () => {
+    sizeCanvas();
+    computeLayout();
+  });
+
+  let last = performance.now();
+
+  function frame(now) {
+    const dt = Math.min((now - last) / 1000, 0.05);
+    last = now;
+    update(dt);
+    render();
+    requestAnimationFrame(frame);
+  }
+
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

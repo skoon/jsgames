@@ -1,0 +1,2281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#070d10">
+<title>Borrowed Phone</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --ink: #edf9f5;
+    --muted: rgba(232, 248, 242, 0.47);
+    --faint: rgba(232, 248, 242, 0.22);
+    --teal: #70e7c8;
+    --teal-deep: #2ec3a1;
+    --amber: #ffc96b;
+    --amber-deep: #dda343;
+    --red: #ff8175;
+    --blue: #83c7ff;
+    --violet: #c1a6ff;
+    --line: rgba(147, 221, 206, 0.15);
+    --panel: rgba(9, 20, 24, 0.96);
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    background:
+      radial-gradient(110% 80% at 50% 0%, #203731 0%, #0a1316 55%, #04080a 100%);
+    color: var(--ink);
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    -webkit-user-select: none;
+    user-select: none;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+  #stage {
+    position: relative;
+    width: min(100%, calc((100dvh - 55px) * 0.75));
+    aspect-ratio: 3 / 4;
+    border-radius: 20px;
+    overflow: hidden;
+    background: #071014;
+    box-shadow:
+      0 30px 70px -28px rgba(0, 0, 0, 0.96),
+      0 0 0 1px rgba(255, 255, 255, 0.07),
+      inset 0 0 0 1px rgba(112, 231, 200, 0.07);
+    container-type: size;
+  }
+  .hint {
+    margin: 0;
+    font-size: clamp(6.5px, 1.8vw, 8px);
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    color: rgba(237, 249, 245, 0.28);
+    white-space: nowrap;
+  }
+  button { font: inherit; }
+  button:focus-visible { outline: 2px solid #bff9e9; outline-offset: 2px; }
+  [hidden] { display: none !important; }
+
+  #app {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    background:
+      linear-gradient(180deg, rgba(19, 39, 39, 0.72), rgba(5, 12, 15, 0.92) 42%, #04090b);
+  }
+
+  /* ---------- case bar ---------- */
+  .topbar {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 8px 8px 0;
+    padding: 6px 8px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: linear-gradient(180deg, rgba(25, 44, 42, 0.96), rgba(7, 16, 18, 0.9));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045);
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+  }
+  .brand-mark {
+    width: 23px;
+    height: 23px;
+    flex: none;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(255, 201, 107, 0.52);
+    border-radius: 6px;
+    background: rgba(255, 201, 107, 0.08);
+    color: var(--amber);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: -0.05em;
+  }
+  .brand b {
+    display: block;
+    font-size: clamp(9.5px, 2.1cqw, 12px);
+    line-height: 1.05;
+    letter-spacing: 0.12em;
+  }
+  .brand small {
+    display: block;
+    margin-top: 2px;
+    color: var(--muted);
+    font-size: clamp(5.5px, 1.2cqw, 7px);
+    letter-spacing: 0.14em;
+  }
+  .hud { display: flex; align-items: center; gap: 11px; flex: none; }
+  .stat { text-align: right; }
+  .stat span {
+    display: block;
+    color: var(--muted);
+    font-size: clamp(5.5px, 1.2cqw, 7px);
+    letter-spacing: 0.14em;
+  }
+  .stat strong {
+    display: block;
+    margin-top: 1px;
+    color: var(--teal);
+    font-size: clamp(12px, 2.8cqw, 16px);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .stat:last-child strong { color: var(--amber); }
+  .stat strong.flash { animation: score-flash 300ms ease-out; }
+  @keyframes score-flash {
+    0% { color: #fff; text-shadow: 0 0 16px rgba(112, 231, 200, 0.9); }
+    100% { text-shadow: none; }
+  }
+
+  /* ---------- phone chassis ---------- */
+  .phone {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    margin: 6px 8px 8px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid rgba(167, 224, 211, 0.17);
+    border-radius: 22px;
+    background:
+      radial-gradient(90% 45% at 50% 0%, rgba(43, 72, 64, 0.22), transparent 75%),
+      linear-gradient(180deg, #0b171a 0%, #081115 58%, #060c0f 100%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.05),
+      0 18px 40px -30px rgba(0, 0, 0, 0.9);
+  }
+  .statusbar {
+    flex: 0 0 auto;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 12px;
+    color: rgba(237, 249, 245, 0.56);
+    font-size: clamp(6px, 1.35cqw, 8px);
+    letter-spacing: 0.08em;
+    border-bottom: 1px solid rgba(147, 221, 206, 0.07);
+  }
+  .statusbar .right { display: flex; gap: 6px; align-items: center; }
+  .signal { letter-spacing: -0.12em; color: var(--teal); }
+  .phone-head {
+    flex: 0 0 auto;
+    padding: 8px 10px 7px;
+    border-bottom: 1px solid var(--line);
+  }
+  .title-row {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .eyebrow {
+    margin: 0 0 2px;
+    color: var(--muted);
+    font-size: clamp(5.5px, 1.2cqw, 7px);
+    letter-spacing: 0.2em;
+    line-height: 1.3;
+    text-transform: uppercase;
+  }
+  .phone-title {
+    margin: 0;
+    color: var(--ink);
+    font-size: clamp(17px, 4.2cqw, 25px);
+    line-height: 1;
+    letter-spacing: -0.04em;
+  }
+  .unread-pill {
+    flex: none;
+    padding: 3px 7px;
+    border: 1px solid rgba(112, 231, 200, 0.3);
+    border-radius: 999px;
+    background: rgba(112, 231, 200, 0.08);
+    color: var(--teal);
+    font-size: clamp(5.5px, 1.25cqw, 7px);
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .phone-sub {
+    margin: 4px 0 0;
+    color: var(--muted);
+    font-size: clamp(7px, 1.55cqw, 9px);
+    line-height: 1.4;
+  }
+  .filters {
+    display: flex;
+    gap: 4px;
+    margin-top: 7px;
+  }
+  .filter {
+    flex: 1;
+    min-width: 0;
+    padding: 4px 2px;
+    border: 1px solid rgba(147, 221, 206, 0.12);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.025);
+    color: rgba(237, 249, 245, 0.48);
+    cursor: pointer;
+    font-size: clamp(5.5px, 1.3cqw, 7.5px);
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+  }
+  .filter:hover { background: rgba(255, 255, 255, 0.06); color: var(--ink); }
+  .filter.active {
+    border-color: rgba(112, 231, 200, 0.42);
+    background: rgba(112, 231, 200, 0.1);
+    color: var(--teal);
+  }
+
+  /* ---------- inbox ---------- */
+  .inbox-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(112, 231, 200, 0.22) transparent;
+  }
+  .inbox-list::-webkit-scrollbar { width: 4px; }
+  .inbox-list::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: rgba(112, 231, 200, 0.2);
+  }
+  .message-card {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr) 15px;
+    gap: 8px;
+    align-items: start;
+    padding: 8px 10px;
+    border: 0;
+    border-bottom: 1px solid rgba(147, 221, 206, 0.09);
+    background: transparent;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background 120ms ease;
+  }
+  .message-card:hover { background: rgba(255, 255, 255, 0.045); }
+  .message-card.unread { background: linear-gradient(90deg, rgba(112, 231, 200, 0.055), transparent 75%); }
+  .message-card.unread:hover { background: linear-gradient(90deg, rgba(112, 231, 200, 0.1), rgba(255, 255, 255, 0.025)); }
+  .message-card.done { opacity: 0.55; }
+  .app-icon {
+    width: 27px;
+    height: 27px;
+    display: grid;
+    place-items: center;
+    border-radius: 8px;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+  }
+  .app-icon.text {
+    border: 1px solid rgba(131, 199, 255, 0.3);
+    background: rgba(131, 199, 255, 0.09);
+    color: var(--blue);
+  }
+  .app-icon.email {
+    border: 1px solid rgba(255, 201, 107, 0.32);
+    background: rgba(255, 201, 107, 0.08);
+    color: var(--amber);
+  }
+  .app-icon.loop {
+    border: 1px solid rgba(193, 166, 255, 0.32);
+    background: rgba(193, 166, 255, 0.08);
+    color: var(--violet);
+  }
+  .card-main { display: block; min-width: 0; }
+  .card-top { display: flex; align-items: baseline; gap: 5px; min-width: 0; }
+  .card-sender {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--ink);
+    font-size: clamp(7.6px, 1.65cqw, 9.7px);
+    font-weight: 700;
+    line-height: 1.25;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .card-time {
+    flex: none;
+    margin-left: auto;
+    color: var(--faint);
+    font-size: clamp(5.5px, 1.2cqw, 7px);
+    white-space: nowrap;
+  }
+  .card-subject {
+    display: block;
+    margin-top: 1px;
+    overflow: hidden;
+    color: rgba(237, 249, 245, 0.72);
+    font-size: clamp(7px, 1.45cqw, 8.5px);
+    line-height: 1.25;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .card-preview {
+    display: block;
+    margin-top: 2px;
+    overflow: hidden;
+    color: var(--muted);
+    font-size: clamp(6.5px, 1.35cqw, 8px);
+    line-height: 1.3;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .card-state {
+    align-self: center;
+    justify-self: end;
+    color: var(--teal);
+    font-size: 9px;
+    line-height: 1;
+  }
+  .message-card.unread .card-state {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--teal);
+    box-shadow: 0 0 8px rgba(112, 231, 200, 0.65);
+    animation: unread-pulse 2.2s ease-in-out infinite;
+  }
+  @keyframes unread-pulse {
+    0%, 100% { opacity: 0.55; }
+    50% { opacity: 1; }
+  }
+  .empty-list {
+    padding: 24px 16px;
+    color: var(--muted);
+    font-size: 8px;
+    line-height: 1.6;
+    text-align: center;
+  }
+  .case-cta {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 5px 8px 0;
+    padding: 7px 9px;
+    border: 1px solid rgba(255, 201, 107, 0.4);
+    border-radius: 7px;
+    background: rgba(255, 201, 107, 0.09);
+    color: var(--amber);
+    cursor: pointer;
+    font-size: clamp(6.5px, 1.5cqw, 8.5px);
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    transition: background 120ms ease;
+  }
+  .case-cta:hover { background: rgba(255, 201, 107, 0.16); }
+  .case-cta span { font-size: 12px; }
+  .phone-foot {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 5px 11px;
+    color: var(--faint);
+    font-size: clamp(5.5px, 1.2cqw, 7px);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .phone-foot b { color: rgba(237, 249, 245, 0.4); font-weight: 400; }
+
+  /* ---------- message detail ---------- */
+  .detail-head {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--line);
+    background: rgba(255, 255, 255, 0.018);
+  }
+  .back-btn {
+    flex: none;
+    width: 25px;
+    height: 25px;
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--teal);
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+  }
+  .back-btn:hover { background: rgba(255, 255, 255, 0.08); }
+  .detail-title { min-width: 0; flex: 1; }
+  .detail-title span {
+    display: block;
+    color: var(--muted);
+    font-size: clamp(5.5px, 1.25cqw, 7px);
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+  }
+  .detail-title strong {
+    display: block;
+    margin-top: 1px;
+    overflow: hidden;
+    color: var(--ink);
+    font-size: clamp(7.5px, 1.65cqw, 9.8px);
+    line-height: 1.25;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .detail-time {
+    flex: none;
+    color: var(--faint);
+    font-size: clamp(5.5px, 1.2cqw, 7px);
+  }
+  .detail-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 9px 9px 12px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(112, 231, 200, 0.22) transparent;
+  }
+  .detail-scroll::-webkit-scrollbar { width: 4px; }
+  .detail-scroll::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: rgba(112, 231, 200, 0.2);
+  }
+  .subject-row { padding: 0 2px 7px; }
+  .detail-subject {
+    margin: 0;
+    color: var(--ink);
+    font-family: inherit;
+    font-size: clamp(10px, 2.3cqw, 14px);
+    line-height: 1.3;
+    letter-spacing: -0.02em;
+  }
+  .detail-tag {
+    display: inline-block;
+    margin-top: 4px;
+    padding: 2px 5px;
+    border: 1px solid rgba(255, 201, 107, 0.22);
+    border-radius: 4px;
+    color: var(--amber);
+    font-size: clamp(5.5px, 1.2cqw, 7px);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .message-body {
+    padding: 3px 3px 2px;
+    border: 1px solid rgba(147, 221, 206, 0.12);
+    border-radius: 9px;
+    background: rgba(255, 255, 255, 0.025);
+  }
+  .body-line {
+    position: relative;
+    display: block;
+    width: 100%;
+    padding: 5px 7px;
+    border: 0;
+    border-left: 2px solid transparent;
+    border-radius: 5px;
+    background: transparent;
+    color: rgba(237, 249, 245, 0.82);
+    cursor: pointer;
+    font: inherit;
+    font-size: clamp(7.4px, 1.6cqw, 9.5px);
+    line-height: 1.5;
+    letter-spacing: 0.005em;
+    text-align: left;
+    transition: background 100ms ease, border-color 100ms ease, color 100ms ease;
+  }
+  .body-line:hover { background: rgba(255, 255, 255, 0.055); }
+  .body-line.meta {
+    color: var(--muted);
+    font-size: clamp(6.5px, 1.35cqw, 8px);
+  }
+  .body-line.selected {
+    border-left-color: var(--amber);
+    background: rgba(255, 201, 107, 0.1);
+    color: #fff4d8;
+  }
+  .body-line:disabled { cursor: default; }
+  .body-line:disabled:hover { background: transparent; }
+  .signal-strip {
+    display: flex;
+    align-items: flex-start;
+    gap: 5px;
+    margin: 7px 2px 0;
+    padding: 5px 6px;
+    border: 1px solid rgba(255, 201, 107, 0.17);
+    border-radius: 6px;
+    background: rgba(255, 201, 107, 0.045);
+    color: rgba(255, 231, 183, 0.72);
+    font-size: clamp(6.3px, 1.35cqw, 8px);
+    line-height: 1.45;
+  }
+  .signal-strip b { flex: none; color: var(--amber); font-size: 8px; line-height: 1.2; }
+  .reason-bar {
+    margin-top: 8px;
+    padding-top: 7px;
+    border-top: 1px solid var(--line);
+  }
+  .reason-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-height: 14px;
+    color: var(--muted);
+    font-size: clamp(6.3px, 1.35cqw, 8px);
+    letter-spacing: 0.04em;
+  }
+  .reason-top .count { color: var(--amber); }
+  .text-btn {
+    border: 0;
+    background: none;
+    color: var(--teal);
+    cursor: pointer;
+    font-size: clamp(6.2px, 1.3cqw, 7.6px);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .text-btn:hover { text-decoration: underline; }
+  .clean-btn {
+    width: 100%;
+    margin-top: 5px;
+    padding: 6px 8px;
+    border: 1px dashed rgba(112, 231, 200, 0.25);
+    border-radius: 6px;
+    background: rgba(112, 231, 200, 0.03);
+    color: rgba(196, 255, 239, 0.68);
+    cursor: pointer;
+    font-size: clamp(6.5px, 1.4cqw, 8.2px);
+    letter-spacing: 0.04em;
+    text-align: center;
+    transition: background 120ms ease, border-color 120ms ease;
+  }
+  .clean-btn:hover { background: rgba(112, 231, 200, 0.08); }
+  .clean-btn.active {
+    border-style: solid;
+    border-color: rgba(112, 231, 200, 0.55);
+    background: rgba(112, 231, 200, 0.12);
+    color: var(--teal);
+  }
+  .flag-hint {
+    min-height: 24px;
+    margin: 5px 1px 0;
+    color: var(--muted);
+    font-size: clamp(6.3px, 1.35cqw, 8px);
+    line-height: 1.4;
+  }
+  .flag-hint.good { color: #c9ffef; }
+  .flag-hint.odd { color: #ffdca4; }
+  .actions-wrap { margin-top: 3px; }
+  .actions-label {
+    margin: 7px 1px 4px;
+    color: var(--muted);
+    font-size: clamp(5.8px, 1.25cqw, 7px);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+  .action-list { display: grid; gap: 4px; }
+  .action {
+    width: 100%;
+    display: flex;
+    align-items: flex-start;
+    gap: 7px;
+    padding: 7px 8px;
+    border: 1px solid rgba(147, 221, 206, 0.14);
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.025);
+    color: rgba(237, 249, 245, 0.82);
+    cursor: pointer;
+    font-size: clamp(6.8px, 1.42cqw, 8.4px);
+    line-height: 1.42;
+    text-align: left;
+    transition: background 120ms ease, border-color 120ms ease, transform 80ms ease;
+  }
+  .action:hover:not(:disabled) {
+    border-color: rgba(112, 231, 200, 0.36);
+    background: rgba(112, 231, 200, 0.07);
+  }
+  .action:active:not(:disabled) { transform: translateY(1px); }
+  .action:disabled { cursor: not-allowed; opacity: 0.33; }
+  .action-num {
+    flex: none;
+    width: 13px;
+    height: 13px;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(255, 201, 107, 0.28);
+    border-radius: 50%;
+    color: var(--amber);
+    font-size: 6.5px;
+    line-height: 1;
+  }
+  .verdict {
+    margin-top: 8px;
+    padding: 9px;
+    border: 1px solid rgba(112, 231, 200, 0.22);
+    border-left: 2px solid var(--teal);
+    border-radius: 7px;
+    background: rgba(112, 231, 200, 0.055);
+  }
+  .verdict.bad {
+    border-color: rgba(255, 129, 117, 0.22);
+    border-left-color: var(--red);
+    background: rgba(255, 129, 117, 0.055);
+  }
+  .verdict.weak {
+    border-color: rgba(255, 201, 107, 0.22);
+    border-left-color: var(--amber);
+    background: rgba(255, 201, 107, 0.05);
+  }
+  .verdict h3 {
+    margin: 1px 0 4px;
+    color: var(--ink);
+    font-size: clamp(10px, 2.1cqw, 13px);
+    line-height: 1.2;
+  }
+  .verdict.bad h3 { color: #ffc4bd; }
+  .verdict.weak h3 { color: #ffe3af; }
+  .point-row { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0; }
+  .point-chip {
+    padding: 2px 5px;
+    border: 1px solid rgba(112, 231, 200, 0.25);
+    border-radius: 4px;
+    background: rgba(112, 231, 200, 0.07);
+    color: var(--teal);
+    font-size: clamp(5.8px, 1.2cqw, 6.9px);
+    letter-spacing: 0.04em;
+  }
+  .verdict-copy, .action-chosen {
+    margin: 5px 0 0;
+    color: rgba(237, 249, 245, 0.73);
+    font-size: clamp(6.8px, 1.4cqw, 8.4px);
+    line-height: 1.5;
+  }
+  .action-chosen { color: var(--muted); }
+  .action-chosen b { color: rgba(237, 249, 245, 0.85); }
+  .verify-note {
+    margin: 6px 0 0;
+    padding-top: 5px;
+    border-top: 1px solid rgba(112, 231, 200, 0.16);
+    color: rgba(201, 255, 239, 0.68);
+    font-size: clamp(6px, 1.25cqw, 7.4px);
+    line-height: 1.45;
+  }
+  .tells {
+    margin-top: 7px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(255, 255, 255, 0.07);
+  }
+  .tells-label {
+    margin: 0 0 2px;
+    color: var(--amber);
+    font-size: clamp(5.5px, 1.15cqw, 6.7px);
+    letter-spacing: 0.13em;
+  }
+  .tells ul {
+    margin: 0;
+    padding-left: 12px;
+    color: rgba(237, 249, 245, 0.62);
+    font-size: clamp(6.3px, 1.3cqw, 7.7px);
+    line-height: 1.48;
+  }
+  .tells li { margin: 2px 0; }
+  .return-btn {
+    width: 100%;
+    margin-top: 8px;
+    padding: 7px;
+    border: 1px solid rgba(112, 231, 200, 0.32);
+    border-radius: 6px;
+    background: rgba(112, 231, 200, 0.08);
+    color: var(--teal);
+    cursor: pointer;
+    font-size: clamp(6.6px, 1.35cqw, 8px);
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .return-btn:hover { background: rgba(112, 231, 200, 0.15); }
+
+  /* ---------- case file ---------- */
+  .case-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 11px 11px 14px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 201, 107, 0.22) transparent;
+  }
+  .case-scroll::-webkit-scrollbar { width: 4px; }
+  .case-scroll::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: rgba(255, 201, 107, 0.2);
+  }
+  .case-kicker {
+    margin: 0 0 3px;
+    color: var(--amber);
+    font-size: clamp(6px, 1.3cqw, 7.5px);
+    letter-spacing: 0.2em;
+  }
+  .case-title {
+    margin: 0;
+    color: var(--ink);
+    font-size: clamp(16px, 4cqw, 24px);
+    line-height: 1.05;
+    letter-spacing: -0.04em;
+  }
+  .case-lede {
+    margin: 5px 0 0;
+    color: var(--muted);
+    font-size: clamp(7px, 1.45cqw, 8.5px);
+    line-height: 1.5;
+  }
+  .evidence {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    margin-top: 8px;
+  }
+  .evidence-chip {
+    padding: 5px 6px;
+    border: 1px solid rgba(147, 221, 206, 0.12);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.025);
+    color: var(--muted);
+    font-size: clamp(6px, 1.25cqw, 7.3px);
+    line-height: 1.35;
+  }
+  .evidence-chip b {
+    display: block;
+    margin-bottom: 1px;
+    color: var(--ink);
+    font-size: clamp(7px, 1.5cqw, 8.6px);
+    font-weight: 700;
+  }
+  .case-label {
+    margin: 9px 1px 4px;
+    color: var(--muted);
+    font-size: clamp(5.8px, 1.2cqw, 7px);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+  .suspect-list { display: grid; gap: 4px; }
+  .suspect {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 7px;
+    border: 1px solid rgba(147, 221, 206, 0.14);
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.025);
+    color: inherit;
+    cursor: pointer;
+    text-align: left;
+  }
+  .suspect:hover:not(:disabled) {
+    border-color: rgba(255, 201, 107, 0.35);
+    background: rgba(255, 201, 107, 0.055);
+  }
+  .suspect:disabled { cursor: default; }
+  .suspect.locked { opacity: 0.5; }
+  .suspect.right {
+    border-color: rgba(112, 231, 200, 0.5);
+    background: rgba(112, 231, 200, 0.08);
+    opacity: 1;
+  }
+  .suspect.wrong {
+    border-color: rgba(255, 129, 117, 0.4);
+    background: rgba(255, 129, 117, 0.06);
+    opacity: 1;
+  }
+  .suspect-avatar {
+    flex: none;
+    width: 24px;
+    height: 24px;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(255, 201, 107, 0.25);
+    border-radius: 50%;
+    background: rgba(255, 201, 107, 0.07);
+    color: var(--amber);
+    font-size: 6.5px;
+    font-weight: 700;
+  }
+  .suspect-main { min-width: 0; flex: 1; }
+  .suspect-main b {
+    display: block;
+    color: var(--ink);
+    font-size: clamp(7.2px, 1.5cqw, 8.8px);
+    line-height: 1.25;
+  }
+  .suspect-main small {
+    display: block;
+    margin-top: 1px;
+    color: var(--muted);
+    font-size: clamp(5.8px, 1.2cqw, 7px);
+    line-height: 1.25;
+  }
+  .suspect-arrow { flex: none; color: var(--faint); font-size: 11px; }
+  .case-note {
+    margin: 7px 0 0;
+    padding: 7px 8px;
+    border: 1px solid rgba(255, 201, 107, 0.18);
+    border-radius: 6px;
+    background: rgba(255, 201, 107, 0.045);
+    color: rgba(255, 235, 196, 0.75);
+    font-size: clamp(6.2px, 1.3cqw, 7.6px);
+    line-height: 1.5;
+  }
+  .case-note.good {
+    border-color: rgba(112, 231, 200, 0.22);
+    background: rgba(112, 231, 200, 0.05);
+    color: rgba(201, 255, 239, 0.75);
+  }
+  .final-list { display: grid; gap: 4px; margin-top: 4px; }
+  .final-choice {
+    width: 100%;
+    display: flex;
+    align-items: flex-start;
+    gap: 7px;
+    padding: 7px 8px;
+    border: 1px solid rgba(147, 221, 206, 0.14);
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.025);
+    color: rgba(237, 249, 245, 0.82);
+    cursor: pointer;
+    font-size: clamp(6.4px, 1.35cqw, 8px);
+    line-height: 1.4;
+    text-align: left;
+  }
+  .final-choice:hover { border-color: rgba(255, 201, 107, 0.36); background: rgba(255, 201, 107, 0.055); }
+  .final-choice .action-num { margin-top: 1px; }
+  .case-footer {
+    display: flex;
+    gap: 5px;
+    margin-top: 8px;
+  }
+  .case-footer .return-btn { margin-top: 0; }
+
+  /* ---------- overlays ---------- */
+  .overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    display: grid;
+    place-items: center;
+    padding: 16px;
+    background: rgba(3, 9, 11, 0.87);
+    -webkit-backdrop-filter: blur(5px);
+    backdrop-filter: blur(5px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    animation: fade-in 160ms ease-out;
+  }
+  .overlay[hidden] { display: none; }
+  @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+  .panel {
+    width: 100%;
+    max-width: 315px;
+    max-height: 100%;
+    overflow-y: auto;
+    padding: 1px;
+    scrollbar-width: thin;
+  }
+  .intro-panel { text-align: center; }
+  .intro-title {
+    margin: 0;
+    color: var(--ink);
+    font-size: clamp(31px, 8.4cqw, 50px);
+    line-height: 0.92;
+    letter-spacing: -0.075em;
+    text-shadow: 0 0 30px rgba(112, 231, 200, 0.15);
+  }
+  .intro-title span { color: var(--teal); }
+  .intro-lede {
+    margin: 9px auto 0;
+    max-width: 270px;
+    color: rgba(237, 249, 245, 0.65);
+    font-size: clamp(8px, 1.9cqw, 10.5px);
+    line-height: 1.55;
+  }
+  .intro-card {
+    margin: 10px auto 0;
+    padding: 7px 8px;
+    border: 1px solid rgba(255, 201, 107, 0.22);
+    border-radius: 8px;
+    background: rgba(255, 201, 107, 0.045);
+    text-align: left;
+  }
+  .intro-time {
+    display: block;
+    color: var(--amber);
+    font-size: clamp(6px, 1.4cqw, 7.8px);
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+  }
+  .intro-card p {
+    margin: 3px 0 0;
+    color: rgba(255, 240, 209, 0.75);
+    font-size: clamp(7px, 1.55cqw, 9px);
+    line-height: 1.5;
+  }
+  .intro-card b { color: var(--ink); }
+  .how {
+    display: grid;
+    gap: 3px;
+    margin-top: 9px;
+    text-align: left;
+  }
+  .how-item {
+    display: flex;
+    align-items: baseline;
+    gap: 7px;
+    padding: 4px 2px;
+    border-bottom: 1px solid rgba(147, 221, 206, 0.09);
+    color: rgba(237, 249, 245, 0.62);
+    font-size: clamp(7px, 1.55cqw, 9px);
+    line-height: 1.4;
+  }
+  .how-item b {
+    flex: none;
+    color: var(--teal);
+    font-size: clamp(6px, 1.3cqw, 7.5px);
+    letter-spacing: 0.08em;
+  }
+  .btn {
+    margin-top: 12px;
+    padding: 10px 24px;
+    border: 0;
+    border-radius: 999px;
+    cursor: pointer;
+    color: #06211c;
+    background: linear-gradient(180deg, #88f2d6, #46c8a9);
+    box-shadow:
+      0 14px 30px -14px rgba(112, 231, 200, 0.8),
+      inset 0 -2px 0 rgba(0, 0, 0, 0.16);
+    font-size: clamp(8px, 1.8cqw, 10.5px);
+    font-weight: 800;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    transition: transform 100ms ease, filter 150ms ease;
+  }
+  .btn:hover { filter: brightness(1.06); }
+  .btn:active { transform: translateY(1px) scale(0.99); }
+  .intro-foot {
+    margin: 7px 0 0;
+    color: var(--faint);
+    font-size: clamp(5.5px, 1.25cqw, 7px);
+    letter-spacing: 0.08em;
+    line-height: 1.4;
+    text-transform: uppercase;
+  }
+  .intro-phone {
+    display: flex;
+    justify-content: center;
+    gap: 5px;
+    margin: 9px 0 0;
+  }
+  .intro-app {
+    width: 24px;
+    height: 24px;
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    font-size: 7px;
+    font-weight: 700;
+  }
+  .intro-app.text { color: var(--blue); background: rgba(131, 199, 255, 0.07); }
+  .intro-app.email { color: var(--amber); background: rgba(255, 201, 107, 0.07); }
+  .intro-app.loop { color: var(--violet); background: rgba(193, 166, 255, 0.07); }
+
+  .final-panel { text-align: center; max-width: 305px; }
+  .final-title {
+    margin: 0;
+    color: var(--teal);
+    font-size: clamp(25px, 6.5cqw, 38px);
+    line-height: 1;
+    letter-spacing: -0.055em;
+  }
+  .final-title.bad { color: var(--red); }
+  .final-sub {
+    margin: 7px auto 0;
+    max-width: 270px;
+    color: rgba(237, 249, 245, 0.64);
+    font-size: clamp(7.4px, 1.6cqw, 9px);
+    line-height: 1.55;
+  }
+  .final-score {
+    margin: 10px auto 0;
+    padding: 7px 8px 6px;
+    border: 1px solid rgba(112, 231, 200, 0.22);
+    border-radius: 8px;
+    background: rgba(112, 231, 200, 0.045);
+  }
+  .final-score span {
+    display: block;
+    color: var(--muted);
+    font-size: clamp(5.5px, 1.2cqw, 7px);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+  .final-score strong {
+    display: inline-block;
+    margin-top: 2px;
+    color: var(--teal);
+    font-size: clamp(31px, 7.8cqw, 45px);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .final-score em {
+    color: var(--muted);
+    font-size: clamp(7px, 1.55cqw, 9px);
+    font-style: normal;
+    letter-spacing: 0.08em;
+  }
+  .rank {
+    margin-top: 7px;
+  }
+  .rank b {
+    display: block;
+    color: var(--amber);
+    font-size: clamp(8px, 1.8cqw, 10px);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  .rank span {
+    display: block;
+    margin-top: 2px;
+    color: var(--muted);
+    font-size: clamp(6px, 1.3cqw, 7.5px);
+    line-height: 1.4;
+  }
+  .breakdown {
+    margin-top: 9px;
+    padding-top: 6px;
+    border-top: 1px solid var(--line);
+    text-align: left;
+  }
+  .score-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 2px 0;
+    color: var(--muted);
+    font-size: clamp(6.2px, 1.3cqw, 7.6px);
+  }
+  .score-row b {
+    color: rgba(237, 249, 245, 0.82);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .final-evidence {
+    margin: 8px 0 0;
+    padding-top: 6px;
+    border-top: 1px solid rgba(255, 201, 107, 0.13);
+    color: rgba(255, 201, 107, 0.6);
+    font-size: clamp(5.5px, 1.2cqw, 6.8px);
+    letter-spacing: 0.08em;
+    line-height: 1.4;
+    text-transform: uppercase;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
+  @container (max-height: 565px) {
+    .phone-head { padding-top: 6px; padding-bottom: 5px; }
+    .message-card { padding-top: 6px; padding-bottom: 6px; }
+    .how { gap: 1px; }
+    .how-item { padding-top: 3px; padding-bottom: 3px; }
+    .intro-card { margin-top: 7px; }
+    .intro-foot { margin-top: 5px; }
+  }
+</style>
+</head>
+<body>
+  <div id="stage">
+    <div id="app" inert>
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">BP</span>
+          <div>
+            <b>BORROWED PHONE</b>
+            <small>CASE 014 &middot; IRIS CHEN</small>
+          </div>
+        </div>
+        <div class="hud">
+          <div class="stat"><span>CHECKED</span><strong id="progress">0/7</strong></div>
+          <div class="stat"><span>SCORE</span><strong id="score">0000</strong></div>
+        </div>
+      </header>
+
+      <section id="inboxView" class="phone" aria-label="Iris's messages">
+        <div class="statusbar">
+          <span>5:42</span>
+          <span class="right"><span class="signal">▂▄▆</span><span>5G</span><span>78%</span></span>
+        </div>
+        <div class="phone-head">
+          <div class="title-row">
+            <div>
+              <p class="eyebrow">IRIS'S PHONE</p>
+              <h1 class="phone-title">Messages</h1>
+            </div>
+            <span class="unread-pill" id="unreadPill">7 new</span>
+          </div>
+          <p class="phone-sub" id="inboxSub">One transfer is already pending.</p>
+          <div class="filters" role="group" aria-label="Filter messages">
+            <button type="button" class="filter active" data-filter="all" aria-pressed="true">All</button>
+            <button type="button" class="filter" data-filter="text" aria-pressed="false">Texts</button>
+            <button type="button" class="filter" data-filter="email" aria-pressed="false">Email</button>
+            <button type="button" class="filter" data-filter="loop" aria-pressed="false">Loop</button>
+          </div>
+        </div>
+        <div id="inboxList" class="inbox-list" aria-live="polite"></div>
+        <button type="button" id="caseCTA" class="case-cta" hidden>
+          Review the evidence <span aria-hidden="true">&rarr;</span>
+        </button>
+        <footer class="phone-foot">
+          <span>LOCKED &middot; IRIS CHEN</span>
+          <b id="footStatus">7 UNREAD</b>
+        </footer>
+      </section>
+
+      <section id="detailView" class="phone" aria-label="Message detail" hidden>
+        <div class="statusbar">
+          <span>5:42</span>
+          <span class="right"><span class="signal">▂▄▆</span><span>5G</span><span>78%</span></span>
+        </div>
+        <div class="detail-head">
+          <button type="button" id="backBtn" class="back-btn" aria-label="Back to messages">&larr;</button>
+          <div class="detail-title">
+            <span id="detailApp">TEXT</span>
+            <strong id="detailSender">Sender</strong>
+          </div>
+          <span class="detail-time" id="detailTime">5:42 PM</span>
+        </div>
+        <div id="detailScroll" class="detail-scroll">
+          <div class="subject-row">
+            <h2 class="detail-subject" id="detailSubject">Message</h2>
+            <span class="detail-tag" id="detailTag">SMS</span>
+          </div>
+          <div id="bodyLines" class="message-body"></div>
+          <div id="signalStrip" class="signal-strip">
+            <b aria-hidden="true">!</b>
+            <span>Tap any line that is a warning sign. Odd wording alone is not proof.</span>
+          </div>
+          <div id="reasonBar" class="reason-bar">
+            <div class="reason-top">
+              <span id="reasonState">No lines flagged yet.</span>
+              <button type="button" id="clearBtn" class="text-btn" hidden>clear</button>
+            </div>
+            <button type="button" id="cleanBtn" class="clean-btn" aria-pressed="false">No warning signs here</button>
+            <p id="flagHint" class="flag-hint">Read the request, not just the tone.</p>
+          </div>
+          <div id="actionsWrap" class="actions-wrap">
+            <p class="actions-label">Choose one response</p>
+            <div id="actionList" class="action-list"></div>
+          </div>
+          <div id="resultWrap" class="result-wrap" aria-live="polite" hidden></div>
+        </div>
+      </section>
+
+      <section id="caseView" class="phone" aria-label="Case evidence" hidden>
+        <div class="statusbar">
+          <span>5:58</span>
+          <span class="right"><span class="signal">▂▄▆</span><span>5G</span><span>78%</span></span>
+        </div>
+        <div class="detail-head">
+          <button type="button" id="caseBack" class="back-btn" aria-label="Back to messages">&larr;</button>
+          <div class="detail-title">
+            <span>CASE FILE</span>
+            <strong>The thread</strong>
+          </div>
+          <span class="detail-time">2 MIN LEFT</span>
+        </div>
+        <div id="caseScroll" class="case-scroll"></div>
+      </section>
+    </div>
+
+    <div id="intro" class="overlay" role="dialog" aria-modal="true" aria-labelledby="introTitle">
+      <div class="panel intro-panel">
+        <p class="eyebrow">A MESSAGE MYSTERY</p>
+        <h1 class="intro-title" id="introTitle">Borrowed<br><span>Phone</span></h1>
+        <p class="intro-lede">Iris left her phone on the counter before her lab. It has not stopped buzzing since.</p>
+        <div class="intro-card">
+          <span class="intro-time">5:42 PM &middot; transfer at 6:00</span>
+          <p>A buyer, a bank alert, payroll, and people she actually knows. One thread is trying to take <b>$480</b>.</p>
+        </div>
+        <div class="how">
+          <div class="how-item"><b>01</b><span>Read each text, email, and marketplace offer.</span></div>
+          <div class="how-item"><b>02</b><span>Tap the lines that are real warning signs.</span></div>
+          <div class="how-item"><b>03</b><span>Verify through a separate, trusted channel.</span></div>
+        </div>
+        <div class="intro-phone" aria-hidden="true">
+          <span class="intro-app text">TXT</span>
+          <span class="intro-app email">EML</span>
+          <span class="intro-app loop">LOP</span>
+        </div>
+        <button type="button" id="startBtn" class="btn">Unlock the phone</button>
+        <p class="intro-foot">No timer &middot; seven messages &middot; some are genuine</p>
+      </div>
+    </div>
+
+    <div id="final" class="overlay" role="dialog" aria-modal="true" aria-labelledby="finalTitle" hidden>
+      <div class="panel final-panel">
+        <p class="eyebrow" id="finalEyebrow">CASE CLOSED</p>
+        <h2 class="final-title" id="finalTitle">Line held.</h2>
+        <p class="final-sub" id="finalSub"></p>
+        <div class="final-score">
+          <span>FINAL SCORE</span>
+          <strong id="finalScore">0000</strong><em>/ 1000</em>
+        </div>
+        <div class="rank">
+          <b id="finalRank">Clean line</b>
+          <span id="finalRankNote"></span>
+        </div>
+        <div class="breakdown" id="finalBreakdown"></div>
+        <p class="final-evidence" id="finalEvidence"></p>
+        <button type="button" id="playAgain" class="btn">Play again</button>
+      </div>
+    </div>
+  </div>
+  <p class="hint">read the messages &middot; flag the signs &middot; verify independently</p>
+
+<script>
+(() => {
+  'use strict';
+
+  const MAX_SCORE = 1000;
+  const GENUINE_POINTS = 30;
+  const FLAG_POINTS = 20;
+  const WRONG_LINE_POINTS = 10;
+  const SAFE_POINTS = 70;
+
+  const APP = {
+    text: { label: 'TEXT', short: 'T', tag: 'SMS' },
+    email: { label: 'EMAIL', short: 'E', tag: 'EMAIL' },
+    loop: { label: 'LOOP MARKET', short: 'L', tag: 'MARKETPLACE' },
+  };
+
+  const messages = [
+    {
+      id: 'miles',
+      app: 'loop',
+      sender: 'Miles R. \u00b7 @milesmoves',
+      time: '5:21 PM',
+      subject: 'Re: City bike \u2014 $480',
+      preview: "I'll send $540 to cover the mover's fee.",
+      body: [
+        { text: "Hey! I'll take the bike at your asking price. Can my mover pick it up tonight?" },
+        {
+          text: "I'm out of town, so I'll send $540 to cover the mover's fee.",
+          flag: 'Overpayment before the item changes hands is a setup for a refund request.',
+        },
+        {
+          text: "Just refund the extra $60 to my mover's Vell tag: @milesmoves.",
+          flag: 'The refund goes to a different person and app than the payment.',
+        },
+        {
+          text: "Skip the Loop checkout \u2014 it holds funds for 3 days and I need it today.",
+          flag: 'Moving the deal off-platform removes the marketplace protection.',
+        },
+        { text: "Text me at 555-0176 once it's sent." },
+      ],
+      actions: [
+        {
+          text: 'Send the $60 refund to @milesmoves',
+          kind: 'risky',
+          points: 0,
+          result: "The $540 never clears. You have sent $60 of Iris's rent to a stranger, and Miles stops replying.",
+        },
+        {
+          text: 'Ask for a screenshot of the $540 payment',
+          kind: 'weak',
+          points: 10,
+          result: 'A screenshot proves nothing. The money is not in Iris\u2019s account, and the overpayment was never real.',
+        },
+        {
+          text: 'Keep the sale inside Loop and arrange cash at pickup',
+          kind: 'safe',
+          points: SAFE_POINTS,
+          result: 'You refuse to refund money that has not arrived and keep the transaction inside the platform. Miles goes quiet.',
+        },
+      ],
+      genuine: false,
+      genuineNotes: [],
+    },
+    {
+      id: 'bank',
+      app: 'text',
+      sender: 'NORTHSTAR BANK \u00b7 555-0176',
+      time: '5:26 PM',
+      subject: 'Fraud alert: $480 pending',
+      preview: 'Reply NO in the next 10 minutes.',
+      body: [
+        { text: 'NORTHSTAR FRAUD ALERT' },
+        { text: 'A $480.00 transfer to MILES ROWE is pending. It will clear at 6:00 PM.' },
+        {
+          text: 'Reply NO in the next 10 minutes or we cannot stop it.',
+          flag: 'A ten-minute reply demand is pressure, not proof of a real alert.',
+        },
+        {
+          text: 'Or call our fraud desk at 555-0176.',
+          flag: 'The call-back number comes from the message \u2014 and it is also Miles\u2019s number.',
+        },
+        {
+          text: 'Do not open the app while the transfer is locked.',
+          flag: 'A real fraud team does not stop you from checking your own banking app.',
+        },
+      ],
+      actions: [
+        {
+          text: 'Reply NO to the alert',
+          kind: 'risky',
+          points: 0,
+          result: 'Your reply confirms a live number. The \u201cbank\u201d never needed a yes or no; the $480 transfer still clears.',
+        },
+        {
+          text: 'Call the fraud desk at 555-0176',
+          kind: 'risky',
+          points: 0,
+          result: '555-0176 is Miles\u2019s number, not Northstar. The person who answers keeps you talking while the transfer clears.',
+        },
+        {
+          text: 'Open Northstar\u2019s app; if the alert is not there, call the number on Iris\u2019s debit card',
+          kind: 'safe',
+          points: SAFE_POINTS,
+          result: 'The app shows no alert from Northstar. The number on the debit card reaches the real fraud team, which freezes the pending transfer.',
+        },
+      ],
+      genuine: false,
+      genuineNotes: [],
+    },
+    {
+      id: 'fake-payroll',
+      app: 'email',
+      sender: 'Northgate Payroll <payroll@northgate-secure.co>',
+      time: '5:31 PM',
+      subject: 'ACTION REQUIRED: Direct deposit failed \u2014 17 min',
+      preview: 'Re-enter your routing and account numbers.',
+      body: [
+        {
+          text: 'From: Northgate Payroll <payroll@northgate-secure.co>',
+          meta: true,
+          flag: 'A lookalike domain, not the university\u2019s northgate.edu address.',
+        },
+        { text: 'Hi Iris,' },
+        {
+          text: 'Your $480 rent transfer was declined because your direct-deposit profile is outdated.',
+          flag: 'Payroll does not process rent transfers. The message invents a connection that feels personal.',
+        },
+        {
+          text: 'Re-enter your routing and account numbers here: northgate-secure.co/deposit',
+          flag: 'An unsolicited link asking for full banking credentials.',
+        },
+        { text: 'Accounts not verified by 6:00 PM will be frozen.' },
+        { text: '\u2014 M. Rowe, Payroll Support' },
+      ],
+      actions: [
+        {
+          text: 'Open the link and update the account',
+          kind: 'risky',
+          points: 0,
+          result: 'The link opens a convincing copy of the payroll portal. The banking details go to the attacker, along with any chance of stopping the change.',
+        },
+        {
+          text: 'Reply with the routing and account numbers',
+          kind: 'risky',
+          points: 0,
+          result: 'Payroll never needs your full account number by email. You have handed over exactly what the fake page wanted.',
+        },
+        {
+          text: 'Open the payroll portal from Iris\u2019s bookmark, then call the office number published there',
+          kind: 'safe',
+          points: SAFE_POINTS,
+          result: 'The real portal shows a direct-deposit change to a prepaid card, not a failed rent payment. Payroll flags the change and closes the phishing email.',
+        },
+      ],
+      genuine: false,
+      genuineNotes: [],
+    },
+    {
+      id: 'real-payroll',
+      app: 'email',
+      sender: 'Northgate University Payroll',
+      time: '5:29 PM',
+      subject: 'Direct deposit change confirmation',
+      preview: 'A change was requested for the next pay period.',
+      body: [
+        {
+          text: 'From: Northgate University Payroll <payroll@northgate.edu>',
+          meta: true,
+          note: 'A real university address, no attachment, and no payment link.',
+        },
+        { text: 'Hi Iris,' },
+        {
+          text: 'We received a request to change your direct deposit to a prepaid account ending 8841. It takes effect next pay period.',
+          note: 'Alarming, but it reports a change instead of demanding credentials or secrecy.',
+        },
+        {
+          text: 'If you did not make this change, call the payroll office at 555-0140 \u2014 the number printed on your pay stub. Do not reply with banking details by email.',
+          note: 'This is a verification instruction: use a number you already have, not a link from the message.',
+        },
+        { text: '118 Hale Hall \u00b7 Monday\u2013Friday, 8\u20135' },
+      ],
+      actions: [
+        {
+          text: 'Call 555-0140 from the pay stub and ask payroll to freeze the change',
+          kind: 'safe',
+          points: SAFE_POINTS,
+          result: 'Payroll confirms the request came from an unknown IP address. The prepaid account is removed and the change is frozen.',
+        },
+        {
+          text: 'Reply with the old account number to prove it was not you',
+          kind: 'risky',
+          points: 0,
+          result: 'The message warned you not to send banking details by email. The reply gives the attacker another account to target.',
+        },
+        {
+          text: 'Delete the email because you did not request a change',
+          kind: 'weak',
+          points: 10,
+          result: 'Deleting the warning does not undo the change. The prepaid account stays scheduled for the next pay period.',
+        },
+      ],
+      genuine: true,
+      genuineNotes: [
+        'It reports a specific, checkable change rather than asking for a password or a payment.',
+        'It gives a published phone number and explicitly says not to send banking details by email.',
+        'The northgate.edu domain fits, but the correct move is still to verify through the pay stub.',
+      ],
+    },
+    {
+      id: 'dara',
+      app: 'text',
+      sender: 'Dara Okafor \u00b7 landlord',
+      time: '5:34 PM',
+      subject: 'Rent / basement',
+      preview: 'I reversed the duplicate. Do not send anything else.',
+      body: [
+        {
+          text: 'Iris \u2014 I see two rent transfers, $900 and $900. I reversed the duplicate, so your ledger should show one payment.',
+          note: 'About money, but it reports a correction and asks for nothing.',
+        },
+        {
+          text: "Don't send anything else. The plumber is coming for 2B tomorrow.",
+          note: 'A request to stop, not a request to pay.',
+        },
+        {
+          text: 'Also, your bike is still chained in the basement. I moved it away from the boiler.',
+          note: 'Unrelated, specific, and calm.',
+        },
+      ],
+      actions: [
+        {
+          text: 'Open the bank app and confirm one payment and one reversal',
+          kind: 'safe',
+          points: SAFE_POINTS,
+          result: 'The ledger matches Dara\u2019s message: one rent payment and one reversal. You do not send anything else.',
+        },
+        {
+          text: 'Send another $900 in case the rent is short',
+          kind: 'risky',
+          points: 0,
+          result: 'There was no shortfall. You have sent $900 of Iris\u2019s money to a landlord who already reversed the duplicate.',
+        },
+        {
+          text: 'Reply asking Dara for her bank login so you can check',
+          kind: 'risky',
+          points: 0,
+          result: 'Dara never asked for a login. You have handed credentials to a saved contact whose account may be fine \u2014 but that step is never safe.',
+        },
+      ],
+      genuine: true,
+      genuineNotes: [
+        'The message reports a duplicate charge and a reversal; it never asks for a new payment.',
+        'It contains no link, credential request, secrecy, or artificial deadline.',
+        'The odd details \u2014 the basement bike, the plumber \u2014 are specific and ordinary for a landlord.',
+      ],
+    },
+    {
+      id: 'vale',
+      app: 'email',
+      sender: 'Dr. Aris Vale',
+      time: '5:37 PM',
+      subject: 'Found your folder / Thursday',
+      preview: 'Your rent envelope is in my locked drawer.',
+      body: [
+        {
+          text: 'From: Aris Vale <a.vale@northgate.edu>',
+          meta: true,
+          note: 'A real course address, no attachment, and no link.',
+        },
+        {
+          text: 'Iris \u2014 your rent envelope was under the seminar room door. I put it in the locked drawer in my office. I did not count it.',
+          note: 'Unusual to mention cash, but it reports a found item and asks for nothing.',
+        },
+        {
+          text: 'The draft is due Thursday, not Friday; I moved the deadline after the power outage.',
+          note: 'A deadline, but it can be checked on the course page.',
+        },
+        { text: 'Aris' },
+      ],
+      actions: [
+        {
+          text: 'Check the course page, then collect the envelope in person',
+          kind: 'safe',
+          points: SAFE_POINTS,
+          result: 'The course page confirms Thursday. The envelope is sealed in Dr. Vale\u2019s drawer, and you arrange to pick it up in person.',
+        },
+        {
+          text: 'Venmo Dr. Vale the cash for safekeeping',
+          kind: 'risky',
+          points: 0,
+          result: 'There was no request to send money. You have invented one and paid a tab nobody asked you to cover.',
+        },
+        {
+          text: 'Delete it \u2014 professors do not mention cash',
+          kind: 'weak',
+          points: 10,
+          result: 'Odd is not the same as fraudulent. You miss the deadline change and leave Iris\u2019s rent envelope sitting in an office.',
+        },
+      ],
+      genuine: true,
+      genuineNotes: [
+        'No money is requested \u2014 the message reports where Iris\u2019s own envelope was found.',
+        'The deadline can be checked independently on the course page.',
+        'The sender uses a university address and does not ask for credentials or a reply link.',
+      ],
+    },
+    {
+      id: 'tessa',
+      app: 'loop',
+      sender: 'Tessa M. \u00b7 @tessa.m',
+      time: '5:40 PM',
+      subject: 'Re: City bike \u2014 $480',
+      preview: 'I can pay asking price in cash on Saturday.',
+      body: [
+        { text: 'Hi! Is the bike still available? I can pay your asking price in cash and pick it up Saturday morning.' },
+        {
+          text: 'I\u2019m 5\u20326\u2033 \u2014 would the frame fit? Happy to meet at the co-op if that\u2019s easier.',
+          note: 'A normal fitting question. No payment request, no urgency, no link.',
+        },
+        {
+          text: 'No rush if someone else got there first. \u2014 Tessa',
+          note: 'No pressure, no personal information request.',
+        },
+      ],
+      actions: [
+        {
+          text: 'Reply in Loop and arrange a public pickup; cash in person',
+          kind: 'safe',
+          points: SAFE_POINTS,
+          result: 'Tessa agrees to meet at the bike co-op on Saturday. Payment stays in person and inside the marketplace conversation.',
+        },
+        {
+          text: 'Send your address and bank details to hold the bike',
+          kind: 'risky',
+          points: 0,
+          result: 'You have sent personal and banking details to an unverified buyer before any sale was agreed.',
+        },
+        {
+          text: 'Block her for asking about the frame',
+          kind: 'weak',
+          points: 10,
+          result: 'Nothing suspicious happened. You ended a normal sale because a buyer asked a normal question.',
+        },
+      ],
+      genuine: true,
+      genuineNotes: [
+        'The offer matches the asking price and uses cash at a public pickup.',
+        'She asks normal practical questions and gives no deadline or payment link.',
+        'A legitimate marketplace message can look ordinary \u2014 that is the point.',
+      ],
+    },
+  ];
+
+  const suspects = [
+    { id: 'miles', initials: 'MR', name: 'Miles R.', detail: 'Loop buyer \u00b7 555-0176' },
+    { id: 'dara', initials: 'DO', name: 'Dara Okafor', detail: 'Landlord \u00b7 saved contact' },
+    { id: 'vale', initials: 'AV', name: 'Dr. Aris Vale', detail: 'Seminar professor' },
+  ];
+
+  const finalActions = [
+    {
+      id: 'call',
+      text: 'Call the fraud desk at 555-0176 and authorize the freeze',
+      points: 0,
+      outcome: 'The number belongs to Miles. He keeps you on the line until 6:00, then the $480 clears.',
+    },
+    {
+      id: 'verify',
+      text: 'Call the number on Iris\u2019s debit card, then call payroll at 555-0140',
+      points: 110,
+      outcome: 'Northstar stops the transfer and payroll removes the prepaid account. Miles\u2019s number goes dead.',
+    },
+    {
+      id: 'reply',
+      text: 'Reply NO to the alert and watch the app for confirmation',
+      points: 20,
+      outcome: 'A reply cannot cancel a transfer. The \u201cbank\u201d is not Northstar, and at 6:00 the $480 clears.',
+    },
+  ];
+
+  const state = {
+    checked: 0,
+    score: 0,
+    reasoning: 0,
+    verification: 0,
+    deduction: 0,
+    containment: 0,
+    currentId: null,
+    filter: 'all',
+    suspect: null,
+    finalAction: null,
+    msg: makeMessageState(),
+  };
+
+  const els = {
+    app: document.getElementById('app'),
+    stage: document.getElementById('stage'),
+    progress: document.getElementById('progress'),
+    score: document.getElementById('score'),
+    unreadPill: document.getElementById('unreadPill'),
+    inboxSub: document.getElementById('inboxSub'),
+    inboxList: document.getElementById('inboxList'),
+    footStatus: document.getElementById('footStatus'),
+    caseCTA: document.getElementById('caseCTA'),
+    inboxView: document.getElementById('inboxView'),
+    detailView: document.getElementById('detailView'),
+    caseView: document.getElementById('caseView'),
+    detailApp: document.getElementById('detailApp'),
+    detailSender: document.getElementById('detailSender'),
+    detailTime: document.getElementById('detailTime'),
+    detailSubject: document.getElementById('detailSubject'),
+    detailTag: document.getElementById('detailTag'),
+    detailScroll: document.getElementById('detailScroll'),
+    bodyLines: document.getElementById('bodyLines'),
+    reasonBar: document.getElementById('reasonBar'),
+    signalStrip: document.getElementById('signalStrip'),
+    reasonState: document.getElementById('reasonState'),
+    clearBtn: document.getElementById('clearBtn'),
+    cleanBtn: document.getElementById('cleanBtn'),
+    flagHint: document.getElementById('flagHint'),
+    actionsWrap: document.getElementById('actionsWrap'),
+    actionList: document.getElementById('actionList'),
+    resultWrap: document.getElementById('resultWrap'),
+    backBtn: document.getElementById('backBtn'),
+    caseBack: document.getElementById('caseBack'),
+    caseScroll: document.getElementById('caseScroll'),
+    intro: document.getElementById('intro'),
+    startBtn: document.getElementById('startBtn'),
+    final: document.getElementById('final'),
+    finalEyebrow: document.getElementById('finalEyebrow'),
+    finalTitle: document.getElementById('finalTitle'),
+    finalSub: document.getElementById('finalSub'),
+    finalScore: document.getElementById('finalScore'),
+    finalRank: document.getElementById('finalRank'),
+    finalRankNote: document.getElementById('finalRankNote'),
+    finalBreakdown: document.getElementById('finalBreakdown'),
+    finalEvidence: document.getElementById('finalEvidence'),
+    playAgain: document.getElementById('playAgain'),
+  };
+
+  const esc = (value) => String(value).replace(/[&<>"']/g, (ch) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  }[ch]));
+
+  const pad = (value) => String(value).padStart(4, '0');
+
+  function makeMessageState() {
+    return Object.fromEntries(messages.map((message) => [
+      message.id,
+      { selected: new Set(), clean: false, done: false, result: null },
+    ]));
+  }
+
+  let lastScore = -1;
+
+  function renderHUD() {
+    els.progress.textContent = `${state.checked}/${messages.length}`;
+    els.score.textContent = pad(state.score);
+    els.score.setAttribute('aria-label', `${state.score} out of ${MAX_SCORE} points`);
+    if (lastScore >= 0 && state.score !== lastScore) {
+      els.score.classList.remove('flash');
+      void els.score.offsetWidth;
+      els.score.classList.add('flash');
+    }
+    lastScore = state.score;
+  }
+
+  function currentMessage() {
+    return messages.find((message) => message.id === state.currentId) || null;
+  }
+
+  function renderInbox() {
+    const unread = messages.filter((message) => !state.msg[message.id].done).length;
+    const allDone = unread === 0;
+    els.unreadPill.textContent = allDone ? 'all checked' : `${unread} new`;
+    els.footStatus.textContent = allDone ? 'ALL CHECKED' : `${unread} UNREAD`;
+    els.inboxSub.textContent = allDone
+      ? 'All seven checked. Connect the evidence.'
+      : state.checked === 0
+        ? 'One transfer is already pending.'
+        : `${unread} message${unread === 1 ? '' : 's'} left before 6:00.`;
+
+    const shown = state.filter === 'all'
+      ? messages
+      : messages.filter((message) => message.app === state.filter);
+
+    if (!shown.length) {
+      els.inboxList.innerHTML = '<p class="empty-list">No messages in this lane.<br>Try another filter.</p>';
+    } else {
+      els.inboxList.innerHTML = shown.map((message) => {
+        const ms = state.msg[message.id];
+        const app = APP[message.app];
+        const classes = [
+          'message-card',
+          ms.done ? 'done' : 'unread',
+        ].join(' ');
+        return `
+          <button type="button" class="${classes}" data-id="${message.id}" aria-label="Open ${esc(app.label)} message from ${esc(message.sender)}${ms.done ? ', checked' : ', unread'}">
+            <span class="app-icon ${message.app}" aria-hidden="true">${app.short}</span>
+            <span class="card-main">
+              <span class="card-top">
+                <span class="card-sender">${esc(message.sender)}</span>
+                <span class="card-time">${esc(message.time)}</span>
+              </span>
+              <span class="card-subject">${esc(message.subject)}</span>
+              <span class="card-preview">${esc(message.preview)}</span>
+            </span>
+            <span class="card-state" aria-hidden="true">${ms.done ? '\u2713' : ''}</span>
+          </button>
+        `;
+      }).join('');
+    }
+
+    els.caseCTA.hidden = state.checked < messages.length;
+    els.caseCTA.setAttribute('aria-label', 'Review the evidence and name the person behind the scam');
+  }
+
+  function syncFilters() {
+    document.querySelectorAll('.filter').forEach((button) => {
+      const active = button.dataset.filter === state.filter;
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-pressed', String(active));
+    });
+  }
+
+  function showView(name) {
+    els.inboxView.hidden = name !== 'inbox';
+    els.detailView.hidden = name !== 'detail';
+    els.caseView.hidden = name !== 'case';
+    state.view = name;
+  }
+
+  function openMessage(id) {
+    const message = messages.find((entry) => entry.id === id);
+    if (!message) return;
+    state.currentId = id;
+    showView('detail');
+    renderDetail();
+    els.detailScroll.scrollTop = state.msg[id].done ? els.detailScroll.scrollHeight : 0;
+    els.backBtn.focus({ preventScroll: true });
+  }
+
+  function lineButtonHTML(line, index, ms, done) {
+    const classes = [
+      'body-line',
+      line.meta ? 'meta' : '',
+      ms.selected.has(index) ? 'selected' : '',
+    ].filter(Boolean).join(' ');
+    return `
+      <button type="button" class="${classes}" data-line="${index}" aria-pressed="${ms.selected.has(index)}" ${done ? 'disabled' : ''}>
+        ${esc(line.text)}
+      </button>
+    `;
+  }
+
+  function actionButtonHTML(action, index, disabled) {
+    return `
+      <button type="button" class="action" data-action="${index}" ${disabled ? 'disabled' : ''}>
+        <span class="action-num" aria-hidden="true">${index + 1}</span>
+        <span>${esc(action.text)}</span>
+      </button>
+    `;
+  }
+
+  function renderDetail() {
+    const message = currentMessage();
+    if (!message) return;
+    const ms = state.msg[message.id];
+    const app = APP[message.app];
+
+    els.detailApp.textContent = app.label;
+    els.detailSender.textContent = message.sender;
+    els.detailTime.textContent = message.time;
+    els.detailSubject.textContent = message.subject;
+    els.detailTag.textContent = ms.done ? `${app.tag} \u00b7 CHECKED` : app.tag;
+
+    els.bodyLines.innerHTML = message.body
+      .map((line, index) => lineButtonHTML(line, index, ms, ms.done))
+      .join('');
+
+    els.signalStrip.hidden = ms.done;
+    els.reasonBar.hidden = ms.done;
+    els.actionsWrap.hidden = ms.done;
+    els.resultWrap.hidden = !ms.done;
+
+    if (ms.done) {
+      els.resultWrap.innerHTML = buildResult(message, ms);
+      return;
+    }
+
+    els.actionList.innerHTML = message.actions
+      .map((action, index) => actionButtonHTML(action, index, !ms.clean && ms.selected.size === 0))
+      .join('');
+
+    els.flagHint.className = 'flag-hint';
+    els.flagHint.textContent = 'Read the request, not just the tone.';
+    syncReasonUI();
+  }
+
+  function buildResult(message, ms) {
+    const result = ms.result;
+    const action = message.actions[result.actionIndex];
+    const tone = action.kind === 'safe' ? 'good' : action.kind;
+    const heading = action.kind === 'safe'
+      ? 'Verified, not guessed.'
+      : action.kind === 'risky'
+        ? 'That was the opening.'
+        : 'The message sits there.';
+    const eyebrow = action.kind === 'safe' ? 'MESSAGE LOGGED' : 'MESSAGE EXPOSED YOU';
+    const tells = message.genuine
+      ? message.genuineNotes.map((note) => `<li>${esc(note)}</li>`).join('')
+      : message.body
+        .filter((line) => line.flag)
+        .map((line) => `<li>${esc(line.flag)}</li>`)
+        .join('');
+
+    const cleanNote = ms.clean
+      ? message.genuine
+        ? 'You marked it clean. Nothing here asks for money, credentials, secrecy, or a rushed decision.'
+        : 'You marked a scam clean. It made a direct financial request and gave you a way to comply.'
+      : '';
+
+    return `
+      <div class="verdict ${tone}">
+        <p class="eyebrow">${eyebrow}</p>
+        <h3>${heading}</h3>
+        <div class="point-row">
+          <span class="point-chip">Reasoning +${result.reasoning}</span>
+          <span class="point-chip">Verification +${result.verification}</span>
+        </div>
+        <p class="action-chosen"><b>Your move:</b> ${esc(action.text)}</p>
+        <p class="verdict-copy">${esc(action.result)}</p>
+        ${cleanNote ? `<p class="verify-note">${esc(cleanNote)}</p>` : ''}
+        ${action.kind === 'safe' ? '<p class="verify-note">Independent verification \u2014 checked through a channel that did not come from the message.</p>' : ''}
+        <div class="tells">
+          <p class="tells-label">${message.genuine ? 'WHY IT PASSES' : 'THE TELLS'}</p>
+          <ul>${tells}</ul>
+        </div>
+        <button type="button" id="resultBack" class="return-btn">Back to messages</button>
+      </div>
+    `;
+  }
+
+  function syncReasonUI() {
+    const message = currentMessage();
+    if (!message) return;
+    const ms = state.msg[message.id];
+    const count = ms.selected.size;
+
+    if (ms.clean) {
+      els.reasonState.textContent = 'Marked clean \u00b7 no warning signs.';
+    } else if (count > 0) {
+      els.reasonState.innerHTML = `<span class="count">${count}</span> line${count === 1 ? '' : 's'} flagged.`;
+    } else {
+      els.reasonState.textContent = 'No lines flagged yet.';
+    }
+
+    els.clearBtn.hidden = !ms.clean && count === 0;
+    els.cleanBtn.classList.toggle('active', ms.clean);
+    els.cleanBtn.setAttribute('aria-pressed', String(ms.clean));
+    els.cleanBtn.textContent = ms.clean ? 'Marked clean \u2713' : 'No warning signs here';
+
+    els.bodyLines.querySelectorAll('.body-line').forEach((button) => {
+      const index = Number(button.dataset.line);
+      button.classList.toggle('selected', ms.selected.has(index));
+      button.setAttribute('aria-pressed', String(ms.selected.has(index)));
+    });
+
+    const blocked = !ms.clean && count === 0;
+    els.actionList.querySelectorAll('.action').forEach((button) => {
+      button.disabled = blocked;
+    });
+  }
+
+  function clickLine(index) {
+    const message = currentMessage();
+    if (!message) return;
+    const ms = state.msg[message.id];
+    if (ms.done || index < 0 || index >= message.body.length) return;
+
+    if (ms.clean) ms.clean = false;
+    if (ms.selected.has(index)) ms.selected.delete(index);
+    else ms.selected.add(index);
+
+    const line = message.body[index];
+    if (line.flag) {
+      els.flagHint.className = 'flag-hint good';
+      els.flagHint.textContent = `Flagged: ${line.flag}`;
+    } else {
+      els.flagHint.className = 'flag-hint odd';
+      els.flagHint.textContent = line.note || 'Odd, perhaps \u2014 but no money, credentials, secrecy, or pressure here.';
+    }
+
+    syncReasonUI();
+  }
+
+  function toggleClean() {
+    const message = currentMessage();
+    if (!message) return;
+    const ms = state.msg[message.id];
+    if (ms.done) return;
+
+    ms.clean = !ms.clean;
+    if (ms.clean) ms.selected.clear();
+    els.flagHint.className = 'flag-hint';
+    els.flagHint.textContent = ms.clean
+      ? 'Marked clean. If anything asks for money, access, or urgency, read it again.'
+      : 'Read the request, not just the tone.';
+    syncReasonUI();
+  }
+
+  function clearFlags() {
+    const message = currentMessage();
+    if (!message) return;
+    const ms = state.msg[message.id];
+    if (ms.done) return;
+    ms.clean = false;
+    ms.selected.clear();
+    els.flagHint.className = 'flag-hint';
+    els.flagHint.textContent = 'Read the request, not just the tone.';
+    syncReasonUI();
+  }
+
+  function chooseAction(index) {
+    const message = currentMessage();
+    if (!message) return;
+    const ms = state.msg[message.id];
+    if (ms.done) return;
+    if (!ms.clean && ms.selected.size === 0) return;
+
+    const action = message.actions[index];
+    if (!action) return;
+
+    let reasoning = 0;
+    if (message.genuine) {
+      reasoning = ms.clean ? GENUINE_POINTS : Math.max(0, -WRONG_LINE_POINTS * ms.selected.size);
+    } else if (!ms.clean) {
+      reasoning = 0;
+      ms.selected.forEach((lineIndex) => {
+        reasoning += message.body[lineIndex].flag ? FLAG_POINTS : -WRONG_LINE_POINTS;
+      });
+      reasoning = Math.max(0, reasoning);
+    }
+
+    const verification = action.points;
+    state.reasoning += reasoning;
+    state.verification += verification;
+    state.score += reasoning + verification;
+    state.checked += 1;
+
+    ms.done = true;
+    ms.result = {
+      reasoning,
+      verification,
+      actionIndex: index,
+      actionKind: action.kind,
+      selected: [...ms.selected],
+      clean: ms.clean,
+    };
+
+    renderHUD();
+    renderDetail();
+    els.detailScroll.scrollTop = els.detailScroll.scrollHeight;
+  }
+
+  function returnToInbox() {
+    state.currentId = null;
+    showView('inbox');
+    renderInbox();
+    syncFilters();
+    const target = els.inboxList.querySelector('.message-card.unread') || els.inboxList.querySelector('.message-card');
+    if (target) target.focus({ preventScroll: true });
+  }
+
+  function renderCase() {
+    const answered = Boolean(state.suspect);
+    const culpritCorrect = state.suspect === 'miles';
+    const finalChosen = Boolean(state.finalAction);
+
+    const suspectButtons = suspects.map((suspect) => {
+      const classes = ['suspect'];
+      if (answered) classes.push('locked');
+      if (state.suspect === suspect.id) classes.push(suspect.id === 'miles' ? 'right' : 'wrong');
+      return `
+        <button type="button" class="${classes.join(' ')}" data-suspect="${suspect.id}" ${answered ? 'disabled' : ''}>
+          <span class="suspect-avatar" aria-hidden="true">${suspect.initials}</span>
+          <span class="suspect-main"><b>${esc(suspect.name)}</b><small>${esc(suspect.detail)}</small></span>
+          <span class="suspect-arrow" aria-hidden="true">${answered ? (suspect.id === 'miles' ? '\u2713' : '') : '\u2192'}</span>
+        </button>
+      `;
+    }).join('');
+
+    const finalButtons = finalActions.map((action, index) => `
+      <button type="button" class="final-choice" data-final="${action.id}" ${finalChosen ? 'disabled' : ''}>
+        <span class="action-num" aria-hidden="true">${index + 1}</span>
+        <span>${esc(action.text)}</span>
+      </button>
+    `).join('');
+
+    els.caseScroll.innerHTML = `
+      <p class="case-kicker">CASE 014 \u00b7 5:58 PM</p>
+      <h2 class="case-title">Who is pulling<br>the strings?</h2>
+      <p class="case-lede">A buyer, a \u201cbank,\u201d and a payroll email. The seven messages share more than one detail.</p>
+      <div class="evidence">
+        <div class="evidence-chip"><b>$480</b>the bike\u2019s asking price</div>
+        <div class="evidence-chip"><b>555-0176</b>Miles\u2019s text line</div>
+        <div class="evidence-chip"><b>555-0176</b>the \u201cbank\u201d alert sender</div>
+        <div class="evidence-chip"><b>M. Rowe</b>the fake payroll signature</div>
+      </div>
+      <p class="case-label">Name the person behind it</p>
+      <div class="suspect-list">${suspectButtons}</div>
+      ${answered ? `
+        <p class="case-note ${culpritCorrect ? 'good' : ''}">
+          ${culpritCorrect
+            ? 'Miles\u2019s number is in the marketplace thread and on the fake bank text. The fake payroll email signs off as M. Rowe, and $480 is the bike price. The same person built all three messages.'
+            : 'The tell is the shared number: Miles R. uses 555-0176 in the listing, and the \u201cbank\u201d alert comes from 555-0176. The fake payroll email signs \u201cM. Rowe.\u201d Dara and Dr. Vale never ask you to move money.'
+          }
+        </p>
+        <p class="case-label">It is 5:59. What do you do?</p>
+        <div class="final-list">${finalButtons}</div>
+      ` : ''}
+      <div class="case-footer">
+        <button type="button" id="caseBackBottom" class="return-btn">Back to messages</button>
+      </div>
+    `;
+  }
+
+  function openCase() {
+    if (state.checked < messages.length) return;
+    state.currentId = null;
+    showView('case');
+    renderCase();
+    els.caseScroll.scrollTop = 0;
+    const firstSuspect = els.caseScroll.querySelector('[data-suspect]:not(:disabled)');
+    if (firstSuspect) firstSuspect.focus({ preventScroll: true });
+    else els.caseBack.focus({ preventScroll: true });
+  }
+
+  function chooseSuspect(id) {
+    if (state.suspect) return;
+    if (!suspects.some((suspect) => suspect.id === id)) return;
+    state.suspect = id;
+    state.deduction = id === 'miles' ? 100 : 0;
+    state.score += state.deduction;
+    renderHUD();
+    renderCase();
+    const move = els.caseScroll.querySelector('[data-final]');
+    if (move) move.focus({ preventScroll: true });
+  }
+
+  function rankFor(score) {
+    if (score >= MAX_SCORE) {
+      return ['Clean line', 'Perfect verification. Nothing got through.'];
+    }
+    if (score >= 850) {
+      return ['Sharp eye', 'You separated pressure from proof.'];
+    }
+    if (score >= 650) {
+      return ['Careful enough', 'A few tells slipped, but the damage was limited.'];
+    }
+    if (score >= 400) {
+      return ['Lucky exit', 'You caught enough of the pattern to avoid the worst.'];
+    }
+    return ['Hooked', 'The messages did their job. Read the requests, not the polish.'];
+  }
+
+  function chooseFinal(id) {
+    if (state.finalAction) return;
+    const action = finalActions.find((entry) => entry.id === id);
+    if (!action) return;
+    state.finalAction = id;
+    state.containment = action.points;
+    state.score += action.points;
+    renderHUD();
+    showFinal(action);
+  }
+
+  function showFinal(action) {
+    const success = state.finalAction === 'verify';
+    const rank = rankFor(state.score);
+    const culpritCorrect = state.suspect === 'miles';
+
+    els.finalEyebrow.textContent = success ? 'CASE CLOSED \u00b7 5:59 PM' : 'CASE LOST \u00b7 6:00 PM';
+    els.finalTitle.textContent = success ? 'Line held.' : 'Transfer cleared.';
+    els.finalTitle.classList.toggle('bad', !success);
+    els.finalSub.textContent = success
+      ? 'Northstar stops the $480 transfer. Payroll freezes the prepaid-card change. Miles\u2019s number goes dead.'
+      : action.outcome;
+
+    if (!culpritCorrect) {
+      els.finalSub.textContent += ' You also named the wrong person; the shared number points to Miles.';
+    }
+
+    els.finalScore.textContent = pad(state.score);
+    els.finalRank.textContent = rank[0];
+    els.finalRankNote.textContent = rank[1];
+    els.finalBreakdown.innerHTML = `
+      <div class="score-row"><span>Reasoning \u00b7 flags and clean calls</span><b>${state.reasoning} / 300</b></div>
+      <div class="score-row"><span>Verification \u00b7 seven responses</span><b>${state.verification} / 490</b></div>
+      <div class="score-row"><span>Case read \u00b7 culprit</span><b>${state.deduction} / 100</b></div>
+      <div class="score-row"><span>Final move \u00b7 containment</span><b>${state.containment} / 110</b></div>
+    `;
+    els.finalEvidence.textContent = '$480 \u00b7 555-0176 \u00b7 M. Rowe \u00b7 prepaid 8841';
+
+    els.final.hidden = false;
+    els.app.inert = true;
+    els.playAgain.focus({ preventScroll: true });
+  }
+
+  function resetGame() {
+    state.checked = 0;
+    state.score = 0;
+    state.reasoning = 0;
+    state.verification = 0;
+    state.deduction = 0;
+    state.containment = 0;
+    state.currentId = null;
+    state.filter = 'all';
+    state.suspect = null;
+    state.finalAction = null;
+    state.msg = makeMessageState();
+    lastScore = -1;
+
+    renderHUD();
+    renderInbox();
+    syncFilters();
+    showView('inbox');
+    els.final.hidden = true;
+    els.finalTitle.classList.remove('bad');
+    els.app.inert = true;
+    els.intro.hidden = false;
+    els.startBtn.focus({ preventScroll: true });
+  }
+
+  function startGame() {
+    els.intro.hidden = true;
+    els.app.inert = false;
+    showView('inbox');
+    renderInbox();
+    const first = els.inboxList.querySelector('.message-card');
+    if (first) first.focus({ preventScroll: true });
+  }
+
+  /* ---------- events ---------- */
+
+  els.startBtn.addEventListener('click', startGame);
+  els.playAgain.addEventListener('click', resetGame);
+  els.backBtn.addEventListener('click', returnToInbox);
+  els.caseBack.addEventListener('click', returnToInbox);
+  els.caseCTA.addEventListener('click', openCase);
+  els.cleanBtn.addEventListener('click', toggleClean);
+  els.clearBtn.addEventListener('click', clearFlags);
+
+  els.inboxList.addEventListener('click', (event) => {
+    const card = event.target.closest('.message-card');
+    if (card) openMessage(card.dataset.id);
+  });
+
+  document.querySelectorAll('.filter').forEach((button) => {
+    button.addEventListener('click', () => {
+      state.filter = button.dataset.filter;
+      syncFilters();
+      renderInbox();
+      const first = els.inboxList.querySelector('.message-card');
+      if (first) first.focus({ preventScroll: true });
+    });
+  });
+
+  els.bodyLines.addEventListener('click', (event) => {
+    const line = event.target.closest('.body-line');
+    if (line) clickLine(Number(line.dataset.line));
+  });
+
+  els.actionList.addEventListener('click', (event) => {
+    const button = event.target.closest('.action');
+    if (button) chooseAction(Number(button.dataset.action));
+  });
+
+  els.resultWrap.addEventListener('click', (event) => {
+    if (event.target.closest('#resultBack')) returnToInbox();
+  });
+
+  els.caseScroll.addEventListener('click', (event) => {
+    const suspect = event.target.closest('[data-suspect]');
+    if (suspect) {
+      chooseSuspect(suspect.dataset.suspect);
+      return;
+    }
+    const final = event.target.closest('[data-final]');
+    if (final) {
+      chooseFinal(final.dataset.final);
+      return;
+    }
+    if (event.target.closest('#caseBackBottom')) returnToInbox();
+  });
+
+  renderHUD();
+  renderInbox();
+  syncFilters();
+  showView('inbox');
+  els.startBtn.focus({ preventScroll: true });
+})();
+
+</script>
+</body>
+</html>

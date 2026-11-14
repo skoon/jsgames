@@ -1,0 +1,1938 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#081012">
+<title>Shift Balance</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --ink: #f3f8f2;
+    --muted: rgba(226, 240, 232, 0.48);
+    --faint: rgba(226, 240, 232, 0.24);
+    --teal: #6ee7cf;
+    --amber: #ffc86b;
+    --blue: #8ac8ff;
+    --pink: #ffa6c1;
+    --red: #ff8275;
+    --line: rgba(143, 220, 205, 0.16);
+    --panel: rgba(8, 19, 21, 0.94);
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    background:
+      radial-gradient(110% 82% at 50% 0%, #26392f 0%, #0b1415 55%, #05090a 100%);
+    color: var(--ink);
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    -webkit-user-select: none;
+    user-select: none;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+  #stage {
+    position: relative;
+    width: min(100%, 520px, calc((100dvh - 48px) * 0.75));
+    aspect-ratio: 3 / 4;
+    border-radius: 20px;
+    overflow: hidden;
+    background:
+      radial-gradient(115% 80% at 50% -10%, rgba(65, 96, 78, 0.26), transparent 55%),
+      #081012;
+    box-shadow:
+      0 30px 70px -28px rgba(0, 0, 0, 0.95),
+      0 0 0 1px rgba(255, 255, 255, 0.07),
+      inset 0 0 0 1px rgba(110, 231, 207, 0.07);
+    container-type: size;
+  }
+  .hint {
+    margin: 0;
+    font-size: clamp(6.5px, 1.8vw, 8px);
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    color: rgba(240, 247, 239, 0.27);
+    white-space: nowrap;
+  }
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  .game {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px 12px 9px;
+  }
+
+  /* ---------- HUD ---------- */
+  .hud {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 6px 9px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background:
+      linear-gradient(180deg, rgba(21, 37, 36, 0.95), rgba(7, 16, 18, 0.88));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045);
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+  }
+  .brand-mark {
+    width: 22px;
+    height: 22px;
+    flex: none;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(255, 200, 107, 0.5);
+    border-radius: 5px;
+    background: rgba(255, 200, 107, 0.08);
+    color: var(--amber);
+    font-size: 12px;
+    line-height: 1;
+  }
+  .brand b {
+    display: block;
+    font-size: 11.5px;
+    line-height: 1.02;
+    letter-spacing: 0.13em;
+  }
+  .brand small {
+    display: block;
+    margin-top: 2px;
+    font-size: 5.8px;
+    letter-spacing: 0.14em;
+    color: var(--muted);
+  }
+  .stats {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: none;
+  }
+  .stat { text-align: right; }
+  .stat span {
+    display: block;
+    color: var(--muted);
+    font-size: 5.8px;
+    letter-spacing: 0.13em;
+  }
+  .stat strong {
+    display: block;
+    margin-top: 1px;
+    color: var(--teal);
+    font-size: 14px;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .stat:nth-child(2) strong { color: var(--amber); }
+  .stat:last-child strong { color: rgba(240, 247, 239, 0.62); }
+  .stat strong.flash { animation: score-flash 320ms ease-out; }
+  @keyframes score-flash {
+    0% { color: #ffffff; text-shadow: 0 0 18px rgba(110, 231, 207, 0.9); }
+    100% { color: inherit; text-shadow: none; }
+  }
+
+  .weekstrip {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+    padding: 0 3px;
+    color: var(--muted);
+    font-size: 6.5px;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  #weekTag { color: var(--amber); font-weight: 700; }
+  #workTag { color: var(--blue); }
+  #schoolTag {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .dot {
+    width: 3px;
+    height: 3px;
+    flex: none;
+    border-radius: 50%;
+    background: rgba(255, 200, 107, 0.42);
+  }
+  #modeTag {
+    margin-left: auto;
+    color: rgba(224, 240, 232, 0.25);
+    font-size: 5.8px;
+  }
+
+  /* ---------- week brief ---------- */
+  .brief {
+    position: relative;
+    flex: 0 0 auto;
+    padding: 8px 10px 8px 12px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 200, 107, 0.16);
+    border-radius: 12px;
+    background:
+      repeating-linear-gradient(0deg, transparent 0 18px, rgba(255, 255, 255, 0.018) 18px 19px),
+      linear-gradient(180deg, rgba(29, 40, 31, 0.95), rgba(14, 24, 21, 0.95));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045);
+  }
+  .brief::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    border-radius: 0 2px 2px 0;
+    background: linear-gradient(180deg, var(--amber), rgba(255, 200, 107, 0.14));
+  }
+  .brief-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 2px;
+  }
+  .brief-eyebrow {
+    margin: 0;
+    color: var(--amber);
+    font-size: 6px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+  }
+  .pay-badge {
+    flex: none;
+    padding: 2px 5px;
+    border: 1px solid rgba(110, 231, 207, 0.24);
+    border-radius: 4px;
+    background: rgba(110, 231, 207, 0.07);
+    color: var(--teal);
+    font-size: 6.5px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    white-space: nowrap;
+  }
+  .brief h1 {
+    margin: 0;
+    color: var(--ink);
+    font-size: 14px;
+    line-height: 1.12;
+    letter-spacing: 0.01em;
+  }
+  .brief-copy {
+    margin: 3px 0 0;
+    color: rgba(226, 240, 232, 0.56);
+    font-size: 7.5px;
+    line-height: 1.42;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .schedule {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 5px;
+  }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 5px;
+    border: 1px solid rgba(255, 255, 255, 0.065);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.025);
+    color: rgba(226, 240, 232, 0.48);
+    font-size: 5.9px;
+    letter-spacing: 0.035em;
+    white-space: nowrap;
+  }
+  .chip b { color: rgba(226, 240, 232, 0.78); font-weight: 700; }
+  .chip.carry { border-color: rgba(255, 200, 107, 0.2); color: var(--amber); }
+
+  /* ---------- wallet ---------- */
+  .wallet-panel {
+    flex: 0 0 auto;
+    padding: 6px 8px 5px;
+    border: 1px solid rgba(255, 200, 107, 0.18);
+    border-radius: 11px;
+    background:
+      linear-gradient(180deg, rgba(45, 39, 22, 0.6), rgba(18, 24, 19, 0.86));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+    transition: border-color 120ms ease, background 120ms ease;
+  }
+  .wallet-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 0 2px 2px;
+  }
+  .wallet-head .label {
+    display: block;
+    color: var(--muted);
+    font-size: 5.8px;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+  }
+  .wallet-head strong {
+    display: inline-block;
+    margin-top: 1px;
+    color: var(--amber);
+    font-size: 11px;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .wallet-head .pay-from {
+    margin-left: 4px;
+    color: rgba(226, 240, 232, 0.32);
+    font-size: 5.8px;
+    letter-spacing: 0.02em;
+  }
+  .wallet-side {
+    text-align: right;
+    font-size: 5.8px;
+    letter-spacing: 0.07em;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .wallet-side b {
+    display: inline-block;
+    margin-left: 3px;
+    color: var(--teal);
+    font-size: 9px;
+    font-variant-numeric: tabular-nums;
+  }
+  .wallet-side b.warn { color: var(--red); }
+  .wallet {
+    min-height: 29px;
+    max-height: 58px;
+    display: flex;
+    flex-wrap: wrap;
+    align-content: flex-start;
+    gap: 4px;
+    padding: 3px;
+    overflow-y: auto;
+    border: 1px dashed transparent;
+    border-radius: 7px;
+    scrollbar-width: thin;
+  }
+  .wallet.drop-ready {
+    border-color: rgba(110, 231, 207, 0.55);
+    background: rgba(110, 231, 207, 0.07);
+    box-shadow: inset 0 0 14px rgba(110, 231, 207, 0.08);
+  }
+  .empty-drop {
+    align-self: center;
+    width: 100%;
+    padding: 4px 2px;
+    color: rgba(226, 240, 232, 0.23);
+    font-size: 6pt;
+    letter-spacing: 0.06em;
+    text-align: center;
+  }
+
+  /* ---------- money bills ---------- */
+  .bill {
+    position: relative;
+    width: 42px;
+    height: 25px;
+    flex: none;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border: 1px solid rgba(255, 200, 107, 0.43);
+    border-radius: 4px;
+    background:
+      linear-gradient(135deg, rgba(255, 200, 107, 0.14), rgba(255, 200, 107, 0.045)),
+      repeating-linear-gradient(90deg, transparent 0 9px, rgba(255, 200, 107, 0.05) 9px 10px);
+    box-shadow: 0 2px 0 rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+    color: #ffde9d;
+    font: inherit;
+    font-size: 7.5px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    font-variant-numeric: tabular-nums;
+    cursor: grab;
+    touch-action: none;
+    transition: transform 100ms ease, border-color 100ms ease, box-shadow 100ms ease;
+  }
+  .bill::before {
+    content: "";
+    position: absolute;
+    inset: 2px;
+    border: 1px solid rgba(255, 200, 107, 0.14);
+    border-radius: 2px;
+    pointer-events: none;
+  }
+  .bill:hover {
+    border-color: rgba(255, 200, 107, 0.8);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 9px -4px rgba(255, 200, 107, 0.45);
+  }
+  .bill:focus-visible {
+    outline: 2px solid var(--teal);
+    outline-offset: 2px;
+  }
+  .bill.selected {
+    border-color: var(--teal);
+    background:
+      linear-gradient(135deg, rgba(110, 231, 207, 0.16), rgba(110, 231, 207, 0.04)),
+      repeating-linear-gradient(90deg, transparent 0 9px, rgba(110, 231, 207, 0.06) 9px 10px);
+    color: #c7fff2;
+    box-shadow: 0 0 0 2px rgba(110, 231, 207, 0.16), 0 4px 10px -5px rgba(110, 231, 207, 0.6);
+    transform: translateY(-2px);
+  }
+  .bill.dragging-source { opacity: 0.25; }
+  .bill.in-cat {
+    width: 34px;
+    height: 20px;
+    font-size: 6.5px;
+    border-color: rgba(var(--cat-rgb), 0.36);
+    background: rgba(var(--cat-rgb), 0.08);
+    color: var(--cat);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  }
+  .bill.in-cat::before { border-color: rgba(var(--cat-rgb), 0.11); }
+  .bill.in-cat:hover { border-color: rgba(var(--cat-rgb), 0.72); box-shadow: none; }
+  .drag-ghost {
+    position: fixed;
+    z-index: 50;
+    width: 42px;
+    height: 25px;
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--teal);
+    border-radius: 4px;
+    background: #16312c;
+    color: #d1fff5;
+    font: inherit;
+    font-size: 7.5px;
+    font-weight: 700;
+    pointer-events: none;
+    box-shadow: 0 10px 24px -8px rgba(0, 0, 0, 0.9), 0 0 0 2px rgba(110, 231, 207, 0.15);
+    transform: translate(-50%, -50%) rotate(-4deg);
+  }
+
+  /* ---------- budget board ---------- */
+  .budget {
+    flex: 1 1 0;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 6px;
+  }
+  .category {
+    --cat: var(--amber);
+    --cat-rgb: 255, 200, 107;
+    position: relative;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 6px 7px 5px;
+    overflow: hidden;
+    border: 1px solid rgba(var(--cat-rgb), 0.2);
+    border-radius: 10px;
+    background:
+      linear-gradient(180deg, rgba(var(--cat-rgb), 0.052), rgba(7, 16, 18, 0.82));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+    transition: border-color 110ms ease, background 110ms ease, box-shadow 110ms ease;
+  }
+  .category.school { --cat: var(--blue); --cat-rgb: 138, 200, 255; }
+  .category.savings { --cat: var(--teal); --cat-rgb: 110, 231, 207; }
+  .category.extras { --cat: var(--pink); --cat-rgb: 255, 166, 193; }
+  .category.drop-ready,
+  .category.can-place:hover {
+    border-color: rgba(var(--cat-rgb), 0.7);
+    background:
+      linear-gradient(180deg, rgba(var(--cat-rgb), 0.12), rgba(7, 16, 18, 0.82));
+    box-shadow: 0 0 0 1px rgba(var(--cat-rgb), 0.14), inset 0 0 20px rgba(var(--cat-rgb), 0.055);
+  }
+  .cat-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 5px;
+    min-width: 0;
+  }
+  .cat-icon {
+    width: 19px;
+    height: 19px;
+    flex: none;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(var(--cat-rgb), 0.3);
+    border-radius: 5px;
+    background: rgba(var(--cat-rgb), 0.08);
+    color: var(--cat);
+    font-size: 9px;
+    line-height: 1;
+  }
+  .cat-name { min-width: 0; flex: 1; }
+  .cat-name h2 {
+    margin: 0;
+    font-size: 9px;
+    line-height: 1.1;
+    letter-spacing: 0.02em;
+    color: var(--ink);
+  }
+  .cat-name p {
+    margin: 1px 0 0;
+    overflow: hidden;
+    color: var(--muted);
+    font-size: 5.6px;
+    line-height: 1.25;
+    letter-spacing: 0.01em;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .cat-tag {
+    flex: none;
+    padding: 2px 4px;
+    border: 1px solid rgba(var(--cat-rgb), 0.28);
+    border-radius: 3px;
+    background: rgba(var(--cat-rgb), 0.06);
+    color: var(--cat);
+    font-size: 5.2px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    white-space: nowrap;
+  }
+  .cat-numbers {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 5px;
+    margin-top: 5px;
+    color: var(--muted);
+    font-size: 5.8px;
+    line-height: 1.1;
+    white-space: nowrap;
+  }
+  .cat-numbers b {
+    color: rgba(240, 247, 239, 0.82);
+    font-size: 7.5px;
+    font-variant-numeric: tabular-nums;
+  }
+  .cat-numbers .short { color: var(--red); }
+  .cat-numbers .ok { color: var(--teal); }
+  .bar {
+    height: 3px;
+    margin-top: 3px;
+    overflow: hidden;
+    border-radius: 99px;
+    background: rgba(255, 255, 255, 0.075);
+  }
+  .bar span {
+    display: block;
+    width: 0;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--cat);
+    box-shadow: 0 0 7px rgba(var(--cat-rgb), 0.42);
+    transition: width 180ms ease;
+  }
+  .cat-note {
+    margin-top: 3px;
+    min-height: 9px;
+    color: rgba(var(--cat-rgb), 0.72);
+    font-size: 5.5px;
+    line-height: 1.3;
+    letter-spacing: 0.01em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .cat-tokens {
+    min-height: 22px;
+    max-height: 43px;
+    margin-top: auto;
+    padding: 3px 2px 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-content: flex-start;
+    gap: 3px;
+    overflow-y: auto;
+    border-top: 1px dashed rgba(var(--cat-rgb), 0.13);
+    scrollbar-width: thin;
+  }
+  .cat-empty {
+    align-self: center;
+    width: 100%;
+    padding: 2px 0;
+    color: rgba(var(--cat-rgb), 0.3);
+    font-size: 5.4px;
+    letter-spacing: 0.05em;
+    text-align: center;
+  }
+  .place-btn {
+    position: absolute;
+    right: 5px;
+    bottom: 4px;
+    z-index: 2;
+    padding: 2px 5px;
+    border: 1px solid rgba(var(--cat-rgb), 0.55);
+    border-radius: 4px;
+    background: rgba(7, 16, 18, 0.94);
+    color: var(--cat);
+    font: inherit;
+    font-size: 5.5px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.48);
+  }
+  .place-btn:hover { background: rgba(var(--cat-rgb), 0.14); }
+  .place-btn:focus-visible { outline: 2px solid var(--cat); outline-offset: 1px; }
+  .category.essentials .cat-tag,
+  .category.school .cat-tag { color: rgba(255, 244, 218, 0.72); }
+
+  /* ---------- footer ---------- */
+  .actionbar {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-height: 28px;
+  }
+  .notice {
+    min-width: 0;
+    flex: 1;
+    color: rgba(226, 240, 232, 0.36);
+    font-size: 5.9px;
+    line-height: 1.35;
+    letter-spacing: 0.015em;
+  }
+  .notice.warn { color: #ffb2a8; }
+  .notice.good { color: rgba(110, 231, 207, 0.74); }
+  .actions { display: flex; align-items: center; gap: 5px; flex: none; }
+  .ghost-btn {
+    padding: 6px 7px;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--muted);
+    font: inherit;
+    font-size: 6px;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+  .ghost-btn:hover:not(:disabled) { color: var(--ink); border-color: rgba(255, 255, 255, 0.2); }
+  .ghost-btn:disabled { opacity: 0.3; cursor: default; }
+  .ghost-btn:focus-visible, .finish-btn:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+  .finish-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 7px 10px;
+    border: 0;
+    border-radius: 7px;
+    background: linear-gradient(180deg, #7ff0d4, #46c8a9);
+    box-shadow: 0 7px 18px -9px rgba(94, 231, 199, 0.9), inset 0 -2px 0 rgba(0, 0, 0, 0.16);
+    color: #06211c;
+    font: inherit;
+    font-size: 6.5px;
+    font-weight: 700;
+    letter-spacing: 0.075em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .finish-btn:hover { filter: brightness(1.06); }
+  .finish-btn:active { transform: translateY(1px); }
+
+  /* ---------- overlays ---------- */
+  .overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 8;
+    display: grid;
+    place-items: center;
+    padding: 16px;
+    background: rgba(3, 8, 9, 0.88);
+    -webkit-backdrop-filter: blur(5px);
+    backdrop-filter: blur(5px);
+    animation: fade-in 160ms ease-out;
+  }
+  .overlay[hidden] { display: none; }
+  @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+  .panel {
+    width: 100%;
+    max-width: 375px;
+    max-height: 100%;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 17px 16px 15px;
+    border: 1px solid rgba(143, 220, 205, 0.17);
+    border-radius: 14px;
+    background:
+      linear-gradient(180deg, rgba(20, 38, 37, 0.995), rgba(6, 15, 17, 0.995));
+    box-shadow:
+      0 24px 60px -25px rgba(0, 0, 0, 0.95),
+      inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    text-align: center;
+    scrollbar-width: thin;
+  }
+  .eyebrow {
+    margin: 0 0 5px;
+    color: var(--amber);
+    font-size: 6.5px;
+    letter-spacing: 0.21em;
+    text-transform: uppercase;
+  }
+  .title {
+    margin: 0 0 8px;
+    color: var(--ink);
+    font-size: clamp(25px, 6.8vw, 34px);
+    line-height: 1.02;
+    letter-spacing: 0.01em;
+    text-shadow: 0 0 30px rgba(110, 231, 207, 0.13);
+  }
+  .title .accent { color: var(--teal); }
+  .title .slash { color: rgba(255, 200, 107, 0.55); font-weight: 400; }
+  .lead {
+    margin: 0;
+    color: rgba(226, 240, 232, 0.6);
+    font-size: 8.5px;
+    line-height: 1.5;
+    letter-spacing: 0.005em;
+  }
+  .lead b { color: rgba(255, 200, 107, 0.9); font-weight: 700; }
+  .rules {
+    display: grid;
+    gap: 4px;
+    margin: 10px 0 0;
+    text-align: left;
+  }
+  .rule {
+    position: relative;
+    padding-left: 12px;
+    color: rgba(226, 240, 232, 0.56);
+    font-size: 7.2px;
+    line-height: 1.4;
+  }
+  .rule::before {
+    content: "▸";
+    position: absolute;
+    left: 1px;
+    color: var(--amber);
+  }
+  .rule b { color: rgba(240, 247, 239, 0.86); font-weight: 700; }
+  .score-rules {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+    margin-top: 10px;
+  }
+  .score-rule {
+    padding: 6px 3px 5px;
+    border: 1px solid rgba(255, 255, 255, 0.065);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.025);
+  }
+  .score-rule span {
+    display: block;
+    color: var(--muted);
+    font-size: 5.2px;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+  }
+  .score-rule strong {
+    display: block;
+    margin-top: 2px;
+    color: var(--teal);
+    font-size: 9px;
+    line-height: 1.15;
+    font-variant-numeric: tabular-nums;
+  }
+  .score-rule:nth-child(2) strong { color: var(--amber); }
+  .score-rule:nth-child(3) strong { color: var(--blue); }
+  .btn {
+    margin-top: 13px;
+    padding: 10px 22px;
+    border: 0;
+    border-radius: 999px;
+    background: linear-gradient(180deg, #7ff0d4, #46c8a9);
+    box-shadow:
+      0 14px 30px -14px rgba(94, 231, 199, 0.9),
+      inset 0 -2px 0 rgba(0, 0, 0, 0.16);
+    color: #06211c;
+    font: inherit;
+    font-size: 8.5px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+  .btn:hover { filter: brightness(1.06); }
+  .btn:active { transform: translateY(1px) scale(0.99); }
+  .btn:focus-visible { outline: 2px solid #c9fff3; outline-offset: 3px; }
+  .fine {
+    margin: 7px 0 0;
+    color: rgba(226, 240, 232, 0.27);
+    font-size: 5.8px;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+  }
+  .event-title {
+    margin: 0 0 6px;
+    font-size: 19px;
+    line-height: 1.08;
+    color: var(--ink);
+  }
+  .event-title em { color: var(--red); font-style: normal; }
+  .event-copy { margin: 0; color: rgba(226, 240, 232, 0.58); font-size: 8px; line-height: 1.5; }
+  .expense-figure {
+    margin: 10px 0 0;
+    padding: 8px;
+    border: 1px solid rgba(255, 130, 117, 0.25);
+    border-radius: 8px;
+    background: rgba(255, 130, 117, 0.055);
+  }
+  .expense-figure span {
+    display: block;
+    color: rgba(255, 180, 172, 0.65);
+    font-size: 5.5px;
+    letter-spacing: 0.15em;
+  }
+  .expense-figure strong {
+    display: block;
+    color: #ffaca3;
+    font-size: 24px;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+  }
+  .source-list {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+    margin-top: 7px;
+  }
+  .source {
+    padding: 5px 2px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 5px;
+    background: rgba(255, 255, 255, 0.02);
+  }
+  .source span { display: block; color: var(--muted); font-size: 5.1px; letter-spacing: 0.07em; text-transform: uppercase; }
+  .source strong { display: block; margin-top: 2px; color: var(--ink); font-size: 9px; }
+  .source.hit strong { color: var(--teal); }
+  .source.zero strong { color: rgba(226, 240, 232, 0.28); }
+  .source.raid strong { color: var(--red); }
+  .event-read {
+    margin: 8px 0 0;
+    padding: 6px 7px;
+    border-left: 2px solid rgba(110, 231, 207, 0.5);
+    border-radius: 0 5px 5px 0;
+    background: rgba(110, 231, 207, 0.04);
+    color: rgba(226, 240, 232, 0.52);
+    font-size: 6.8px;
+    line-height: 1.4;
+    text-align: left;
+  }
+  .event-read.warn {
+    border-left-color: rgba(255, 130, 117, 0.65);
+    background: rgba(255, 130, 117, 0.055);
+    color: rgba(255, 207, 202, 0.72);
+  }
+  .event-gain {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    margin-top: 7px;
+    color: var(--teal);
+    font-size: 6.2px;
+    letter-spacing: 0.05em;
+  }
+  .event-gain b { font-size: 9px; }
+  .week-preview {
+    margin-top: 9px;
+    padding-top: 7px;
+    border-top: 1px dashed rgba(255, 255, 255, 0.08);
+    color: var(--muted);
+    font-size: 6px;
+    line-height: 1.4;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+  .week-preview b { color: var(--amber); font-weight: 700; }
+  .rank {
+    margin: 8px 0 0;
+    color: var(--amber);
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+  }
+  .final-score {
+    margin: 8px 0 0;
+    padding: 8px;
+    border: 1px solid rgba(110, 231, 207, 0.16);
+    border-radius: 9px;
+    background: rgba(110, 231, 207, 0.045);
+  }
+  .final-score span {
+    display: block;
+    color: var(--muted);
+    font-size: 5.5px;
+    letter-spacing: 0.17em;
+  }
+  .final-score strong {
+    display: block;
+    margin-top: 1px;
+    color: var(--teal);
+    font-size: 32px;
+    line-height: 1;
+    letter-spacing: 0.02em;
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 26px rgba(110, 231, 207, 0.25);
+  }
+  .final-score small {
+    display: block;
+    margin-top: 4px;
+    color: var(--muted);
+    font-size: 5.8px;
+    letter-spacing: 0.08em;
+  }
+  .report-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+    margin-top: 7px;
+  }
+  .report-stat {
+    padding: 5px 3px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.02);
+  }
+  .report-stat span { display: block; color: var(--muted); font-size: 5.1px; letter-spacing: 0.06em; text-transform: uppercase; }
+  .report-stat strong { display: block; margin-top: 2px; color: var(--ink); font-size: 10px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .report-stat:nth-child(2) strong { color: var(--teal); }
+  .report-stat:nth-child(3) strong { color: var(--amber); }
+  .breakdown {
+    display: grid;
+    gap: 3px;
+    margin-top: 7px;
+    padding: 6px 7px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.018);
+  }
+  .break-line {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 6px;
+    color: rgba(226, 240, 232, 0.5);
+    font-size: 6.1px;
+    line-height: 1.4;
+  }
+  .break-line b { color: var(--ink); font-weight: 700; font-variant-numeric: tabular-nums; }
+  .outro {
+    margin: 8px 0 0;
+    color: rgba(226, 240, 232, 0.55);
+    font-size: 6.9px;
+    line-height: 1.45;
+    text-align: left;
+  }
+  [hidden] { display: none !important; }
+
+  /* ---------- compact stages ---------- */
+  @container (max-height: 570px) {
+    .game { gap: 4px; padding: 7px 9px; }
+    .hud { padding: 4px 7px; }
+    .brand small { display: none; }
+    .brief { padding: 6px 8px 6px 10px; }
+    .brief-copy { -webkit-line-clamp: 1; font-size: 7px; }
+    .brief h1 { font-size: 12.5px; }
+    .schedule { margin-top: 4px; }
+    .chip { padding: 1px 4px; }
+    .wallet-panel { padding: 4px 6px 3px; }
+    .wallet { max-height: 50px; }
+    .budget { gap: 4px; }
+    .category { padding: 5px 6px 4px; }
+    .cat-name p { display: none; }
+    .cat-tokens { max-height: 38px; }
+    .actionbar { min-height: 25px; }
+    .overlay { padding: 10px; }
+    .panel { padding: 13px 13px 11px; }
+  }
+  @container (max-height: 495px) {
+    .brief-copy { display: none; }
+    .brief h1 { font-size: 11.5px; }
+    .schedule { margin-top: 3px; }
+    .chip { font-size: 5.4px; }
+    .wallet-head .pay-from { display: none; }
+    .cat-note { display: none; }
+    .cat-head { gap: 4px; }
+    .cat-icon { width: 16px; height: 16px; font-size: 8px; }
+    .cat-name h2 { font-size: 8px; }
+    .cat-numbers { margin-top: 3px; }
+    .cat-tokens { max-height: 32px; }
+    .actionbar { min-height: 23px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.001ms !important;
+      transition-duration: 0.001ms !important;
+    }
+  }
+</style>
+</head>
+<body>
+<p class="hint">Drag the money &middot; cover the week &middot; keep a cushion</p>
+<main id="stage">
+  <div class="game" id="game">
+    <header class="hud">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">$</div>
+        <div>
+          <b>SHIFT<br>BALANCE</b>
+          <small>PART-TIME / FULL-TIME LIFE</small>
+        </div>
+      </div>
+      <div class="stats" aria-label="Game status">
+        <div class="stat"><span>WEEK</span><strong id="hudWeek">1/4</strong></div>
+        <div class="stat"><span>SAVINGS</span><strong id="hudSavings">$0</strong></div>
+        <div class="stat"><span>SCORE</span><strong id="hudScore">000</strong></div>
+      </div>
+    </header>
+
+    <div class="weekstrip">
+      <span id="weekTag">WEEK 01</span>
+      <span class="dot" aria-hidden="true"></span>
+      <span id="workTag">12 HRS</span>
+      <span class="dot" aria-hidden="true"></span>
+      <span id="schoolTag">CHEM QUIZ FRIDAY</span>
+      <span id="modeTag">PLANNING</span>
+    </div>
+
+    <section class="brief" aria-labelledby="briefTitle">
+      <div class="brief-top">
+        <p class="brief-eyebrow" id="briefEyebrow">FIRST SHIFT</p>
+        <span class="pay-badge" id="payBadge">$160 TAKE-HOME</span>
+      </div>
+      <h1 id="briefTitle">First shift, first budget.</h1>
+      <p class="brief-copy" id="briefCopy">Two weeks of after-school shifts just landed. The phone bill, bus fare, and Friday's chem quiz are all due.</p>
+      <div class="schedule" id="schedule"></div>
+    </section>
+
+    <section class="wallet-panel" aria-label="Available cash">
+      <div class="wallet-head">
+        <div>
+          <span class="label">AVAILABLE CASH</span>
+          <strong id="walletTotal">$160</strong>
+          <span class="pay-from" id="payFrom">+ $0 carried in</span>
+        </div>
+        <div class="wallet-side">UNASSIGNED <b id="cashCushion">$160</b></div>
+      </div>
+      <div class="wallet" id="wallet" data-drop="wallet" role="group" aria-label="Unassigned cash cushion"></div>
+    </section>
+
+    <section class="budget" id="budget" aria-label="Budget categories"></section>
+
+    <footer class="actionbar">
+      <div class="notice" id="notice" role="status" aria-live="polite">Drag bills into an envelope. Click a bill first if you prefer to tap.</div>
+      <div class="actions">
+        <button class="ghost-btn" id="resetBtn" type="button">Reset</button>
+        <button class="finish-btn" id="finishBtn" type="button">Finish week <span aria-hidden="true">→</span></button>
+      </div>
+    </footer>
+  </div>
+
+  <div class="overlay" id="overlay" role="dialog" aria-modal="true" aria-labelledby="ovTitle" hidden>
+    <div class="panel" id="panel"></div>
+  </div>
+</main>
+<script>
+'use strict';
+
+const GOAL = 100;
+const MAX_SCORE = 500;
+
+const WEEKS = [
+  {
+    n: 1,
+    kicker: 'FIRST SHIFT',
+    title: 'First shift, first budget.',
+    copy: "Two weeks of after-school shifts at Wheelhouse Bikes just landed. Your phone share, bus fare, and Friday's chem quiz are all due.",
+    hours: 12,
+    pay: 160,
+    school: 'Chem quiz Friday',
+    essentialsDue: 75,
+    schoolDue: 20,
+    extras: 'Late-night noodles with the crew',
+    event: {
+      title: 'Cable frayed',
+      amount: 15,
+      copy: "Your charging cable frays down to the wire the night before an online quiz. A replacement costs $15."
+    }
+  },
+  {
+    n: 2,
+    kicker: 'MIDTERM SQUEEZE',
+    title: 'Midterms cut the hours.',
+    copy: 'Exams cut your shifts to 8 hours. The rent share at home and the print-shop fee still arrive on schedule.',
+    hours: 8,
+    pay: 110,
+    school: 'Midterms Tue–Thu',
+    essentialsDue: 65,
+    schoolDue: 25,
+    extras: 'A movie night after midterms',
+    event: {
+      title: 'Printer panic',
+      amount: 15,
+      copy: "The school printer jams, and the only open print shop charges $15 to save your history essay."
+    }
+  },
+  {
+    n: 3,
+    kicker: 'SPRING BREAK',
+    title: 'More shifts, bigger share.',
+    copy: 'Spring break means picking up extra shifts—and a bigger grocery share while everyone is home.',
+    hours: 16,
+    pay: 200,
+    school: 'College essay draft',
+    essentialsDue: 85,
+    schoolDue: 25,
+    extras: 'Concert ticket with friends',
+    event: {
+      title: 'Flat tire',
+      amount: 25,
+      copy: 'A jagged bottle cap shreds your bike tube on the ride home. Repair kit and bus fare come to $25.'
+    }
+  },
+  {
+    n: 4,
+    kicker: 'FINALS WEEK',
+    title: 'Finals week, thinner schedule.',
+    copy: 'Finals week and a thinner schedule. The last paycheck is smaller, but your savings goal is finally in sight.',
+    hours: 10,
+    pay: 130,
+    school: 'Two finals this week',
+    essentialsDue: 80,
+    schoolDue: 25,
+    extras: 'Celebration takeout with friends',
+    event: {
+      title: 'Clinic copay',
+      amount: 15,
+      copy: 'You wake up with a fever before your first final. The clinic copay is $15.'
+    }
+  }
+];
+
+const CATS = {
+  essentials: { name: 'Essentials', icon: '⌂', tag: 'NEED', sub: 'phone share · bus · groceries' },
+  school: { name: 'School', icon: '▤', tag: 'NEED', sub: 'print fees · supplies' },
+  savings: { name: 'Savings', icon: '◎', tag: 'GOAL', sub: 'college visit fund' },
+  extras: { name: 'Extras', icon: '✦', tag: 'OPTIONAL', sub: 'a little life, optional' }
+};
+const CAT_LIST = ['essentials', 'school', 'savings', 'extras'];
+
+const els = {
+  game: document.getElementById('game'),
+  overlay: document.getElementById('overlay'),
+  panel: document.getElementById('panel'),
+  hudWeek: document.getElementById('hudWeek'),
+  hudSavings: document.getElementById('hudSavings'),
+  hudScore: document.getElementById('hudScore'),
+  weekTag: document.getElementById('weekTag'),
+  workTag: document.getElementById('workTag'),
+  schoolTag: document.getElementById('schoolTag'),
+  modeTag: document.getElementById('modeTag'),
+  briefEyebrow: document.getElementById('briefEyebrow'),
+  briefTitle: document.getElementById('briefTitle'),
+  briefCopy: document.getElementById('briefCopy'),
+  payBadge: document.getElementById('payBadge'),
+  schedule: document.getElementById('schedule'),
+  wallet: document.getElementById('wallet'),
+  walletTotal: document.getElementById('walletTotal'),
+  payFrom: document.getElementById('payFrom'),
+  cashCushion: document.getElementById('cashCushion'),
+  budget: document.getElementById('budget'),
+  notice: document.getElementById('notice'),
+  resetBtn: document.getElementById('resetBtn'),
+  finishBtn: document.getElementById('finishBtn')
+};
+
+let state = null;
+
+function money(value) {
+  return '$' + Math.round(Number(value) || 0);
+}
+
+function padScore(value) {
+  return String(Math.max(0, Math.round(value))).padStart(3, '0');
+}
+
+function freshState() {
+  return {
+    phase: 'title',
+    weekIndex: 0,
+    tokens: [],
+    nextTokenId: 1,
+    savings: 0,
+    carry: 0,
+    carryIn: 0,
+    arrears: { essentials: 0, school: 0 },
+    selected: null,
+    earned: 0,
+    needsPoints: 0,
+    surprisePoints: 0,
+    cushionPoints: 0,
+    essentialsCovered: 0,
+    eventFromCashCount: 0,
+    extrasTotal: 0,
+    unexpectedTotal: 0,
+    history: [],
+    confirmShort: false,
+    notice: '',
+    noticeKind: '',
+    lastEvent: null
+  };
+}
+
+function makeChange(amount) {
+  let left = Math.max(0, Math.round(amount));
+  const values = [];
+  while (left >= 20) { values.push(20); left -= 20; }
+  if (left >= 10) { values.push(10); left -= 10; }
+  while (left >= 5) { values.push(5); left -= 5; }
+  if (left > 0) values.push(left);
+  const twenty = values.indexOf(20);
+  if (twenty !== -1) values.splice(twenty, 1, 10, 5, 5);
+  return values.sort((a, b) => b - a);
+}
+
+function findToken(id) {
+  return state.tokens.find(token => token.id === Number(id));
+}
+
+function allocationTotal(category) {
+  return state.tokens.reduce((sum, token) => sum + (token.cat === category ? token.value : 0), 0);
+}
+
+function walletTotal() {
+  return state.tokens.reduce((sum, token) => sum + (!token.cat ? token.value : 0), 0);
+}
+
+function availableTotal() {
+  return state.tokens.reduce((sum, token) => sum + token.value, 0);
+}
+
+function dueFor(category) {
+  const week = WEEKS[state.weekIndex];
+  if (category === 'essentials') return week.essentialsDue + state.arrears.essentials;
+  if (category === 'school') return week.schoolDue + state.arrears.school;
+  return 0;
+}
+
+function savingsScore() {
+  return Math.min(GOAL, state.savings) * 2;
+}
+
+function currentScore() {
+  return state.earned + savingsScore();
+}
+
+function setNotice(text, kind) {
+  state.notice = text || '';
+  state.noticeKind = kind || '';
+}
+
+function openWeek(index) {
+  const week = WEEKS[index];
+  if (!week) return;
+  state.weekIndex = index;
+  state.phase = 'planning';
+  state.carryIn = state.carry;
+  const values = makeChange(state.carryIn + week.pay);
+  state.tokens = values.map(value => ({ id: state.nextTokenId++, value, cat: null }));
+  state.carry = 0;
+  state.selected = null;
+  state.confirmShort = false;
+  state.lastEvent = null;
+  if (state.arrears.essentials > 0 || state.arrears.school > 0) {
+    setNotice('Past-due bills carried in. Clear the red amounts before you finish the week.', 'warn');
+  } else if (state.carryIn > 0) {
+    setNotice('The cash you left unassigned carried forward. Plan for this week and the next surprise.', 'good');
+  } else {
+    setNotice('Drag bills into envelopes—or click a bill, then choose where it goes.', '');
+  }
+  renderAll();
+}
+
+function renderNotice() {
+  els.notice.textContent = state.notice || '';
+  els.notice.className = 'notice' + (state.noticeKind ? ' ' + state.noticeKind : '');
+}
+
+function tokenButton(token, inCategory) {
+  const cat = inCategory ? CATS[inCategory] : null;
+  const selected = state.selected === token.id;
+  const label = inCategory
+    ? money(token.value) + ' in ' + cat.name + '. Click to return it to available cash.'
+    : money(token.value) + ' bill. Click to select it.';
+  return '<button type="button" class="bill' + (inCategory ? ' in-cat' : '') + (selected ? ' selected' : '') +
+    '" data-token="' + token.id + '" aria-label="' + label + '"' +
+    (inCategory ? '' : ' aria-pressed="' + (selected ? 'true' : 'false') + '"') + '>' +
+    money(token.value) + '</button>';
+}
+
+function categoryCard(category, week) {
+  const cat = CATS[category];
+  const allocated = allocationTotal(category);
+  const selectedToken = state.selected !== null ? findToken(state.selected) : null;
+  const cards = [];
+  let tag = cat.tag;
+  let numbers = '';
+  let note = '';
+  let bar = '';
+
+  if (category === 'essentials' || category === 'school') {
+    const due = dueFor(category);
+    const short = Math.max(0, due - allocated);
+    const over = Math.max(0, allocated - due);
+    const percent = due > 0 ? Math.min(100, (allocated / due) * 100) : 100;
+    const arrears = state.arrears[category];
+    tag = 'NEED';
+    numbers = '<span>DUE <b>' + money(due) + '</b></span><span>' +
+      (short > 0
+        ? '<span class="short">SHORT ' + money(short) + '</span>'
+        : '<span class="ok">COVERED' + (over > 0 ? ' +' + money(over) + ' BACK' : '') + '</span>') +
+      '</span>';
+    note = arrears > 0
+      ? 'Includes ' + money(arrears) + ' past due.'
+      : short > 0
+        ? 'Unpaid bills roll into next week.'
+        : over > 0
+          ? money(over) + ' comes back at week end.'
+          : 'This bill is safe.';
+    bar = '<div class="bar"><span style="width:' + percent.toFixed(1) + '%"></span></div>';
+    cards.push('aria-label="' + cat.name + ', due ' + money(due) + ', funded ' + money(allocated) + '"');
+  } else if (category === 'savings') {
+    const total = state.savings + allocated;
+    const percent = Math.min(100, (total / GOAL) * 100);
+    const left = Math.max(0, GOAL - total);
+    tag = 'GOAL';
+    numbers = '<span>TOTAL <b>' + money(total) + '</b> / ' + money(GOAL) + '</span><span class="' +
+      (left > 0 ? '' : 'ok') + '">' + (left > 0 ? money(left) + ' TO GO' : 'GOAL READY') + '</span>';
+    note = money(allocated) + ' queued this week · 2 pts per $1';
+    bar = '<div class="bar"><span style="width:' + percent.toFixed(1) + '%"></span></div>';
+    cards.push('aria-label="Savings, ' + money(total) + ' of ' + money(GOAL) + ' goal, ' + money(allocated) + ' assigned this week"');
+  } else {
+    tag = 'OPTIONAL';
+    numbers = '<span>THIS WEEK <b>' + money(allocated) + '</b></span><span>NO SCORE</span>';
+    note = week.extras;
+    cards.push('aria-label="Extras, optional, ' + money(allocated) + ' assigned this week"');
+  }
+
+  const tokens = state.tokens
+    .filter(token => token.cat === category)
+    .map(token => tokenButton(token, category))
+    .join('');
+  const canPlace = selectedToken ? ' can-place' : '';
+  const placeButton = selectedToken
+    ? '<button class="place-btn" type="button" data-place="' + category + '">Place ' +
+      money(selectedToken.value) + ' here</button>'
+    : '';
+
+  return '<article class="category ' + category + canPlace + '" data-cat="' + category +
+    '" data-drop="' + category + '" ' + cards.join(' ') + '>' +
+    '<div class="cat-head">' +
+      '<div class="cat-icon" aria-hidden="true">' + cat.icon + '</div>' +
+      '<div class="cat-name"><h2>' + cat.name + '</h2><p>' + cat.sub + '</p></div>' +
+      '<span class="cat-tag">' + tag + '</span>' +
+    '</div>' +
+    '<div class="cat-numbers">' + numbers + '</div>' +
+    bar +
+    '<div class="cat-note">' + note + '</div>' +
+    '<div class="cat-tokens">' + (tokens || '<span class="cat-empty">Drop bills here</span>') + '</div>' +
+    placeButton +
+  '</article>';
+}
+
+function renderWallet() {
+  const unassigned = state.tokens.filter(token => !token.cat);
+  els.wallet.innerHTML = unassigned.length
+    ? unassigned.map(token => tokenButton(token, null)).join('')
+    : '<span class="empty-drop">No cash left unassigned. Surprises will have to come from Extras or Savings.</span>';
+  els.cashCushion.textContent = money(walletTotal());
+  els.cashCushion.className = walletTotal() === 0 ? 'warn' : '';
+}
+
+function renderAll(focusTokenId) {
+  if (!state || !WEEKS[state.weekIndex]) return;
+  const week = WEEKS[state.weekIndex];
+
+  els.hudWeek.textContent = (state.weekIndex + 1) + '/4';
+  els.hudSavings.textContent = money(state.savings);
+  els.hudScore.textContent = padScore(currentScore());
+  els.weekTag.textContent = 'WEEK ' + String(week.n).padStart(2, '0');
+  els.workTag.textContent = week.hours + ' HRS / WK';
+  els.schoolTag.textContent = week.school.toUpperCase();
+  els.modeTag.textContent = state.phase === 'planning' ? 'PLANNING' : 'SETTLED';
+  els.briefEyebrow.textContent = 'WEEK ' + String(week.n).padStart(2, '0') + ' · ' + week.kicker;
+  els.briefTitle.textContent = week.title;
+  els.briefCopy.textContent = week.copy;
+  els.payBadge.textContent = money(week.pay) + ' TAKE-HOME';
+  els.schedule.innerHTML =
+    '<span class="chip"><b>' + week.hours + ' hrs</b> scheduled</span>' +
+    '<span class="chip">▤ ' + week.school + '</span>' +
+    (state.carryIn > 0 ? '<span class="chip carry">+ ' + money(state.carryIn) + ' carried in</span>' : '');
+
+  els.walletTotal.textContent = money(availableTotal());
+  els.payFrom.textContent = '+ ' + money(state.carryIn) + ' carried in';
+  els.budget.innerHTML = CAT_LIST.map(category => categoryCard(category, week)).join('');
+  els.resetBtn.disabled = state.tokens.every(token => !token.cat);
+  els.finishBtn.innerHTML = state.confirmShort
+    ? 'Finish anyway <span aria-hidden="true">→</span>'
+    : 'Finish week <span aria-hidden="true">→</span>';
+
+  renderWallet();
+  renderNotice();
+
+  if (focusTokenId) {
+    const target = els.wallet.querySelector('[data-token="' + focusTokenId + '"]');
+    if (target) target.focus({ preventScroll: true });
+  }
+}
+
+'use strict';
+
+let dragState = null;
+let suppressClickUntil = 0;
+
+function setBillsFocus(id) {
+  const target = els.wallet.querySelector('[data-token="' + id + '"]');
+  if (target) target.focus({ preventScroll: true });
+}
+
+function selectToken(id) {
+  if (state.phase !== 'planning') return;
+  const token = findToken(id);
+  if (!token || token.cat) return;
+  const clearing = state.selected === id;
+  state.selected = clearing ? null : id;
+  state.confirmShort = false;
+  setNotice(
+    clearing
+      ? 'Selection cleared. Drag a bill or select another.'
+      : 'Selected ' + money(token.value) + '. Choose an envelope, or drag the bill.',
+    clearing ? '' : 'good'
+  );
+  renderAll(clearing ? null : id);
+}
+
+function assignToken(id, category) {
+  if (state.phase !== 'planning') return;
+  const token = findToken(id);
+  if (!token) return;
+  if (category === 'wallet' || category === null) {
+    returnToken(id);
+    return;
+  }
+  if (!CATS[category]) return;
+  token.cat = category;
+  state.selected = null;
+  state.confirmShort = false;
+  setNotice('Moved ' + money(token.value) + ' to ' + CATS[category].name + '.', 'good');
+  renderAll();
+}
+
+function returnToken(id) {
+  if (state.phase !== 'planning') return;
+  const token = findToken(id);
+  if (!token || !token.cat) return;
+  token.cat = null;
+  state.selected = null;
+  state.confirmShort = false;
+  setNotice('Returned ' + money(token.value) + ' to available cash.', '');
+  renderAll();
+}
+
+function handleWalletClick(event) {
+  if (Date.now() < suppressClickUntil) return;
+  const bill = event.target.closest('.bill');
+  if (!bill) return;
+  const token = findToken(bill.dataset.token);
+  if (!token || token.cat) return;
+  selectToken(token.id);
+}
+
+function handleBudgetClick(event) {
+  if (Date.now() < suppressClickUntil) return;
+  const bill = event.target.closest('.bill');
+  if (bill) {
+    returnToken(Number(bill.dataset.token));
+    return;
+  }
+  const card = event.target.closest('[data-cat]');
+  if (!card) return;
+  if (state.selected === null) {
+    setNotice('Select a bill from Available Cash first—or drag one straight into this envelope.', '');
+    renderNotice();
+    return;
+  }
+  assignToken(state.selected, card.dataset.cat);
+}
+
+function resetPlan() {
+  if (state.phase !== 'planning') return;
+  state.tokens.forEach(token => { token.cat = null; });
+  state.selected = null;
+  state.confirmShort = false;
+  setNotice('Week reset. Every bill is back in available cash.', '');
+  renderAll();
+}
+
+function finishWeek() {
+  if (state.phase !== 'planning' || !els.overlay.hidden) return;
+  const shortEssentials = Math.max(0, dueFor('essentials') - allocationTotal('essentials'));
+  const shortSchool = Math.max(0, dueFor('school') - allocationTotal('school'));
+
+  if (shortEssentials > 0 || shortSchool > 0) {
+    if (!state.confirmShort) {
+      const parts = [];
+      if (shortEssentials > 0) parts.push('Essentials ' + money(shortEssentials) + ' short');
+      if (shortSchool > 0) parts.push('School ' + money(shortSchool) + ' short');
+      state.confirmShort = true;
+      setNotice(parts.join(' · ') + '. Finish again to carry the unpaid amount into next week.', 'warn');
+      renderAll();
+      return;
+    }
+  }
+  settleWeek();
+}
+
+function settleWeek() {
+  const week = WEEKS[state.weekIndex];
+  const dueEssentials = dueFor('essentials');
+  const dueSchool = dueFor('school');
+  const fundedEssentials = allocationTotal('essentials');
+  const fundedSchool = allocationTotal('school');
+  const shortEssentials = Math.max(0, dueEssentials - fundedEssentials);
+  const shortSchool = Math.max(0, dueSchool - fundedSchool);
+  const overEssentials = Math.max(0, fundedEssentials - dueEssentials);
+  const overSchool = Math.max(0, fundedSchool - dueSchool);
+  const needsPaid = shortEssentials === 0 && shortSchool === 0;
+
+  let cashAfter = walletTotal() + overEssentials + overSchool;
+  let extrasPool = allocationTotal('extras');
+  let savingsPool = state.savings + allocationTotal('savings');
+  const cost = week.event.amount;
+  let remaining = cost;
+
+  const fromCash = Math.min(cashAfter, remaining);
+  cashAfter -= fromCash;
+  remaining -= fromCash;
+
+  const fromExtras = Math.min(extrasPool, remaining);
+  extrasPool -= fromExtras;
+  remaining -= fromExtras;
+
+  const fromSavings = Math.min(savingsPool, remaining);
+  savingsPool -= fromSavings;
+  remaining -= fromSavings;
+
+  const eventShort = remaining;
+  const needsPoints = needsPaid ? 50 : 0;
+  const surprisePoints = fromCash === cost ? 15 : 0;
+  const cushionPoints = needsPaid && cashAfter >= 10 ? 10 : 0;
+  const weekPoints = needsPoints + surprisePoints + cushionPoints;
+
+  state.earned += weekPoints;
+  state.needsPoints += needsPoints;
+  state.surprisePoints += surprisePoints;
+  state.cushionPoints += cushionPoints;
+  if (needsPaid) state.essentialsCovered += 1;
+  if (fromCash === cost) state.eventFromCashCount += 1;
+  state.savings = savingsPool;
+  state.carry = cashAfter;
+  state.arrears.essentials = shortEssentials + eventShort;
+  state.arrears.school = shortSchool;
+  state.extrasTotal += extrasPool;
+  state.unexpectedTotal += cost;
+  state.phase = 'event';
+  state.confirmShort = false;
+  state.selected = null;
+
+  const result = {
+    week: week.n,
+    title: week.event.title,
+    cost,
+    fromCash,
+    fromExtras,
+    fromSavings,
+    eventShort,
+    cashAfter,
+    needsPaid,
+    shortEssentials,
+    shortSchool,
+    weekPoints,
+    needsPoints,
+    surprisePoints,
+    cushionPoints,
+    savingsAfter: state.savings,
+    extrasAfter: extrasPool
+  };
+  state.lastEvent = result;
+  state.history.push(result);
+  setNotice('Week ' + week.n + ' settled. Review the surprise before moving on.', '');
+  renderAll();
+  showEventOverlay(result);
+}
+
+function sourceTile(label, value, kind) {
+  return '<div class="source ' + kind + '"><span>' + label + '</span><strong>' + money(value) + '</strong></div>';
+}
+
+function eventMessage(result) {
+  if (result.eventShort > 0) {
+    return 'You were ' + money(result.eventShort) + ' short even after using every available source. That unpaid cost joins next week\'s essentials.';
+  }
+  if (result.fromSavings > 0) {
+    return money(result.fromSavings) + ' came out of savings. An emergency fund is doing its job, but your goal moves backward.';
+  }
+  if (result.fromExtras > 0) {
+    return money(result.fromExtras) + ' was pulled from Extras. The treat money became emergency money this week.';
+  }
+  return 'Your ' + money(result.fromCash) + ' cash cushion absorbed the whole cost. Savings stayed untouched.';
+}
+
+function showEventOverlay(result) {
+  const week = WEEKS[state.weekIndex];
+  const next = WEEKS[state.weekIndex + 1];
+  const gains = [];
+  if (result.needsPoints) gains.push('+50 needs');
+  if (result.surprisePoints) gains.push('+15 surprise');
+  if (result.cushionPoints) gains.push('+10 cushion');
+  if (!gains.length) gains.push('no planning points this week');
+
+  const sourceClass = value => value > 0 ? 'hit' : 'zero';
+  const warning = result.fromSavings > 0 || result.eventShort > 0 ? ' warn' : '';
+  const preview = next
+    ? 'NEXT · <b>WEEK ' + String(next.n).padStart(2, '0') + '</b> · ' + next.hours + ' HRS · ' +
+      money(next.pay) + ' TAKE-HOME · ' + next.school.toUpperCase()
+    : 'NEXT · <b>FINAL REPORT</b> · SAVINGS ' + money(state.savings) + ' / ' + money(GOAL);
+
+  showOverlay(
+    '<p class="eyebrow">UNEXPECTED COST · WEEK ' + week.n + '</p>' +
+    '<h2 class="event-title" id="ovTitle">' + result.title + '.</h2>' +
+    '<p class="event-copy">' + week.event.copy + '</p>' +
+    '<div class="expense-figure"><span>DUE NOW</span><strong>' + money(result.cost) + '</strong></div>' +
+    '<div class="source-list">' +
+      sourceTile('Cash cushion', result.fromCash, sourceClass(result.fromCash)) +
+      sourceTile('Extras', result.fromExtras, sourceClass(result.fromExtras)) +
+      sourceTile('Savings', result.fromSavings, result.fromSavings > 0 ? 'raid' : 'zero') +
+    '</div>' +
+    '<p class="event-read' + warning + '">' + eventMessage(result) + '</p>' +
+    '<div class="event-gain"><b>+' + result.weekPoints + ' pts</b><span>' + gains.join(' · ') + '</span></div>' +
+    '<div class="week-preview">' + preview + '</div>' +
+    '<button class="btn" type="button" data-action="' + (next ? 'next-week' : 'final') + '">' +
+      (next ? 'Start week ' + next.n : 'See the final report') + ' →</button>' +
+    '<p class="fine">Cash left after the surprise: ' + money(result.cashAfter) + '</p>'
+  );
+}
+
+function advanceWeek() {
+  closeOverlay();
+  if (state.weekIndex < WEEKS.length - 1) {
+    openWeek(state.weekIndex + 1);
+  } else {
+    showFinal();
+  }
+}
+
+function rankFor(score) {
+  if (score >= 450) return 'Balanced & ready';
+  if (score >= 350) return 'Steady planner';
+  if (score >= 225) return 'Finding your footing';
+  return 'Paycheck to paycheck';
+}
+
+function finalNarrative(score) {
+  const needs = state.essentialsCovered;
+  const saved = state.savings;
+  if (needs === 4 && saved >= GOAL && score >= 450) {
+    return 'Every bill paid, every surprise absorbed, and the goal reached—while finals week tried to take your hours. That is a month worth repeating.';
+  }
+  if (needs === 4 && saved >= GOAL) {
+    return 'You kept every essential paid and reached the goal. The cushion could be stronger, but the plan held when the week got loud.';
+  }
+  if (needs === 4) {
+    return 'Every essential was covered. You finished ' + money(Math.max(0, GOAL - saved)) +
+      ' short of the goal, with ' + money(state.carry) + ' still unassigned. A little more toward savings next month closes it.';
+  }
+  if (saved >= GOAL) {
+    return 'The goal got funded, but some essentials slipped. Savings cannot be the only envelope that gets protected—bills need first claim.';
+  }
+  return 'A tough month. Some bills and the goal slipped, but the board shows exactly where the next paycheck needs to go first.';
+}
+
+function showFinal() {
+  state.phase = 'final';
+  state.selected = null;
+  state.confirmShort = false;
+  setNotice('Month complete. Review what your plan protected.', 'good');
+  renderAll();
+
+  const score = currentScore();
+  const saved = Math.min(GOAL, state.savings);
+  const savingsPoints = savingsScore();
+  const rank = rankFor(score);
+  const hours = WEEKS.reduce((sum, week) => sum + week.hours, 0);
+  const pay = WEEKS.reduce((sum, week) => sum + week.pay, 0);
+
+  showOverlay(
+    '<p class="eyebrow">FOUR WEEKS LATER</p>' +
+    '<h1 class="title" id="ovTitle">The month<br><span class="accent">adds up.</span></h1>' +
+    '<p class="rank">' + rank + '</p>' +
+    '<div class="final-score"><span>FINAL SCORE</span><strong>' + score + '</strong><small>OUT OF ' + MAX_SCORE + ' POSSIBLE</small></div>' +
+    '<div class="report-grid">' +
+      '<div class="report-stat"><span>BILLS COVERED</span><strong>' + state.essentialsCovered + ' / 4</strong></div>' +
+      '<div class="report-stat"><span>SAVED</span><strong>' + money(state.savings) + ' / ' + money(GOAL) + '</strong></div>' +
+      '<div class="report-stat"><span>CASH CUSHION</span><strong>' + money(state.carry) + '</strong></div>' +
+    '</div>' +
+    '<div class="breakdown">' +
+      '<div class="break-line"><span>Essentials &amp; school covered</span><b>' + state.needsPoints + ' / 200</b></div>' +
+      '<div class="break-line"><span>Savings progress</span><b>' + savingsPoints + ' / 200</b></div>' +
+      '<div class="break-line"><span>Surprises covered from cash</span><b>' + state.surprisePoints + ' / 60</b></div>' +
+      '<div class="break-line"><span>Cushion kept</span><b>' + state.cushionPoints + ' / 40</b></div>' +
+    '</div>' +
+    '<p class="outro">' + finalNarrative(score) + '</p>' +
+    '<p class="outro">Take-home: ' + money(pay) + ' across ' + hours + ' hours · extras: ' +
+      money(state.extrasTotal) + ' · surprises: ' + money(state.unexpectedTotal) + ' · goal: ' +
+      money(saved) + ' / ' + money(GOAL) + '.</p>' +
+    '<button class="btn" type="button" data-action="restart">Play another month</button>' +
+    '<p class="fine">Replay to try a different cushion strategy</p>'
+  );
+}
+
+function showTitle() {
+  showOverlay(
+    '<p class="eyebrow">A STUDENT BUDGET GAME</p>' +
+    '<h1 class="title" id="ovTitle">Shift <span class="slash">/</span> <span class="accent">Balance</span></h1>' +
+    '<p class="lead">Maya is 17, working after-school shifts at a bike shop while finals close in. She needs to cover the bills, protect a <b>$100 college-visit fund</b>, and still leave room for a little life.</p>' +
+    '<div class="rules">' +
+      '<div class="rule"><b>Drag bills</b> from Available Cash into Essentials, School, Savings, or Extras. Click a bill first for a tap-friendly fallback.</div>' +
+      '<div class="rule"><b>Leave cash unassigned.</b> That cushion is what absorbs the surprise cost at the end of each week. Unused cash carries forward.</div>' +
+      '<div class="rule"><b>Hours change.</b> Midterms, spring break, and finals week change your take-home pay. Plan around the week you actually have.</div>' +
+    '</div>' +
+    '<div class="score-rules">' +
+      '<div class="score-rule"><span>NEEDS COVERED</span><strong>+50 / week</strong></div>' +
+      '<div class="score-rule"><span>SAVINGS PROGRESS</span><strong>+2 / $1</strong></div>' +
+      '<div class="score-rule"><span>SMART RESERVES</span><strong>+25 / week</strong></div>' +
+    '</div>' +
+    '<button class="btn" type="button" data-action="start">Clock in</button>' +
+    '<p class="fine">4 weeks · $600 take-home · no timer</p>'
+  );
+}
+
+function showOverlay(html) {
+  els.panel.innerHTML = html;
+  els.overlay.hidden = false;
+  els.game.inert = true;
+  const focusTarget = els.panel.querySelector('[data-action], .btn');
+  if (focusTarget) {
+    window.setTimeout(() => focusTarget.focus({ preventScroll: true }), 30);
+  }
+}
+
+function closeOverlay() {
+  els.overlay.hidden = true;
+  els.panel.innerHTML = '';
+  els.game.inert = false;
+}
+
+function startGame() {
+  closeOverlay();
+  state = freshState();
+  openWeek(0);
+}
+
+/* ---------- pointer drag ---------- */
+function clearDropHighlights() {
+  document.querySelectorAll('.drop-ready').forEach(element => element.classList.remove('drop-ready'));
+}
+
+function dropTargetAt(x, y, fallback) {
+  let element = null;
+  if (typeof document.elementFromPoint === 'function') {
+    try { element = document.elementFromPoint(x, y); } catch (error) { element = null; }
+  }
+  if (!element) element = fallback || null;
+  return element && element.closest ? element.closest('[data-drop]') : null;
+}
+
+function cleanupDrag() {
+  if (dragState) {
+    if (dragState.ghost) dragState.ghost.remove();
+    if (dragState.source) dragState.source.classList.remove('dragging-source');
+  }
+  clearDropHighlights();
+  dragState = null;
+}
+
+function onPointerDown(event) {
+  if (!els.overlay.hidden || state.phase !== 'planning') return;
+  const bill = event.target.closest('.bill');
+  if (!bill) return;
+  if (event.button !== undefined && event.button !== 0) return;
+  dragState = {
+    tokenId: Number(bill.dataset.token),
+    pointerId: event.pointerId,
+    startX: event.clientX,
+    startY: event.clientY,
+    started: false,
+    source: bill,
+    ghost: null
+  };
+}
+
+function onPointerMove(event) {
+  if (!dragState) return;
+  if (dragState.pointerId !== undefined && event.pointerId !== dragState.pointerId) return;
+  const dx = event.clientX - dragState.startX;
+  const dy = event.clientY - dragState.startY;
+  if (!dragState.started && dx * dx + dy * dy < 36) return;
+
+  if (!dragState.started) {
+    dragState.started = true;
+    state.selected = null;
+    const token = findToken(dragState.tokenId);
+    dragState.source.classList.add('dragging-source');
+    const ghost = document.createElement('div');
+    ghost.className = 'drag-ghost';
+    ghost.textContent = token ? money(token.value) : '';
+    document.body.appendChild(ghost);
+    dragState.ghost = ghost;
+  }
+
+  if (event.cancelable) event.preventDefault();
+  dragState.ghost.style.left = event.clientX + 'px';
+  dragState.ghost.style.top = event.clientY + 'px';
+  clearDropHighlights();
+  const drop = dropTargetAt(event.clientX, event.clientY, event.target);
+  if (drop) drop.classList.add('drop-ready');
+}
+
+function onPointerUp(event) {
+  if (!dragState) return;
+  if (dragState.pointerId !== undefined && event.pointerId !== dragState.pointerId) return;
+  const wasDragged = dragState.started;
+  const tokenId = dragState.tokenId;
+  const drop = wasDragged
+    ? dropTargetAt(event.clientX, event.clientY, event.target)
+    : null;
+  cleanupDrag();
+
+  if (!wasDragged) return;
+  suppressClickUntil = Date.now() + 300;
+  if (!drop) {
+    state.selected = null;
+    setNotice('Move cancelled. Drop a bill on an envelope or back in Available Cash.', '');
+    renderAll();
+    return;
+  }
+  if (drop.dataset.drop === 'wallet') {
+    returnToken(tokenId);
+  } else {
+    assignToken(tokenId, drop.dataset.drop);
+  }
+}
+
+function onPointerCancel() {
+  if (!dragState) return;
+  cleanupDrag();
+}
+
+/* ---------- start ---------- */
+els.wallet.addEventListener('click', handleWalletClick);
+els.budget.addEventListener('click', handleBudgetClick);
+els.resetBtn.addEventListener('click', resetPlan);
+els.finishBtn.addEventListener('click', finishWeek);
+
+document.addEventListener('pointerdown', onPointerDown);
+document.addEventListener('pointermove', onPointerMove, { passive: false });
+document.addEventListener('pointerup', onPointerUp);
+document.addEventListener('pointercancel', onPointerCancel);
+document.addEventListener('dragstart', event => {
+  if (event.target.closest('.bill')) event.preventDefault();
+});
+window.addEventListener('blur', onPointerCancel);
+
+els.overlay.addEventListener('click', event => {
+  const actionButton = event.target.closest('[data-action]');
+  if (!actionButton) return;
+  const action = actionButton.dataset.action;
+  if (action === 'start' || action === 'restart') {
+    startGame();
+  } else if (action === 'next-week') {
+    advanceWeek();
+  } else if (action === 'final') {
+    closeOverlay();
+    showFinal();
+  }
+});
+
+state = freshState();
+openWeek(0);
+showTitle();
+
+window.__SHIFTBALANCE__ = {
+  getState: () => JSON.parse(JSON.stringify(state)),
+  weeks: WEEKS,
+  goal: GOAL,
+  maxScore: MAX_SCORE,
+  allocation: category => allocationTotal(category),
+  walletTotal,
+  availableTotal,
+  due: category => dueFor(category),
+  score: currentScore,
+  assignToken,
+  returnToken,
+  finishWeek,
+  advanceWeek,
+  restart: startGame,
+  showFinal,
+  rankFor
+};
+
+</script>
+</body>
+</html>

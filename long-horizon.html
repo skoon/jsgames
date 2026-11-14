@@ -1,0 +1,1990 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#070f0e">
+<title>Long Horizon</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --ink: #eef8f2;
+    --muted: rgba(231, 246, 238, 0.47);
+    --faint: rgba(231, 246, 238, 0.22);
+    --green: #8ce8c4;
+    --green-deep: #3fc7a0;
+    --amber: #ffc86b;
+    --red: #ff8e7c;
+    --blue: #7cc7ff;
+    --violet: #c1a6ff;
+    --line: rgba(155, 222, 204, 0.15);
+    --panel: rgba(9, 20, 19, 0.96);
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    background:
+      radial-gradient(110% 80% at 50% 0%, #26372e 0%, #0b1413 53%, #040908 100%);
+    color: var(--ink);
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    -webkit-user-select: none;
+    user-select: none;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+  #stage {
+    position: relative;
+    width: min(100%, calc((100dvh - 55px) * 0.75));
+    aspect-ratio: 3 / 4;
+    border-radius: 20px;
+    overflow: hidden;
+    background: #07100f;
+    box-shadow:
+      0 30px 70px -28px rgba(0, 0, 0, 0.96),
+      0 0 0 1px rgba(255, 255, 255, 0.07),
+      inset 0 0 0 1px rgba(140, 232, 196, 0.07);
+    container-type: size;
+  }
+  .hint {
+    margin: 0;
+    font-size: clamp(6.5px, 1.8vw, 8px);
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    color: rgba(238, 248, 242, 0.28);
+    white-space: nowrap;
+  }
+  button { font: inherit; }
+  button:focus-visible, input:focus-visible, summary:focus-visible {
+    outline: 2px solid #c9ffed;
+    outline-offset: 2px;
+  }
+  [hidden] { display: none !important; }
+
+  #app {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    background:
+      radial-gradient(80% 45% at 50% 0%, rgba(54, 83, 69, 0.22), transparent 75%),
+      linear-gradient(180deg, #0b1715 0%, #07100f 70%, #050b0a 100%);
+  }
+
+  /* ---------- header ---------- */
+  .topbar {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 8px 8px 0;
+    padding: 6px 8px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: linear-gradient(180deg, rgba(25, 44, 40, 0.96), rgba(7, 16, 15, 0.9));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045);
+  }
+  .brand { display: flex; align-items: center; gap: 7px; min-width: 0; }
+  .brand-mark {
+    width: 23px;
+    height: 23px;
+    flex: none;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(140, 232, 196, 0.48);
+    border-radius: 6px;
+    background: rgba(140, 232, 196, 0.08);
+    color: var(--green);
+    font-size: 8px;
+    font-weight: 800;
+    letter-spacing: -0.04em;
+  }
+  .brand b {
+    display: block;
+    font-size: clamp(9.5px, 2.1cqw, 12px);
+    letter-spacing: 0.11em;
+    line-height: 1.05;
+  }
+  .brand small {
+    display: block;
+    margin-top: 2px;
+    color: var(--muted);
+    font-size: clamp(5.5px, 1.2cqw, 7px);
+    letter-spacing: 0.13em;
+  }
+  .hud { display: flex; align-items: center; gap: 12px; flex: none; }
+  .stat { text-align: right; }
+  .stat span {
+    display: block;
+    color: var(--muted);
+    font-size: clamp(5.5px, 1.2cqw, 7px);
+    letter-spacing: 0.13em;
+  }
+  .stat strong {
+    display: block;
+    margin-top: 1px;
+    color: var(--green);
+    font-size: clamp(11px, 2.5cqw, 15px);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .stat:last-child strong { color: var(--amber); }
+
+  /* ---------- screen shells ---------- */
+  .screen {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    margin: 6px 8px 8px;
+    overflow: hidden;
+    border: 1px solid rgba(155, 222, 204, 0.16);
+    border-radius: 18px;
+    background:
+      linear-gradient(180deg, rgba(11, 24, 22, 0.96), rgba(6, 14, 13, 0.97));
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.045),
+      0 18px 38px -30px rgba(0, 0, 0, 0.9);
+  }
+  .plan-scroll, .sim-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 9px 10px 12px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(140, 232, 196, 0.2) transparent;
+  }
+  .plan-scroll::-webkit-scrollbar, .sim-scroll::-webkit-scrollbar { width: 4px; }
+  .plan-scroll::-webkit-scrollbar-thumb, .sim-scroll::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: rgba(140, 232, 196, 0.2);
+  }
+
+  .eyebrow {
+    margin: 0 0 2px;
+    color: var(--muted);
+    font-size: clamp(5.5px, 1.2cqw, 7px);
+    letter-spacing: 0.18em;
+    line-height: 1.3;
+    text-transform: uppercase;
+  }
+  .brief-card {
+    position: relative;
+    overflow: hidden;
+    padding: 8px 9px 7px;
+    border: 1px solid rgba(255, 200, 107, 0.22);
+    border-radius: 9px;
+    background:
+      radial-gradient(90% 140% at 100% 0%, rgba(255, 200, 107, 0.11), transparent 60%),
+      rgba(255, 200, 107, 0.035);
+  }
+  .brief-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 0.75fr;
+    gap: 5px;
+    margin-top: 3px;
+  }
+  .brief-grid span {
+    display: block;
+    color: var(--muted);
+    font-size: clamp(5.5px, 1.2cqw, 7px);
+    letter-spacing: 0.12em;
+  }
+  .brief-grid b {
+    display: block;
+    margin-top: 1px;
+    color: var(--ink);
+    font-size: clamp(11px, 2.5cqw, 15px);
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+  }
+  .brief-note {
+    margin: 5px 0 0;
+    color: rgba(255, 230, 183, 0.57);
+    font-size: clamp(5.7px, 1.2cqw, 7px);
+    line-height: 1.45;
+  }
+
+  .section-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 10px;
+  }
+  .section-head h2 {
+    margin: 0;
+    color: var(--ink);
+    font-size: clamp(13px, 3.1cqw, 19px);
+    line-height: 1.1;
+    letter-spacing: -0.04em;
+  }
+  .section-lede {
+    margin: 4px 0 0;
+    color: var(--muted);
+    font-size: clamp(6.5px, 1.35cqw, 8px);
+    line-height: 1.45;
+  }
+  .reset-btn {
+    flex: none;
+    align-self: flex-end;
+    padding: 3px 5px;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.025);
+    color: var(--muted);
+    cursor: pointer;
+    font-size: clamp(5.5px, 1.15cqw, 6.7px);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .reset-btn:hover { color: var(--ink); background: rgba(255, 255, 255, 0.06); }
+  .alloc-total { flex: none; text-align: right; }
+  .alloc-total strong {
+    display: block;
+    color: var(--green);
+    font-size: clamp(13px, 3cqw, 18px);
+    line-height: 1;
+  }
+  .alloc-total span {
+    display: block;
+    color: var(--muted);
+    font-size: clamp(5.2px, 1.1cqw, 6.5px);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .alloc-bar {
+    display: flex;
+    height: 7px;
+    margin-top: 7px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.04);
+  }
+  .alloc-segment {
+    display: block;
+    height: 100%;
+    transition: width 160ms ease;
+  }
+  .composition {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 4px 1px 6px;
+    color: var(--muted);
+    font-size: clamp(5.8px, 1.2cqw, 7px);
+    letter-spacing: 0.03em;
+  }
+  .composition b { color: rgba(238, 248, 242, 0.8); font-weight: 600; }
+  .composition .right { color: var(--muted); }
+
+  /* ---------- asset rows ---------- */
+  .asset-list { display: grid; gap: 5px; }
+  .asset-row {
+    --accent: #8ce8c4;
+    padding: 6px 8px 6px 9px;
+    border: 1px solid rgba(255, 255, 255, 0.065);
+    border-left: 2px solid var(--accent);
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.024);
+  }
+  .asset-top {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 6px;
+  }
+  .asset-name { display: flex; align-items: baseline; gap: 5px; min-width: 0; }
+  .asset-dot {
+    width: 5px;
+    height: 5px;
+    flex: none;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 60%, transparent);
+  }
+  .asset-name b {
+    color: var(--ink);
+    font-size: clamp(7.5px, 1.55cqw, 9.2px);
+    line-height: 1.2;
+  }
+  .risk-label {
+    flex: none;
+    color: var(--muted);
+    font-size: clamp(5.2px, 1.05cqw, 6.2px);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .asset-pct {
+    flex: none;
+    color: var(--accent);
+    font-size: clamp(11px, 2.5cqw, 15px);
+    font-weight: 700;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .asset-desc {
+    margin: 2px 0 4px;
+    color: var(--muted);
+    font-size: clamp(5.9px, 1.2cqw, 7.2px);
+    line-height: 1.35;
+  }
+  .asset-desc span { color: rgba(238, 248, 242, 0.66); }
+  .range-row { display: flex; align-items: center; gap: 7px; }
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    flex: 1;
+    min-width: 0;
+    height: 4px;
+    margin: 0;
+    border-radius: 999px;
+    background:
+      linear-gradient(90deg,
+        var(--accent) 0 var(--fill, 0%),
+        rgba(255, 255, 255, 0.1) var(--fill, 0%) 100%);
+    cursor: pointer;
+    touch-action: pan-y;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 11px;
+    height: 11px;
+    border: 2px solid #091412;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent);
+  }
+  input[type="range"]::-moz-range-track {
+    height: 4px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.1);
+  }
+  input[type="range"]::-moz-range-progress {
+    height: 4px;
+    border-radius: 999px;
+    background: var(--accent);
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 9px;
+    height: 9px;
+    border: 2px solid #091412;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+  .risk-pips { display: flex; gap: 1px; flex: none; }
+  .risk-pips i {
+    display: block;
+    width: 3px;
+    height: 7px;
+    border-radius: 1px;
+    background: rgba(255, 255, 255, 0.1);
+  }
+  .risk-pips i.on { background: var(--accent); opacity: 0.8; }
+
+  /* ---------- rubric ---------- */
+  .rubric {
+    margin-top: 7px;
+    border: 1px solid rgba(155, 222, 204, 0.1);
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.015);
+  }
+  .rubric summary {
+    list-style: none;
+    cursor: pointer;
+    padding: 5px 7px;
+    color: var(--muted);
+    font-size: clamp(5.9px, 1.2cqw, 7.2px);
+    letter-spacing: 0.04em;
+  }
+  .rubric summary::-webkit-details-marker { display: none; }
+  .rubric summary::after { content: " +"; color: var(--green); }
+  .rubric[open] summary::after { content: " \2212"; }
+  .rubric-body {
+    padding: 0 7px 6px;
+    color: var(--muted);
+    font-size: clamp(5.7px, 1.15cqw, 6.9px);
+    line-height: 1.45;
+  }
+  .rubric-body p { margin: 3px 0; }
+  .rubric-body b { color: rgba(238, 248, 242, 0.78); font-weight: 600; }
+
+  /* ---------- memo ---------- */
+  .memo-count {
+    flex: none;
+    padding: 2px 5px;
+    border: 1px solid rgba(140, 232, 196, 0.26);
+    border-radius: 999px;
+    color: var(--green);
+    font-size: clamp(5.5px, 1.15cqw, 6.7px);
+    font-weight: 700;
+    letter-spacing: 0.06em;
+  }
+  .memo-list { display: grid; gap: 4px; margin-top: 5px; }
+  .memo-option {
+    width: 100%;
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 6px 7px;
+    border: 1px solid rgba(155, 222, 204, 0.11);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.018);
+    color: rgba(238, 248, 242, 0.7);
+    cursor: pointer;
+    font-size: clamp(6.2px, 1.28cqw, 7.7px);
+    line-height: 1.4;
+    text-align: left;
+    transition: border-color 120ms ease, background 120ms ease;
+  }
+  .memo-option:hover { border-color: rgba(140, 232, 196, 0.25); background: rgba(140, 232, 196, 0.035); }
+  .memo-check {
+    flex: none;
+    width: 10px;
+    height: 10px;
+    margin-top: 1px;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(155, 222, 204, 0.25);
+    border-radius: 2px;
+    color: #062019;
+    font-size: 7px;
+    line-height: 1;
+  }
+  .memo-option.selected {
+    border-color: rgba(140, 232, 196, 0.46);
+    background: rgba(140, 232, 196, 0.08);
+    color: #d5ffef;
+  }
+  .memo-option.selected .memo-check {
+    border-color: var(--green);
+    background: var(--green);
+  }
+  .memo-hint {
+    min-height: 11px;
+    margin: 4px 1px 0;
+    color: var(--muted);
+    font-size: clamp(5.6px, 1.15cqw, 6.9px);
+    line-height: 1.35;
+  }
+  .memo-hint.warn { color: var(--amber); }
+  .disclaimer {
+    margin: 8px 1px 0;
+    color: var(--faint);
+    font-size: clamp(5.3px, 1.05cqw, 6.3px);
+    line-height: 1.4;
+  }
+
+  /* ---------- plan footer ---------- */
+  .plan-actions {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 9px 8px;
+    border-top: 1px solid var(--line);
+    background: rgba(5, 12, 11, 0.92);
+  }
+  .run-meta { min-width: 0; flex: 1; }
+  .run-meta span {
+    color: var(--green);
+    font-size: clamp(6.5px, 1.4cqw, 8px);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+  }
+  .run-meta small {
+    display: block;
+    margin-top: 1px;
+    overflow: hidden;
+    color: var(--muted);
+    font-size: clamp(5.4px, 1.1cqw, 6.6px);
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .primary-btn {
+    flex: none;
+    padding: 8px 10px;
+    border: 0;
+    border-radius: 7px;
+    background: linear-gradient(180deg, #9bf2d0, #4bcaa6);
+    color: #052019;
+    cursor: pointer;
+    font-size: clamp(6.4px, 1.35cqw, 7.9px);
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+    box-shadow: 0 8px 18px -12px rgba(140, 232, 196, 0.9);
+    transition: filter 120ms ease, transform 80ms ease;
+  }
+  .primary-btn:hover:not(:disabled) { filter: brightness(1.06); }
+  .primary-btn:active:not(:disabled) { transform: translateY(1px); }
+  .primary-btn:disabled { opacity: 0.34; cursor: not-allowed; }
+
+  /* ---------- simulation ---------- */
+  .sim-head { padding: 1px 1px 0; }
+  .sim-title {
+    margin: 0;
+    color: var(--ink);
+    font-size: clamp(18px, 4.3cqw, 27px);
+    line-height: 0.98;
+    letter-spacing: -0.055em;
+  }
+  .sim-title span { color: var(--green); }
+  .sim-sub {
+    margin: 4px 0 0;
+    color: var(--muted);
+    font-size: clamp(6.4px, 1.3cqw, 7.8px);
+    line-height: 1.45;
+  }
+  .sim-alloc {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+    margin-top: 6px;
+  }
+  .sim-pill {
+    padding: 2px 4px;
+    border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+    border-radius: 3px;
+    background: color-mix(in srgb, var(--accent) 7%, transparent);
+    color: var(--accent);
+    font-size: clamp(5px, 1.05cqw, 6.2px);
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+  }
+  .year-rail {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 1px;
+    margin: 8px 0 7px;
+  }
+  .year-node {
+    position: relative;
+    text-align: center;
+    color: var(--faint);
+    font-size: clamp(5px, 1.05cqw, 6.3px);
+    letter-spacing: 0.02em;
+  }
+  .year-node::before {
+    content: "";
+    position: absolute;
+    top: -1px;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: rgba(155, 222, 204, 0.12);
+  }
+  .year-node::after {
+    content: "";
+    position: relative;
+    display: block;
+    width: 4px;
+    height: 4px;
+    margin: 0 auto 2px;
+    border: 1px solid rgba(155, 222, 204, 0.25);
+    border-radius: 50%;
+    background: #0a1513;
+  }
+  .year-node span { display: block; }
+  .year-node.passed { color: rgba(238, 248, 242, 0.52); }
+  .year-node.passed::before { background: rgba(140, 232, 196, 0.4); }
+  .year-node.passed::after { border-color: var(--green); background: var(--green); }
+  .year-node.active { color: var(--amber); }
+  .year-node.active::after {
+    width: 6px;
+    height: 6px;
+    margin-top: -1px;
+    border-color: var(--amber);
+    background: var(--amber);
+    box-shadow: 0 0 7px rgba(255, 200, 107, 0.65);
+  }
+  .scenario-list { display: grid; gap: 5px; }
+  .scenario-card {
+    --scene: #8ce8c4;
+    padding: 6px 7px 5px;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-left: 2px solid var(--scene);
+    border-radius: 7px;
+    background:
+      linear-gradient(90deg, color-mix(in srgb, var(--scene) 5%, transparent), transparent 60%),
+      rgba(255, 255, 255, 0.022);
+  }
+  .scene-top {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  .scene-num {
+    flex: none;
+    color: var(--scene);
+    font-size: clamp(5.5px, 1.2cqw, 7px);
+    font-weight: 700;
+    letter-spacing: 0.06em;
+  }
+  .scene-name { min-width: 0; flex: 1; }
+  .scene-name h3 {
+    margin: 0;
+    color: var(--ink);
+    font-size: clamp(8px, 1.75cqw, 10.3px);
+    line-height: 1.15;
+  }
+  .scene-name p {
+    margin: 1px 0 0;
+    overflow: hidden;
+    color: var(--muted);
+    font-size: clamp(5.5px, 1.12cqw, 6.7px);
+    line-height: 1.3;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .scene-pct {
+    flex: none;
+    color: var(--scene);
+    font-size: clamp(7px, 1.5cqw, 8.8px);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .scene-numbers {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 6px;
+    margin-top: 4px;
+  }
+  .scene-value {
+    color: var(--ink);
+    font-size: clamp(11px, 2.4cqw, 14px);
+    font-weight: 700;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .scene-delta {
+    color: var(--muted);
+    font-size: clamp(5.5px, 1.12cqw, 6.7px);
+    font-variant-numeric: tabular-nums;
+  }
+  .scene-delta.up { color: var(--green); }
+  .scene-delta.down { color: var(--red); }
+  .scene-track {
+    height: 3px;
+    margin-top: 4px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+  }
+  .scene-track span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--scene);
+    transition: width 220ms ease;
+  }
+  .scene-foot {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 2px;
+    color: var(--faint);
+    font-size: clamp(5.1px, 1.05cqw, 6.2px);
+    letter-spacing: 0.03em;
+  }
+  .sim-note {
+    margin: 7px 1px 0;
+    padding: 5px 6px;
+    border: 1px solid rgba(255, 200, 107, 0.15);
+    border-radius: 5px;
+    background: rgba(255, 200, 107, 0.035);
+    color: rgba(255, 233, 191, 0.67);
+    font-size: clamp(5.9px, 1.18cqw, 7.1px);
+    line-height: 1.42;
+  }
+  .sim-actions {
+    flex: 0 0 auto;
+    padding: 5px 9px 8px;
+    border-top: 1px solid var(--line);
+    background: rgba(5, 12, 11, 0.92);
+  }
+  .weakest-line {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 7px;
+    margin-bottom: 4px;
+  }
+  .weakest-line span {
+    color: var(--muted);
+    font-size: clamp(5.3px, 1.05cqw, 6.3px);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .weakest-line b {
+    color: var(--amber);
+    font-size: clamp(7.4px, 1.55cqw, 9px);
+    font-variant-numeric: tabular-nums;
+  }
+  .weakest-line small {
+    color: var(--faint);
+    font-size: clamp(5.4px, 1.1cqw, 6.5px);
+  }
+  .sim-buttons { display: flex; align-items: stretch; gap: 5px; }
+  .sim-buttons .primary-btn { flex: 1; padding-top: 7px; padding-bottom: 7px; }
+  .link-btn {
+    flex: none;
+    padding: 6px 7px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.025);
+    color: var(--muted);
+    cursor: pointer;
+    font-size: clamp(5.7px, 1.2cqw, 7px);
+    letter-spacing: 0.04em;
+  }
+  .link-btn:hover { color: var(--ink); background: rgba(255, 255, 255, 0.06); }
+
+  /* ---------- overlays ---------- */
+  .overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    display: grid;
+    place-items: center;
+    padding: 15px;
+    background: rgba(3, 9, 8, 0.9);
+    -webkit-backdrop-filter: blur(5px);
+    backdrop-filter: blur(5px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    animation: fade-in 160ms ease-out;
+  }
+  .overlay[hidden] { display: none; }
+  @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+  .panel {
+    width: 100%;
+    max-width: 312px;
+    max-height: 100%;
+    overflow-y: auto;
+    padding: 1px;
+    scrollbar-width: thin;
+  }
+  .intro-panel { text-align: center; }
+  .intro-eyebrow {
+    margin: 0 0 4px;
+    color: var(--green);
+    font-size: clamp(5.5px, 1.2cqw, 7px);
+    letter-spacing: 0.24em;
+  }
+  .intro-title {
+    margin: 0;
+    color: var(--ink);
+    font-size: clamp(34px, 8.8cqw, 53px);
+    line-height: 0.86;
+    letter-spacing: -0.085em;
+    text-shadow: 0 0 32px rgba(140, 232, 196, 0.16);
+  }
+  .intro-title span { color: var(--green); }
+  .intro-lede {
+    margin: 9px auto 0;
+    max-width: 280px;
+    color: rgba(238, 248, 242, 0.65);
+    font-size: clamp(7.8px, 1.75cqw, 10px);
+    line-height: 1.55;
+  }
+  .intro-brief {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 3px;
+    margin: 10px auto 0;
+    padding: 6px 7px;
+    border: 1px solid rgba(255, 200, 107, 0.22);
+    border-radius: 7px;
+    background: rgba(255, 200, 107, 0.04);
+  }
+  .intro-brief div { text-align: left; }
+  .intro-brief span {
+    display: block;
+    color: var(--muted);
+    font-size: clamp(5px, 1.1cqw, 6.2px);
+    letter-spacing: 0.08em;
+  }
+  .intro-brief b {
+    display: block;
+    margin-top: 1px;
+    color: var(--ink);
+    font-size: clamp(8.5px, 1.9cqw, 11px);
+    font-variant-numeric: tabular-nums;
+  }
+  .weather-list {
+    margin: 9px auto 0;
+    display: grid;
+    gap: 3px;
+    text-align: left;
+  }
+  .weather-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 3px;
+    border-bottom: 1px solid rgba(155, 222, 204, 0.09);
+  }
+  .weather-icon {
+    flex: none;
+    width: 17px;
+    height: 17px;
+    display: grid;
+    place-items: center;
+    border: 1px solid color-mix(in srgb, var(--scene) 35%, transparent);
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--scene) 7%, transparent);
+    color: var(--scene);
+    font-size: 6px;
+    font-weight: 700;
+  }
+  .weather-row b {
+    display: block;
+    color: rgba(238, 248, 242, 0.9);
+    font-size: clamp(6.8px, 1.45cqw, 8.4px);
+    font-weight: 600;
+  }
+  .weather-row small {
+    display: block;
+    margin-top: 1px;
+    color: var(--muted);
+    font-size: clamp(5.5px, 1.15cqw, 6.7px);
+    line-height: 1.3;
+  }
+  .btn {
+    margin-top: 11px;
+    padding: 10px 24px;
+    border: 0;
+    border-radius: 999px;
+    cursor: pointer;
+    color: #06211c;
+    background: linear-gradient(180deg, #a2f5d4, #4bcaa6);
+    box-shadow:
+      0 14px 30px -14px rgba(140, 232, 196, 0.8),
+      inset 0 -2px 0 rgba(0, 0, 0, 0.16);
+    font-size: clamp(8px, 1.8cqw, 10.5px);
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    transition: transform 100ms ease, filter 150ms ease;
+  }
+  .btn:hover { filter: brightness(1.06); }
+  .btn:active { transform: translateY(1px) scale(0.99); }
+  .intro-foot {
+    margin: 7px 0 0;
+    color: var(--faint);
+    font-size: clamp(5.3px, 1.15cqw, 6.5px);
+    letter-spacing: 0.04em;
+    line-height: 1.4;
+  }
+
+  .report-panel { text-align: center; max-width: 305px; }
+  .report-eyebrow {
+    margin: 0 0 3px;
+    color: var(--amber);
+    font-size: clamp(5.5px, 1.2cqw, 7px);
+    letter-spacing: 0.2em;
+  }
+  .report-title {
+    margin: 0;
+    color: var(--green);
+    font-size: clamp(23px, 5.8cqw, 35px);
+    line-height: 1;
+    letter-spacing: -0.055em;
+  }
+  .report-title.warn { color: var(--amber); }
+  .report-title.bad { color: var(--red); }
+  .report-sub {
+    margin: 6px auto 0;
+    max-width: 280px;
+    color: rgba(238, 248, 242, 0.63);
+    font-size: clamp(6.8px, 1.45cqw, 8.3px);
+    line-height: 1.5;
+  }
+  .report-score {
+    margin: 9px auto 0;
+    padding: 6px 7px 5px;
+    border: 1px solid rgba(140, 232, 196, 0.22);
+    border-radius: 8px;
+    background: rgba(140, 232, 196, 0.045);
+  }
+  .report-score span {
+    display: block;
+    color: var(--muted);
+    font-size: clamp(5.3px, 1.1cqw, 6.5px);
+    letter-spacing: 0.17em;
+  }
+  .report-score strong {
+    display: inline-block;
+    margin-top: 1px;
+    color: var(--green);
+    font-size: clamp(28px, 7cqw, 42px);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .report-score em {
+    color: var(--muted);
+    font-size: clamp(6.5px, 1.4cqw, 8.2px);
+    font-style: normal;
+  }
+  .report-rank {
+    margin-top: 6px;
+  }
+  .report-rank b {
+    display: block;
+    color: var(--amber);
+    font-size: clamp(7.7px, 1.7cqw, 9.5px);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .report-rank span {
+    display: block;
+    margin-top: 2px;
+    color: var(--muted);
+    font-size: clamp(5.8px, 1.22cqw, 7px);
+    line-height: 1.4;
+  }
+  .score-breakdown {
+    margin-top: 8px;
+    padding-top: 5px;
+    border-top: 1px solid var(--line);
+    text-align: left;
+  }
+  .score-block {
+    margin-top: 6px;
+  }
+  .score-block:first-child { margin-top: 0; }
+  .score-line {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 5px;
+    color: var(--muted);
+    font-size: clamp(6.1px, 1.26cqw, 7.4px);
+  }
+  .score-line b {
+    color: rgba(238, 248, 242, 0.86);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .score-bar {
+    height: 2px;
+    margin-top: 2px;
+    overflow: hidden;
+    border-radius: 99px;
+    background: rgba(255, 255, 255, 0.08);
+  }
+  .score-bar span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--green);
+  }
+  .score-note {
+    margin: 2px 0 0;
+    color: rgba(238, 248, 242, 0.42);
+    font-size: clamp(5.3px, 1.1cqw, 6.4px);
+    line-height: 1.35;
+  }
+  .report-scenarios {
+    margin-top: 8px;
+    padding-top: 5px;
+    border-top: 1px solid var(--line);
+    text-align: left;
+  }
+  .report-label {
+    margin: 0 0 3px;
+    color: var(--muted);
+    font-size: clamp(5.3px, 1.1cqw, 6.5px);
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+  }
+  .report-scenario {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 7px;
+    padding: 2px 0;
+    color: var(--muted);
+    font-size: clamp(5.9px, 1.2cqw, 7.1px);
+  }
+  .report-scenario span:first-child { display: flex; align-items: center; gap: 4px; }
+  .report-scenario i {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--scene);
+  }
+  .report-scenario b {
+    color: rgba(238, 248, 242, 0.85);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .memo-review {
+    margin-top: 7px;
+    padding-top: 5px;
+    border-top: 1px solid var(--line);
+    text-align: left;
+  }
+  .memo-review-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 4px;
+    margin-top: 2px;
+    color: rgba(238, 248, 242, 0.58);
+    font-size: clamp(5.4px, 1.1cqw, 6.5px);
+    line-height: 1.35;
+  }
+  .memo-review-row b { flex: none; color: var(--green); }
+  .memo-review-row.bad b { color: var(--red); }
+  .report-actions {
+    display: flex;
+    gap: 4px;
+    margin-top: 9px;
+  }
+  .report-actions .btn { margin-top: 0; flex: 1; padding: 8px 6px; font-size: clamp(6.3px, 1.3cqw, 7.6px); }
+  .secondary-btn {
+    flex: none;
+    padding: 8px 10px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: clamp(6.3px, 1.3cqw, 7.6px);
+    letter-spacing: 0.05em;
+  }
+  .secondary-btn:hover { color: var(--ink); background: rgba(255, 255, 255, 0.05); }
+  .report-foot {
+    margin: 6px 0 0;
+    color: var(--faint);
+    font-size: clamp(5px, 1.05cqw, 6.1px);
+    letter-spacing: 0.03em;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
+  @container (max-height: 565px) {
+    .section-head { margin-top: 8px; }
+    .asset-row { padding-top: 5px; padding-bottom: 5px; }
+    .brief-card { padding-top: 6px; padding-bottom: 6px; }
+    .weather-list { gap: 1px; }
+    .weather-row { padding-top: 3px; padding-bottom: 3px; }
+  }
+</style>
+</head>
+<body>
+  <div id="stage">
+    <div id="app" inert>
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">LH</span>
+          <div>
+            <b>LONG HORIZON</b>
+            <small>PORTFOLIO STUDIO &middot; 25Y</small>
+          </div>
+        </div>
+        <div class="hud">
+          <div class="stat"><span>STAGE</span><strong id="stageValue">PLAN</strong></div>
+          <div class="stat"><span>GOAL</span><strong>$120K</strong></div>
+        </div>
+      </header>
+
+      <section id="planView" class="screen" aria-label="Portfolio plan">
+        <div id="planScroll" class="plan-scroll">
+          <div class="brief-card">
+            <p class="eyebrow">THE BRIEF &middot; 2026&ndash;2051</p>
+            <div class="brief-grid">
+              <div><span>START</span><b>$40,000</b></div>
+              <div><span>GOAL</span><b>$120,000</b></div>
+              <div><span>HORIZON</span><b>25 YRS</b></div>
+            </div>
+            <p class="brief-note">No withdrawals. Fictional money. Returns are illustrative, not forecasts.</p>
+          </div>
+
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">ALLOCATION</p>
+              <h2>Build the mix</h2>
+            </div>
+            <div style="display:flex;align-items:flex-end;gap:6px">
+              <button type="button" id="resetMix" class="reset-btn">Reset</button>
+              <div class="alloc-total"><strong>100%</strong><span>invested</span></div>
+            </div>
+          </div>
+          <div id="allocBar" class="alloc-bar" aria-hidden="true"></div>
+          <div class="composition">
+            <span>Growth <b id="growthPct">65%</b> &middot; Defensive <b id="defensivePct">35%</b></span>
+            <span class="right">Raising one trims the rest</span>
+          </div>
+          <div id="assetList" class="asset-list"></div>
+
+          <details class="rubric">
+            <summary>How the studio scores</summary>
+            <div class="rubric-body">
+              <p><b>Diversify.</b> Fund at least three sleeves; keep the largest at or below 70%; hold 15&ndash;45% in defensive assets.</p>
+              <p><b>Fit the horizon.</b> For 25 years, target 55&ndash;85% growth, 10&ndash;35% bonds, and no more than 15% cash.</p>
+              <p><b>Explain.</b> Pick two sound memo statements. Hype and contradiction earn nothing.</p>
+              <p><b>Survive.</b> The weakest scenario matters most. Consistency across all three earns the rest.</p>
+            </div>
+          </details>
+
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">TRADE-OFF MEMO</p>
+              <h2>Explain the plan</h2>
+            </div>
+            <span class="memo-count" id="memoCount">0/2</span>
+          </div>
+          <p class="section-lede">Choose exactly two statements. The studio scores reasoning, not confidence.</p>
+          <div id="memoList" class="memo-list"></div>
+          <p id="memoHint" class="memo-hint">Two lines make a memo.</p>
+          <p class="disclaimer">All assets, returns, and scenarios are fictional. This is a learning game, not financial advice.</p>
+        </div>
+        <footer class="plan-actions">
+          <div class="run-meta">
+            <span id="memoFoot">0/2</span> memo statements
+            <small id="runHint">Choose two before the stress test.</small>
+          </div>
+          <button type="button" id="runBtn" class="primary-btn" disabled>Run 3 scenarios &rarr;</button>
+        </footer>
+      </section>
+
+      <section id="simView" class="screen" aria-label="Scenario simulation" hidden>
+        <div id="simScroll" class="sim-scroll">
+          <div class="sim-head">
+            <p class="eyebrow">ALL-WEATHER TEST</p>
+            <h2 class="sim-title">Same plan.<br><span>Three weathers.</span></h2>
+            <p class="sim-sub" id="simSub">One allocation, compounded through three different 25-year markets. No edits during the run.</p>
+            <div id="simAlloc" class="sim-alloc" aria-label="Current allocation"></div>
+          </div>
+          <div id="yearRail" class="year-rail" aria-label="Simulation timeline"></div>
+          <div id="scenarioList" class="scenario-list" aria-live="polite"></div>
+          <p id="simNote" class="sim-note"></p>
+        </div>
+        <footer class="sim-actions">
+          <div class="weakest-line">
+            <span>Weakest path</span>
+            <b id="weakestValue">$40,000</b>
+            <small id="weakestPct">33% of goal</small>
+          </div>
+          <div class="sim-buttons">
+            <button type="button" id="advanceBtn" class="primary-btn">Advance 5 years &rarr;</button>
+            <button type="button" id="editPlanBtn" class="link-btn">Edit plan</button>
+          </div>
+        </footer>
+      </section>
+    </div>
+
+    <div id="intro" class="overlay" role="dialog" aria-modal="true" aria-labelledby="introTitle">
+      <div class="panel intro-panel">
+        <p class="intro-eyebrow">A PORTFOLIO PLANNING STUDIO</p>
+        <h1 class="intro-title" id="introTitle">Long<br><span>Horizon</span></h1>
+        <p class="intro-lede">Build a 25-year mix, explain the trade-offs, then run the same plan through three very different markets.</p>
+        <div class="intro-brief">
+          <div><span>START</span><b>$40,000</b></div>
+          <div><span>GOAL</span><b>$120,000</b></div>
+          <div><span>HORIZON</span><b>25 YRS</b></div>
+        </div>
+        <div class="weather-list">
+          <div class="weather-row" style="--scene:#6fe3c1">
+            <span class="weather-icon" aria-hidden="true">01</span>
+            <div><b>The Long Climb</b><small>Mild inflation. A patient expansion.</small></div>
+          </div>
+          <div class="weather-row" style="--scene:#ff9b7b">
+            <span class="weather-icon" aria-hidden="true">02</span>
+            <div><b>The Early Break</b><small>A deep 3-year bear market, then recovery.</small></div>
+          </div>
+          <div class="weather-row" style="--scene:#c1a6ff">
+            <span class="weather-icon" aria-hidden="true">03</span>
+            <div><b>The Flat Decade</b><small>Ten weak years, then normal returns.</small></div>
+          </div>
+        </div>
+        <button type="button" id="startBtn" class="btn">Open the studio</button>
+        <p class="intro-foot">Scored on mix, horizon fit, reasoning, and the weakest path.<br>No real money &middot; no random luck</p>
+      </div>
+    </div>
+
+    <div id="report" class="overlay" role="dialog" aria-modal="true" aria-labelledby="reportTitle" hidden>
+      <div class="panel report-panel">
+        <p class="report-eyebrow" id="reportEyebrow">25-YEAR REVIEW &middot; 2051</p>
+        <h2 class="report-title" id="reportTitle">All weather.</h2>
+        <p class="report-sub" id="reportSub"></p>
+        <div class="report-score">
+          <span>STUDIO SCORE</span>
+          <strong id="reportScore">0000</strong><em>/ 1000</em>
+        </div>
+        <div class="report-rank">
+          <b id="reportRank">All-weather architect</b>
+          <span id="reportRankNote"></span>
+        </div>
+        <div id="scoreBreakdown" class="score-breakdown"></div>
+        <div id="reportScenarios" class="report-scenarios"></div>
+        <div id="memoReview" class="memo-review"></div>
+        <div class="report-actions">
+          <button type="button" id="reviseBtn" class="btn">Revise plan</button>
+          <button type="button" id="startOverBtn" class="secondary-btn">Start over</button>
+        </div>
+        <p class="report-foot" id="reportFoot">The best path does not rescue the weakest one.</p>
+      </div>
+    </div>
+  </div>
+  <p class="hint">allocate &middot; explain &middot; stress-test across three markets</p>
+
+<script>
+(() => {
+  'use strict';
+
+  const START = 40000;
+  const GOAL = 120000;
+  const YEARS = 25;
+  const STEP = 5;
+  const MAX_SCORE = 1000;
+  const DEFAULT_PLAN = { cash: 15, bonds: 20, index: 55, small: 10 };
+
+  const ASSETS = [
+    {
+      key: 'cash',
+      name: 'Cash reserve',
+      short: 'Cash',
+      color: '#7cc7ff',
+      risk: 'Low risk',
+      riskLevel: 1,
+      avg: 2.2,
+      desc: 'Liquid ballast; inflation can erode its buying power.',
+    },
+    {
+      key: 'bonds',
+      name: 'Bond fund',
+      short: 'Bonds',
+      color: '#ffc86b',
+      risk: 'Medium risk',
+      riskLevel: 2,
+      avg: 3.8,
+      desc: 'Income and ballast; prices can fall when rates rise.',
+    },
+    {
+      key: 'index',
+      name: 'Broad index',
+      short: 'Index',
+      color: '#8ce8c4',
+      risk: 'High risk',
+      riskLevel: 3,
+      avg: 6.6,
+      desc: 'Core growth; can fall hard and recover slowly.',
+    },
+    {
+      key: 'small',
+      name: 'Global small-cap',
+      short: 'Small',
+      color: '#c1a6ff',
+      risk: 'Very high',
+      riskLevel: 4,
+      avg: 8.2,
+      desc: 'Extra growth; deep drawdowns demand a long runway.',
+    },
+  ];
+
+  const MEMO_OPTIONS = [
+    {
+      id: 'horizon',
+      text: 'I can tolerate interim drops because the goal is 25 years away.',
+      sound: true,
+    },
+    {
+      id: 'cash',
+      text: 'Cash steadies the ride, but inflation can erode its buying power.',
+      sound: true,
+    },
+    {
+      id: 'spread',
+      text: 'Spreading money across sleeves means no single market decides the result.',
+      sound: true,
+    },
+    {
+      id: 'recent',
+      text: 'The sleeve with the best recent run is safest for the next 25 years.',
+      sound: false,
+    },
+    {
+      id: 'smallcap',
+      text: 'A bigger small-cap sleeve adds upside without adding meaningful risk.',
+      sound: false,
+    },
+    {
+      id: 'skip',
+      text: 'A long horizon means defensive assets can be skipped completely.',
+      sound: false,
+    },
+  ];
+
+  const flat = (value) => Array(YEARS).fill(value);
+
+  const SCENARIOS = [
+    {
+      id: 'climb',
+      name: 'The Long Climb',
+      short: 'Climb',
+      color: '#6fe3c1',
+      desc: 'Mild inflation. A steady expansion.',
+      returns: {
+        cash: flat(2.2),
+        bonds: flat(3.8),
+        index: flat(6.6),
+        small: flat(8.2),
+      },
+    },
+    {
+      id: 'break',
+      name: 'The Early Break',
+      short: 'Break',
+      color: '#ff9b7b',
+      desc: 'A deep 3-year bear market, then recovery.',
+      returns: {
+        cash: flat(2.0),
+        bonds: [4.2, 5.0, 3.2, ...flat(3.7).slice(3)],
+        index: [-22, -9, 18, ...flat(7.2).slice(3)],
+        small: [-30, -14, 27, ...flat(9.0).slice(3)],
+      },
+    },
+    {
+      id: 'flat',
+      name: 'The Flat Decade',
+      short: 'Flat',
+      color: '#c1a6ff',
+      desc: 'Ten weak years, then normal returns.',
+      returns: {
+        cash: [...flat(2.0).slice(0, 10), ...flat(2.3).slice(10)],
+        bonds: [...flat(2.2).slice(0, 10), ...flat(3.6).slice(10)],
+        index: [1.0, 0.5, 1.5, 3.0, 2.0, 2.5, 3.0, 4.0, 4.5, 5.0, ...flat(6.6).slice(10)],
+        small: [-6, -3, -1, 1, 3, 4, 5, 5, 6, 6, ...flat(8.2).slice(10)],
+      },
+    },
+  ];
+
+  const YEAR_STEPS = Array.from({ length: 6 }, (_, index) => 2026 + index * STEP);
+
+  const state = {
+    plan: { ...DEFAULT_PLAN },
+    runPlan: null,
+    memo: new Set(),
+    step: 0,
+    sim: null,
+    report: null,
+    view: 'plan',
+  };
+
+  const els = {
+    app: document.getElementById('app'),
+    stageValue: document.getElementById('stageValue'),
+    planView: document.getElementById('planView'),
+    simView: document.getElementById('simView'),
+    planScroll: document.getElementById('planScroll'),
+    simScroll: document.getElementById('simScroll'),
+    allocBar: document.getElementById('allocBar'),
+    growthPct: document.getElementById('growthPct'),
+    defensivePct: document.getElementById('defensivePct'),
+    assetList: document.getElementById('assetList'),
+    resetMix: document.getElementById('resetMix'),
+    memoList: document.getElementById('memoList'),
+    memoCount: document.getElementById('memoCount'),
+    memoHint: document.getElementById('memoHint'),
+    memoFoot: document.getElementById('memoFoot'),
+    runHint: document.getElementById('runHint'),
+    runBtn: document.getElementById('runBtn'),
+    simAlloc: document.getElementById('simAlloc'),
+    yearRail: document.getElementById('yearRail'),
+    scenarioList: document.getElementById('scenarioList'),
+    simNote: document.getElementById('simNote'),
+    weakestValue: document.getElementById('weakestValue'),
+    weakestPct: document.getElementById('weakestPct'),
+    advanceBtn: document.getElementById('advanceBtn'),
+    editPlanBtn: document.getElementById('editPlanBtn'),
+    intro: document.getElementById('intro'),
+    startBtn: document.getElementById('startBtn'),
+    report: document.getElementById('report'),
+    reportEyebrow: document.getElementById('reportEyebrow'),
+    reportTitle: document.getElementById('reportTitle'),
+    reportSub: document.getElementById('reportSub'),
+    reportScore: document.getElementById('reportScore'),
+    reportRank: document.getElementById('reportRank'),
+    reportRankNote: document.getElementById('reportRankNote'),
+    scoreBreakdown: document.getElementById('scoreBreakdown'),
+    reportScenarios: document.getElementById('reportScenarios'),
+    memoReview: document.getElementById('memoReview'),
+    reportFoot: document.getElementById('reportFoot'),
+    reviseBtn: document.getElementById('reviseBtn'),
+    startOverBtn: document.getElementById('startOverBtn'),
+  };
+
+  const esc = (value) => String(value).replace(/[&<>"']/g, (ch) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  }[ch]));
+
+  const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+  const pad = (value) => String(value).padStart(4, '0');
+  const money = (value) => new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0,
+  }).format(Math.round(value));
+  const signedMoney = (value) => `${value >= 0 ? '+' : '-'}${money(Math.abs(value))}`;
+  const percentOfGoal = (value) => Math.round((value / GOAL) * 100);
+  const pct = (value) => `${Math.round(value)}%`;
+
+  const simNotes = [
+    'Same $40,000. Same allocation. Three different decades.',
+    'Five years in. The early crash is already drawing blood.',
+    'Ten years in. The flat decade is doing its quiet damage.',
+    'Fifteen years. Recovery is carrying two of the three paths.',
+    'Twenty years. The finish line is close, but sequence still matters.',
+    'Twenty-five years. The studio scores the weakest path, not the luckiest.',
+  ];
+
+  function renderAllocation() {
+    const growth = state.plan.index + state.plan.small;
+    const defensive = state.plan.cash + state.plan.bonds;
+    els.growthPct.textContent = `${growth}%`;
+    els.defensivePct.textContent = `${defensive}%`;
+
+    els.allocBar.innerHTML = ASSETS.map((asset) => `
+      <span class="alloc-segment" style="width:${state.plan[asset.key]}%;background:${asset.color}"></span>
+    `).join('');
+
+    ASSETS.forEach((asset) => {
+      const value = state.plan[asset.key];
+      const row = els.assetList.querySelector(`[data-asset="${asset.key}"]`);
+      if (!row) return;
+      const input = row.querySelector('input');
+      const output = row.querySelector('output');
+      input.value = value;
+      input.style.setProperty('--fill', `${value}%`);
+      input.setAttribute('aria-valuetext', `${value}% allocated to ${asset.name}`);
+      output.textContent = `${value}%`;
+    });
+  }
+
+  function setAllocationFromSlider(key, requested) {
+    if (!ASSETS.some((asset) => asset.key === key)) return;
+    const newUnits = clamp(Math.round(requested / 5), 0, 20);
+    const others = ASSETS.map((asset) => asset.key).filter((assetKey) => assetKey !== key);
+    const remainingUnits = 20 - newUnits;
+    const otherTotalUnits = others.reduce((sum, assetKey) => sum + state.plan[assetKey] / 5, 0);
+    const raw = others.map((assetKey) => (
+      otherTotalUnits > 0
+        ? remainingUnits * ((state.plan[assetKey] / 5) / otherTotalUnits)
+        : remainingUnits / others.length
+    ));
+    const distributed = raw.map(Math.floor);
+    let leftover = remainingUnits - distributed.reduce((sum, unit) => sum + unit, 0);
+    const order = raw
+      .map((unit, index) => ({ index, fraction: unit - Math.floor(unit) }))
+      .sort((a, b) => b.fraction - a.fraction || a.index - b.index);
+
+    for (let index = 0; index < leftover; index += 1) {
+      distributed[order[index].index] += 1;
+    }
+
+    state.plan[key] = newUnits * 5;
+    others.forEach((assetKey, index) => {
+      state.plan[assetKey] = distributed[index] * 5;
+    });
+    renderAllocation();
+  }
+
+  function buildAssetRows() {
+    els.assetList.innerHTML = ASSETS.map((asset) => `
+      <div class="asset-row" data-asset="${asset.key}" style="--accent:${asset.color}">
+        <div class="asset-top">
+          <div class="asset-name">
+            <span class="asset-dot" aria-hidden="true"></span>
+            <b>${esc(asset.name)}</b>
+            <span class="risk-label">${esc(asset.risk)}</span>
+          </div>
+          <output class="asset-pct" id="alloc-${asset.key}" for="range-${asset.key}">0%</output>
+        </div>
+        <p class="asset-desc"><span>Assumed ${asset.avg.toFixed(1)}% / yr.</span> ${esc(asset.desc)}</p>
+        <div class="range-row">
+          <input id="range-${asset.key}" type="range" min="0" max="100" step="5"
+            value="${state.plan[asset.key]}" aria-label="${esc(asset.name)} allocation percentage">
+          <span class="risk-pips" aria-hidden="true">
+            ${[1, 2, 3, 4].map((level) => `<i class="${level <= asset.riskLevel ? 'on' : ''}"></i>`).join('')}
+          </span>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function buildMemo() {
+    els.memoList.innerHTML = MEMO_OPTIONS.map((option, index) => `
+      <button type="button" class="memo-option" data-memo="${option.id}" aria-pressed="false">
+        <span class="memo-check" aria-hidden="true"></span>
+        <span>${esc(option.text)}</span>
+      </button>
+    `).join('');
+  }
+
+  function renderMemo() {
+    els.memoList.querySelectorAll('.memo-option').forEach((button) => {
+      const selected = state.memo.has(button.dataset.memo);
+      button.classList.toggle('selected', selected);
+      button.setAttribute('aria-pressed', String(selected));
+      button.querySelector('.memo-check').textContent = selected ? '\u2713' : '';
+    });
+
+    const count = state.memo.size;
+    els.memoCount.textContent = `${count}/2`;
+    els.memoFoot.textContent = `${count}/2`;
+    els.runBtn.disabled = count !== 2;
+
+    if (count === 2) {
+      els.runHint.textContent = 'Ready for all three weathers.';
+    } else {
+      els.runHint.textContent = count === 0
+        ? 'Choose two before the stress test.'
+        : 'One more statement to unlock the test.';
+    }
+  }
+
+  function toggleMemo(id) {
+    if (!MEMO_OPTIONS.some((option) => option.id === id)) return;
+    if (state.memo.has(id)) {
+      state.memo.delete(id);
+      els.memoHint.className = 'memo-hint';
+      els.memoHint.textContent = state.memo.size === 2 ? 'Two lines make a memo.' : 'Two lines make a memo.';
+    } else if (state.memo.size >= 2) {
+      els.memoHint.className = 'memo-hint warn';
+      els.memoHint.textContent = 'Two lines only. Remove one to swap it.';
+      return;
+    } else {
+      state.memo.add(id);
+      els.memoHint.className = 'memo-hint';
+      els.memoHint.textContent = state.memo.size === 2
+        ? 'Memo locked in. The plan is ready for the stress test.'
+        : 'One line selected. Choose one more.';
+    }
+    renderMemo();
+  }
+
+  function simulatePlan(plan) {
+    return SCENARIOS.map((scenario) => {
+      const values = [START];
+      let value = START;
+      for (let year = 0; year < YEARS; year += 1) {
+        const annualReturn = ASSETS.reduce((sum, asset) => (
+          sum + (plan[asset.key] / 100) * scenario.returns[asset.key][year]
+        ), 0);
+        value *= 1 + annualReturn / 100;
+        values.push(value);
+      }
+      return { ...scenario, values };
+    });
+  }
+
+  function openSimulation() {
+    if (state.memo.size !== 2) return;
+    state.runPlan = { ...state.plan };
+    state.sim = simulatePlan(state.runPlan);
+    state.step = 0;
+    state.report = null;
+    state.view = 'sim';
+    els.planView.hidden = true;
+    els.simView.hidden = false;
+    els.stageValue.textContent = 'YEAR 00';
+    renderSimulation();
+    els.simScroll.scrollTop = 0;
+    els.advanceBtn.focus({ preventScroll: true });
+  }
+
+  function renderSimulation() {
+    if (!state.sim) return;
+    const year = state.step * STEP;
+    els.stageValue.textContent = `YEAR ${String(year).padStart(2, '0')}`;
+
+    els.simAlloc.innerHTML = ASSETS.map((asset) => `
+      <span class="sim-pill" style="--accent:${asset.color}">${asset.short} ${state.plan[asset.key]}%</span>
+    `).join('');
+
+    els.yearRail.innerHTML = YEAR_STEPS.map((label, index) => `
+      <div class="year-node ${index < state.step ? 'passed' : ''} ${index === state.step ? 'active' : ''}">
+        <span>${label}</span>
+      </div>
+    `).join('');
+
+    els.scenarioList.innerHTML = state.sim.map((scenario) => {
+      const value = scenario.values[year];
+      const previous = year === 0 ? START : scenario.values[year - STEP];
+      const delta = value - previous;
+      const progress = percentOfGoal(value);
+      return `
+        <article class="scenario-card" style="--scene:${scenario.color}">
+          <div class="scene-top">
+            <span class="scene-num">${scenario.short.toUpperCase()}</span>
+            <div class="scene-name">
+              <h3>${esc(scenario.name)}</h3>
+              <p>${esc(scenario.desc)}</p>
+            </div>
+            <span class="scene-pct">${progress}%</span>
+          </div>
+          <div class="scene-numbers">
+            <span class="scene-value">${money(value)}</span>
+            <span class="scene-delta ${delta > 0 ? 'up' : delta < 0 ? 'down' : ''}">${year === 0 ? 'START' : signedMoney(delta)}</span>
+          </div>
+          <div class="scene-track"><span style="width:${clamp(progress, 0, 100)}%"></span></div>
+          <div class="scene-foot"><span>YEAR ${year}</span><span>GOAL $120K</span></div>
+        </article>
+      `;
+    }).join('');
+
+    const currentValues = state.sim.map((scenario) => scenario.values[year]);
+    const weakest = Math.min(...currentValues);
+    els.weakestValue.textContent = money(weakest);
+    els.weakestPct.textContent = `${percentOfGoal(weakest)}% of goal`;
+    els.simNote.textContent = simNotes[state.step];
+    els.advanceBtn.textContent = state.step >= 5 ? 'Read the report \u2192' : 'Advance 5 years \u2192';
+  }
+
+  function advanceSimulation() {
+    if (!state.sim) return;
+    if (state.step >= 5) {
+      openReport();
+      return;
+    }
+    state.step += 1;
+    renderSimulation();
+  }
+
+  function editPlan() {
+    state.sim = null;
+    state.runPlan = null;
+    state.step = 0;
+    state.view = 'plan';
+    els.simView.hidden = true;
+    els.planView.hidden = false;
+    els.stageValue.textContent = 'PLAN';
+    renderAllocation();
+    renderMemo();
+    els.planScroll.scrollTop = 0;
+    els.runBtn.focus({ preventScroll: true });
+  }
+
+  function scorePlan() {
+    const plan = state.runPlan || state.plan;
+    const growth = plan.index + plan.small;
+    const defensive = plan.cash + plan.bonds;
+    const funded = ASSETS.filter((asset) => plan[asset.key] >= 5).length;
+    const largest = Math.max(...ASSETS.map((asset) => plan[asset.key]));
+
+    let diversity = 0;
+    if (funded >= 3) diversity += 100;
+    else if (funded === 2) diversity += 50;
+    if (largest <= 70) diversity += 100;
+    else if (largest <= 80) diversity += 50;
+    if (growth >= 40 && growth <= 85 && defensive >= 15 && defensive <= 45) diversity += 100;
+    else if (growth >= 40 && defensive >= 15) diversity += 50;
+
+    let horizon = 0;
+    if (growth >= 55 && growth <= 85) horizon += 100;
+    else if ((growth >= 40 && growth < 55) || (growth > 85 && growth <= 95)) horizon += 50;
+    if (plan.cash <= 15) horizon += 75;
+    else if (plan.cash <= 25) horizon += 40;
+    if (plan.bonds >= 10 && plan.bonds <= 35) horizon += 75;
+    else if (plan.bonds > 0 && plan.bonds <= 45) horizon += 40;
+
+    const soundPicks = MEMO_OPTIONS.filter((option) => state.memo.has(option.id) && option.sound).length;
+    const memo = soundPicks * 100;
+
+    const finals = state.sim.map((scenario) => scenario.values[YEARS]);
+    const worst = Math.min(...finals);
+    const best = Math.max(...finals);
+    const atEightyFive = finals.filter((value) => value >= GOAL * 0.85).length;
+
+    let robustness = 0;
+    if (worst >= GOAL) robustness += 150;
+    else if (worst >= GOAL * 0.85) robustness += 100;
+    else if (worst >= GOAL * 0.70) robustness += 50;
+    if (atEightyFive === 3) robustness += 100;
+    else if (atEightyFive === 2) robustness += 60;
+    else if (atEightyFive === 1) robustness += 20;
+
+    return {
+      total: diversity + horizon + memo + robustness,
+      diversity,
+      horizon,
+      memo,
+      robustness,
+      growth,
+      defensive,
+      funded,
+      largest,
+      soundPicks,
+      finals,
+      worst,
+      best,
+      atEightyFive,
+      worstPct: percentOfGoal(worst),
+    };
+  }
+
+  function rankFor(score) {
+    if (score >= MAX_SCORE) {
+      return ['All-weather architect', 'Every sleeve, every horizon, every weather — and the memo explains why.'];
+    }
+    if (score >= 900) {
+      return ['Long-view planner', 'The plan is coherent and resilient. A small adjustment could clear the last gap.'];
+    }
+    if (score >= 750) {
+      return ['Promising draft', 'The instincts are sound, but the mix or the reasoning still leaks points.'];
+    }
+    if (score >= 600) {
+      return ['Fragile plan', 'It can look fine in one weather and strain in another.'];
+    }
+    return ['Fair-weather mix', 'The plan is leaning on luck, concentration, or a story that does not hold.'];
+  }
+
+  function openReport() {
+    if (state.step < 5 || !state.sim) return;
+    const result = scorePlan();
+    state.report = result;
+    const rank = rankFor(result.total);
+    const goalMet = result.worst >= GOAL;
+    const success = goalMet && result.total >= 900;
+    const warn = !success && (goalMet || result.worst >= GOAL * 0.70);
+    const bad = result.worst < GOAL * 0.70;
+
+    els.reportEyebrow.textContent = '25-YEAR REVIEW \u00b7 2051';
+    els.reportTitle.textContent = success
+      ? 'All weather.'
+      : goalMet
+        ? 'Goal met. Mix strained.'
+        : result.worst >= GOAL * 0.85
+          ? 'Bends, holds.'
+          : warn
+            ? 'A visible crack.'
+            : 'One bad decade.';
+    els.reportTitle.classList.toggle('warn', warn);
+    els.reportTitle.classList.toggle('bad', bad);
+    els.reportSub.textContent = `The weakest path ended at ${money(result.worst)} — ${result.worstPct}% of the goal. The best ended at ${money(result.best)}. The studio scores the weakest path and consistency, not the luckiest run.`;
+    els.reportScore.textContent = pad(result.total);
+    els.reportRank.textContent = rank[0];
+    els.reportRankNote.textContent = rank[1];
+
+    const rows = [
+      {
+        label: 'Diversification',
+        points: result.diversity,
+        max: 300,
+        note: `${result.funded} sleeve${result.funded === 1 ? '' : 's'} funded; largest ${result.largest}%; growth ${result.growth}% / defensive ${result.defensive}%.`,
+      },
+      {
+        label: 'Horizon fit',
+        points: result.horizon,
+        max: 250,
+        note: `Growth ${result.growth}% \u00b7 bonds ${state.runPlan.bonds}% \u00b7 cash ${state.runPlan.cash}% for a 25-year runway.`,
+      },
+      {
+        label: 'Trade-off memo',
+        points: result.memo,
+        max: 200,
+        note: `${result.soundPicks} of 2 selected lines are sound.`,
+      },
+      {
+        label: 'All-weather test',
+        points: result.robustness,
+        max: 250,
+        note: `Worst path ${result.worstPct}% of goal; ${result.atEightyFive}/3 paths cleared 85%.`,
+      },
+    ];
+
+    els.scoreBreakdown.innerHTML = rows.map((row) => `
+      <div class="score-block">
+        <div class="score-line"><span>${esc(row.label)}</span><b>${row.points} / ${row.max}</b></div>
+        <div class="score-bar"><span style="width:${(row.points / row.max) * 100}%"></span></div>
+        <p class="score-note">${esc(row.note)}</p>
+      </div>
+    `).join('');
+
+    els.reportScenarios.innerHTML = `
+      <p class="report-label">Ending values</p>
+      ${state.sim.map((scenario, index) => `
+        <div class="report-scenario" style="--scene:${scenario.color}">
+          <span><i></i>${esc(scenario.name)}</span>
+          <b>${money(result.finals[index])} \u00b7 ${percentOfGoal(result.finals[index])}%</b>
+        </div>
+      `).join('')}
+    `;
+
+    els.memoReview.innerHTML = `
+      <p class="report-label">Your memo</p>
+      ${MEMO_OPTIONS.filter((option) => state.memo.has(option.id)).map((option) => `
+        <div class="memo-review-row ${option.sound ? '' : 'bad'}">
+          <b>${option.sound ? '\u2713' : '\u00d7'}</b>
+          <span>${esc(option.text)}</span>
+        </div>
+      `).join('')}
+    `;
+
+    els.reportFoot.textContent = goalMet && !success
+      ? 'Every weather cleared the goal; the mix still carries avoidable risk.'
+      : result.best >= GOAL && !goalMet
+        ? 'The best path did not rescue the weakest one.'
+        : success
+          ? 'Every weather cleared the goal.'
+          : 'A strong best case cannot compensate for a weak worst case.';
+
+    els.report.hidden = false;
+    els.app.inert = true;
+    els.reviseBtn.focus({ preventScroll: true });
+  }
+
+  function closeReportAndRevise() {
+    els.report.hidden = true;
+    els.app.inert = false;
+    state.sim = null;
+    state.runPlan = null;
+    state.step = 0;
+    state.view = 'plan';
+    els.simView.hidden = true;
+    els.planView.hidden = false;
+    els.stageValue.textContent = 'PLAN';
+    renderAllocation();
+    renderMemo();
+    els.planScroll.scrollTop = 0;
+    els.runBtn.focus({ preventScroll: true });
+  }
+
+  function resetEverything(showIntro) {
+    state.plan = { ...DEFAULT_PLAN };
+    state.runPlan = null;
+    state.memo.clear();
+    state.step = 0;
+    state.sim = null;
+    state.report = null;
+    state.view = 'plan';
+    els.report.hidden = true;
+    els.simView.hidden = true;
+    els.planView.hidden = false;
+    els.stageValue.textContent = 'PLAN';
+    renderAllocation();
+    renderMemo();
+    els.memoHint.className = 'memo-hint';
+    els.memoHint.textContent = 'Two lines make a memo.';
+    els.planScroll.scrollTop = 0;
+    if (showIntro) {
+      els.intro.hidden = false;
+      els.app.inert = true;
+      els.startBtn.focus({ preventScroll: true });
+    } else {
+      els.intro.hidden = true;
+      els.app.inert = false;
+      els.runBtn.focus({ preventScroll: true });
+    }
+  }
+
+  function startStudio() {
+    els.intro.hidden = true;
+    els.app.inert = false;
+    const slider = els.assetList.querySelector('input');
+    if (slider) slider.focus({ preventScroll: true });
+  }
+
+  /* ---------- events ---------- */
+
+  els.startBtn.addEventListener('click', startStudio);
+  els.runBtn.addEventListener('click', openSimulation);
+  els.advanceBtn.addEventListener('click', advanceSimulation);
+  els.editPlanBtn.addEventListener('click', editPlan);
+  els.reviseBtn.addEventListener('click', closeReportAndRevise);
+  els.startOverBtn.addEventListener('click', () => resetEverything(true));
+
+  els.resetMix.addEventListener('click', () => {
+    state.plan = { ...DEFAULT_PLAN };
+    renderAllocation();
+    els.resetMix.blur();
+  });
+
+  els.assetList.addEventListener('input', (event) => {
+    const input = event.target.closest('input[type="range"]');
+    if (!input) return;
+    const row = input.closest('[data-asset]');
+    setAllocationFromSlider(row.dataset.asset, Number(input.value));
+  });
+
+  els.memoList.addEventListener('click', (event) => {
+    const option = event.target.closest('[data-memo]');
+    if (option) toggleMemo(option.dataset.memo);
+  });
+
+  /* ---------- boot ---------- */
+
+  buildAssetRows();
+  buildMemo();
+  renderAllocation();
+  renderMemo();
+  resetEverything(false);
+  els.intro.hidden = false;
+  els.app.inert = true;
+  els.startBtn.focus({ preventScroll: true });
+
+  /* ---------- test hook ---------- */
+
+  window.__LONGHORIZON__ = {
+    setPlan(nextPlan) {
+      const next = {
+        cash: Number(nextPlan.cash || 0),
+        bonds: Number(nextPlan.bonds || 0),
+        index: Number(nextPlan.index || 0),
+        small: Number(nextPlan.small || 0),
+      };
+      const total = Object.values(next).reduce((sum, value) => sum + value, 0);
+      if (total !== 100) throw new Error('Plan must allocate exactly 100%.');
+      if (Object.values(next).some((value) => value < 0 || value % 5 !== 0)) {
+        throw new Error('Plan values must be non-negative multiples of 5.');
+      }
+      state.plan = next;
+      state.sim = null;
+      state.runPlan = null;
+      state.step = 0;
+      renderAllocation();
+      uiSetPlanSafe();
+    },
+    getState() {
+      return {
+        plan: { ...state.plan },
+        memo: [...state.memo],
+        step: state.step,
+        sim: state.sim,
+        report: state.report,
+      };
+    },
+    getScore: () => state.report,
+    simulatePlan,
+  };
+
+  function uiSetPlanSafe() {
+    if (state.view !== 'plan') return;
+    els.stageValue.textContent = 'PLAN';
+    els.advanceBtn.textContent = 'Advance 5 years \u2192';
+  }
+})();
+
+</script>
+</body>
+</html>

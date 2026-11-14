@@ -1,0 +1,2406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#070b15">
+<title>Time Vault</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --ink: #eff5ff;
+    --muted: rgba(225, 236, 255, 0.51);
+    --faint: rgba(225, 236, 255, 0.23);
+    --cyan: #7dd8ff;
+    --cyan-deep: #36b8e8;
+    --gold: #ffc86d;
+    --gold-deep: #d99b35;
+    --violet: #b9a6ff;
+    --mint: #8ce8c4;
+    --red: #ff8d7a;
+    --line: rgba(151, 193, 246, 0.15);
+    --panel: rgba(11, 19, 35, 0.97);
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    background:
+      radial-gradient(110% 82% at 50% 0%, #273257 0%, #0a1020 54%, #030610 100%);
+    color: var(--ink);
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    -webkit-user-select: none;
+    user-select: none;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+  #stage {
+    position: relative;
+    width: min(100%, calc((100dvh - 55px) * 0.75));
+    aspect-ratio: 3 / 4;
+    border-radius: 20px;
+    overflow: hidden;
+    background: #060b16;
+    box-shadow:
+      0 30px 70px -28px rgba(0, 0, 0, 0.96),
+      0 0 0 1px rgba(255, 255, 255, 0.07),
+      inset 0 0 0 1px rgba(125, 216, 255, 0.06);
+    container-type: size;
+  }
+  .hint {
+    margin: 0;
+    color: rgba(233, 242, 255, 0.28);
+    font-size: clamp(6.5px, 1.8vw, 8px);
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  button, input { font: inherit; }
+  button:focus-visible, input:focus-visible, summary:focus-visible {
+    outline: 2px solid #d8f3ff;
+    outline-offset: 2px;
+  }
+  [hidden] { display: none !important; }
+
+  #app {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    background:
+      radial-gradient(78% 46% at 50% 0%, rgba(58, 74, 121, 0.26), transparent 76%),
+      linear-gradient(180deg, #0c1426 0%, #070d19 72%, #040812 100%);
+  }
+
+  /* ---------- top bar ---------- */
+  .topbar {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 8px 8px 0;
+    padding: 6px 8px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: linear-gradient(180deg, rgba(27, 38, 65, 0.97), rgba(7, 13, 26, 0.93));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045);
+  }
+  .brand { display: flex; align-items: center; gap: 7px; min-width: 0; }
+  .brand-mark {
+    width: 23px;
+    height: 23px;
+    flex: none;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(185, 166, 255, 0.5);
+    border-radius: 6px;
+    background: rgba(185, 166, 255, 0.09);
+    color: var(--violet);
+    font-size: 8px;
+    font-weight: 800;
+    letter-spacing: -0.04em;
+  }
+  .brand b {
+    display: block;
+    font-size: clamp(9.5px, 2.1cqw, 12px);
+    letter-spacing: 0.11em;
+    line-height: 1.05;
+    white-space: nowrap;
+  }
+  .brand small {
+    display: block;
+    margin-top: 2px;
+    color: var(--muted);
+    font-size: clamp(5px, 1.12cqw, 6.6px);
+    letter-spacing: 0.12em;
+    white-space: nowrap;
+  }
+  .hud { display: flex; align-items: center; gap: clamp(8px, 2.2cqw, 14px); flex: none; }
+  .stat { text-align: right; }
+  .stat span {
+    display: block;
+    color: var(--muted);
+    font-size: clamp(5px, 1.1cqw, 6.3px);
+    letter-spacing: 0.13em;
+  }
+  .stat strong {
+    display: block;
+    margin-top: 1px;
+    color: var(--cyan);
+    font-size: clamp(10px, 2.4cqw, 14px);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .stat:last-child strong { color: var(--gold); }
+
+  /* ---------- screen ---------- */
+  .screen {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    margin: 6px 8px 8px;
+    overflow: hidden;
+    border: 1px solid rgba(151, 193, 246, 0.16);
+    border-radius: 18px;
+    background: linear-gradient(180deg, rgba(11, 20, 38, 0.97), rgba(5, 10, 21, 0.98));
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.045),
+      0 18px 38px -30px rgba(0, 0, 0, 0.9);
+  }
+  .lab-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 8px 9px 11px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(125, 216, 255, 0.2) transparent;
+  }
+  .lab-scroll::-webkit-scrollbar { width: 4px; }
+  .lab-scroll::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: rgba(125, 216, 255, 0.2);
+  }
+
+  .eyebrow {
+    margin: 0;
+    color: var(--violet);
+    font-size: clamp(5.4px, 1.15cqw, 6.8px);
+    letter-spacing: 0.18em;
+    line-height: 1.3;
+    text-transform: uppercase;
+  }
+
+  /* ---------- mission ---------- */
+  .mission {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+    overflow: hidden;
+    padding: 8px 9px 8px 10px;
+    border: 1px solid rgba(185, 166, 255, 0.22);
+    border-radius: 9px;
+    background:
+      radial-gradient(90% 150% at 100% 0%, rgba(185, 166, 255, 0.125), transparent 62%),
+      rgba(185, 166, 255, 0.035);
+  }
+  .mission::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    border-radius: 0 2px 2px 0;
+    background: linear-gradient(180deg, var(--violet), rgba(185, 166, 255, 0.12));
+  }
+  .mission-copy { min-width: 0; flex: 1; }
+  .mission-copy h1 {
+    margin: 2px 0 0;
+    font-size: clamp(15px, 3.5cqw, 21px);
+    line-height: 1.05;
+    letter-spacing: -0.035em;
+  }
+  .mission-copy p:last-child {
+    margin: 3px 0 0;
+    color: rgba(223, 233, 252, 0.56);
+    font-size: clamp(6px, 1.25cqw, 7.4px);
+    line-height: 1.4;
+  }
+  .target-box {
+    flex: none;
+    min-width: 76px;
+    padding-left: 8px;
+    border-left: 1px dashed rgba(255, 200, 109, 0.25);
+    text-align: right;
+  }
+  .target-box span, .target-box small {
+    display: block;
+    color: rgba(255, 220, 159, 0.52);
+    font-size: clamp(4.9px, 1.02cqw, 6px);
+    letter-spacing: 0.11em;
+    line-height: 1.25;
+  }
+  .target-box strong {
+    display: block;
+    margin: 1px 0;
+    color: var(--gold);
+    font-size: clamp(14px, 3.2cqw, 19px);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .equation-line {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 7px;
+    margin: 6px 1px 0;
+    color: var(--faint);
+    font-size: clamp(5.2px, 1.06cqw, 6.3px);
+    line-height: 1.3;
+  }
+  .equation-line b {
+    display: inline-block;
+    margin-right: 4px;
+    padding: 1px 3px;
+    border: 1px solid rgba(125, 216, 255, 0.2);
+    border-radius: 3px;
+    color: var(--cyan);
+    font-size: 0.92em;
+    letter-spacing: 0.1em;
+  }
+
+  /* ---------- chart ---------- */
+  .chart-card {
+    margin-top: 6px;
+    padding: 7px 8px 6px;
+    border: 1px solid rgba(151, 193, 246, 0.14);
+    border-radius: 10px;
+    background:
+      radial-gradient(80% 120% at 50% 0%, rgba(61, 84, 130, 0.16), transparent 70%),
+      rgba(6, 12, 25, 0.6);
+  }
+  .chart-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .chart-head h2 {
+    margin: 1px 0 0;
+    font-size: clamp(11px, 2.5cqw, 15px);
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+  }
+  .chart-legend {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding-top: 2px;
+    font-size: clamp(5.2px, 1.08cqw, 6.4px);
+    color: var(--muted);
+  }
+  .chart-legend span { display: flex; align-items: center; gap: 3px; white-space: nowrap; }
+  .chart-legend i {
+    width: 7px;
+    height: 7px;
+    display: inline-block;
+    border-radius: 50%;
+    background: currentColor;
+    box-shadow: 0 0 7px currentColor;
+  }
+  .chart-legend .early { color: var(--cyan); }
+  .chart-legend .later { color: var(--gold); }
+  .chart-wrap {
+    position: relative;
+    margin-top: 3px;
+    overflow: hidden;
+    border: 1px solid rgba(151, 193, 246, 0.08);
+    border-radius: 6px;
+    background:
+      linear-gradient(rgba(125, 216, 255, 0.022) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(125, 216, 255, 0.02) 1px, transparent 1px),
+      rgba(3, 8, 18, 0.7);
+    background-size: 24px 24px, 24px 24px, auto;
+  }
+  #chart { display: block; width: 100%; height: auto; }
+  .chart-note {
+    margin: 4px 1px 0;
+    min-height: 2.5em;
+    color: rgba(224, 236, 255, 0.51);
+    font-size: clamp(5.6px, 1.17cqw, 7px);
+    line-height: 1.3;
+  }
+  .chart-note b { color: var(--ink); font-weight: 600; }
+  .chart-axis {
+    fill: rgba(227, 238, 255, 0.35);
+    font-family: inherit;
+    font-size: 10px;
+    letter-spacing: 0.02em;
+  }
+  .chart-axis.small { font-size: 9px; fill: rgba(227, 238, 255, 0.26); }
+  .chart-target-line { stroke: rgba(140, 232, 196, 0.48); stroke-width: 1; stroke-dasharray: 4 4; }
+  .chart-target-label {
+    fill: rgba(168, 242, 212, 0.8);
+    font-family: inherit;
+    font-size: 9px;
+    letter-spacing: 0.07em;
+    text-anchor: end;
+  }
+  .chart-line { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .chart-end { stroke-width: 1.3; }
+  .chart-marker { stroke: rgba(185, 166, 255, 0.28); stroke-width: 1; stroke-dasharray: 3 4; }
+  .chart-marker-label {
+    fill: rgba(205, 192, 255, 0.68);
+    font-family: inherit;
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    text-anchor: middle;
+  }
+  .chart-locked {
+    fill: rgba(226, 237, 255, 0.29);
+    font-family: inherit;
+    font-size: 11px;
+    letter-spacing: 0.19em;
+    text-anchor: middle;
+  }
+  .chart-locked-sub {
+    fill: rgba(226, 237, 255, 0.18);
+    font-family: inherit;
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    text-anchor: middle;
+  }
+
+  /* ---------- saver cards ---------- */
+  .balance-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 5px;
+    margin-top: 5px;
+  }
+  .saver-card {
+    min-width: 0;
+    padding: 6px 7px 5px;
+    border: 1px solid rgba(255, 255, 255, 0.065);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.023);
+  }
+  .saver-card.early { border-top-color: rgba(125, 216, 255, 0.55); }
+  .saver-card.later { border-top-color: rgba(255, 200, 109, 0.55); }
+  .saver-card.leading { background: rgba(255, 255, 255, 0.05); }
+  .saver-card.leading.early { box-shadow: inset 0 0 0 1px rgba(125, 216, 255, 0.18); }
+  .saver-card.leading.later { box-shadow: inset 0 0 0 1px rgba(255, 200, 109, 0.18); }
+  .saver-top { display: flex; align-items: center; justify-content: space-between; gap: 5px; }
+  .saver-name {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--muted);
+    font-size: clamp(5.1px, 1.05cqw, 6.2px);
+    letter-spacing: 0.12em;
+    white-space: nowrap;
+  }
+  .saver-name i {
+    width: 5px;
+    height: 5px;
+    flex: none;
+    border-radius: 50%;
+    background: currentColor;
+  }
+  .saver-card.early .saver-name { color: var(--cyan); }
+  .saver-card.later .saver-name { color: var(--gold); }
+  .crown {
+    color: var(--mint);
+    font-size: clamp(5px, 1cqw, 5.9px);
+    letter-spacing: 0.08em;
+    white-space: nowrap;
+  }
+  .saver-balance {
+    display: block;
+    margin-top: 3px;
+    overflow: hidden;
+    color: var(--ink);
+    font-size: clamp(14px, 3.15cqw, 19px);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .saver-balance.locked { color: rgba(226, 237, 255, 0.34); font-size: clamp(11px, 2.45cqw, 15px); letter-spacing: 0.08em; }
+  .saver-card.early .saver-balance { color: var(--cyan); }
+  .saver-card.later .saver-balance { color: var(--gold); }
+  .saver-meta {
+    display: flex;
+    justify-content: space-between;
+    gap: 5px;
+    margin-top: 3px;
+    color: var(--muted);
+    font-size: clamp(5px, 1.04cqw, 6.2px);
+    line-height: 1.3;
+  }
+  .saver-meta span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .saver-growth {
+    margin-top: 2px;
+    color: var(--faint);
+    font-size: clamp(5.1px, 1.05cqw, 6.2px);
+    line-height: 1.3;
+  }
+  .saver-growth b { color: var(--mint); font-weight: 600; }
+  .compare-line {
+    margin: 5px 1px 0;
+    min-height: 2.3em;
+    color: rgba(224, 236, 255, 0.45);
+    font-size: clamp(5.5px, 1.15cqw, 6.8px);
+    line-height: 1.35;
+  }
+  .compare-line b { color: var(--ink); }
+
+  /* ---------- prediction ---------- */
+  .prediction-card {
+    margin-top: 7px;
+    padding: 7px 8px 7px;
+    border: 1px solid rgba(255, 200, 109, 0.18);
+    border-radius: 9px;
+    background:
+      radial-gradient(85% 140% at 100% 0%, rgba(255, 200, 109, 0.075), transparent 61%),
+      rgba(255, 200, 109, 0.02);
+  }
+  .prediction-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 7px;
+  }
+  .prediction-head h2 {
+    margin: 1px 0 0;
+    font-size: clamp(11px, 2.5cqw, 15px);
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+  }
+  .prediction-head .eyebrow { color: var(--gold); }
+  .pred-state {
+    flex: none;
+    padding: 2px 4px;
+    border: 1px solid rgba(255, 200, 109, 0.24);
+    border-radius: 3px;
+    color: var(--gold);
+    font-size: clamp(5px, 1.02cqw, 6px);
+    letter-spacing: 0.12em;
+  }
+  .prediction-lede {
+    margin: 4px 0 5px;
+    color: var(--muted);
+    font-size: clamp(5.8px, 1.2cqw, 7px);
+    line-height: 1.35;
+  }
+  .choice-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+  }
+  .choice {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    min-height: 25px;
+    padding: 4px;
+    border: 1px solid rgba(151, 193, 246, 0.13);
+    border-radius: 5px;
+    background: rgba(255, 255, 255, 0.022);
+    color: var(--muted);
+    cursor: pointer;
+    font-size: clamp(6px, 1.25cqw, 7.4px);
+    letter-spacing: 0.04em;
+  }
+  .choice:hover:not(:disabled) { color: var(--ink); background: rgba(255, 255, 255, 0.055); }
+  .choice[aria-pressed="true"] { color: var(--ink); border-color: rgba(255, 200, 109, 0.46); background: rgba(255, 200, 109, 0.1); }
+  .choice[data-pick="early"][aria-pressed="true"] { border-color: rgba(125, 216, 255, 0.48); background: rgba(125, 216, 255, 0.1); }
+  .choice:disabled { cursor: default; opacity: 0.66; }
+  .choice i {
+    width: 5px;
+    height: 5px;
+    flex: none;
+    border-radius: 50%;
+    background: currentColor;
+  }
+  .choice[data-pick="early"] i { background: var(--cyan); }
+  .choice[data-pick="later"] i { background: var(--gold); }
+  .forecast-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 5px;
+    margin-top: 5px;
+  }
+  .forecast-field { flex: 1; min-width: 0; }
+  .forecast-field label {
+    display: block;
+    margin-bottom: 2px;
+    color: var(--muted);
+    font-size: clamp(5.1px, 1.04cqw, 6.1px);
+    letter-spacing: 0.09em;
+  }
+  .money-field {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    padding: 3px 5px;
+    border: 1px solid rgba(255, 200, 109, 0.22);
+    border-radius: 5px;
+    background: rgba(4, 9, 19, 0.7);
+    color: var(--gold);
+    font-size: clamp(8px, 1.8cqw, 11px);
+  }
+  .money-field input {
+    width: 100%;
+    min-width: 0;
+    padding: 2px 0;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--ink);
+    font-size: inherit;
+    font-variant-numeric: tabular-nums;
+  }
+  .money-field input::placeholder { color: rgba(227, 238, 255, 0.2); }
+  .money-field input:disabled { color: rgba(227, 238, 255, 0.6); }
+  .forecast-tier {
+    margin: 4px 1px 0;
+    min-height: 2.5em;
+    color: var(--muted);
+    font-size: clamp(5.3px, 1.08cqw, 6.4px);
+    line-height: 1.35;
+  }
+  .forecast-tier.warn { color: var(--red); }
+  .forecast-tier b { color: var(--gold); }
+
+  /* ---------- controls ---------- */
+  .controls-card {
+    margin-top: 8px;
+    padding: 8px;
+    border: 1px solid rgba(151, 193, 246, 0.14);
+    border-radius: 10px;
+    background: rgba(8, 16, 31, 0.72);
+  }
+  .section-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 5px;
+  }
+  .section-head h2 {
+    margin: 1px 0 0;
+    font-size: clamp(12px, 2.8cqw, 17px);
+    line-height: 1.08;
+    letter-spacing: -0.035em;
+  }
+  .rate-chip {
+    flex: none;
+    padding: 2px 4px;
+    border: 1px solid rgba(140, 232, 196, 0.2);
+    border-radius: 3px;
+    color: var(--mint);
+    font-size: clamp(5.2px, 1.08cqw, 6.4px);
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+  }
+  .saver-block {
+    margin-top: 5px;
+    padding: 6px 7px 5px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.018);
+  }
+  .saver-block.early { --accent: var(--cyan); }
+  .saver-block.later { --accent: var(--gold); }
+  .saver-block.market { --accent: var(--violet); }
+  .block-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 6px;
+    margin-bottom: 3px;
+  }
+  .block-head b {
+    color: var(--accent);
+    font-size: clamp(6.1px, 1.3cqw, 7.6px);
+    letter-spacing: 0.1em;
+  }
+  .block-head span {
+    color: var(--faint);
+    font-size: clamp(5.2px, 1.07cqw, 6.3px);
+    line-height: 1.25;
+    text-align: right;
+  }
+  .slider-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 1px 5px;
+    padding: 3px 0;
+  }
+  .slider-row label {
+    color: var(--muted);
+    font-size: clamp(5.4px, 1.1cqw, 6.5px);
+    line-height: 1.2;
+  }
+  .slider-row output {
+    color: var(--ink);
+    font-size: clamp(6.2px, 1.3cqw, 7.7px);
+    line-height: 1.2;
+    font-variant-numeric: tabular-nums;
+  }
+  .slider-row input[type="range"] {
+    grid-column: 1 / -1;
+    width: 100%;
+    height: 12px;
+    margin: 0;
+    appearance: none;
+    -webkit-appearance: none;
+    background: transparent;
+    cursor: pointer;
+    --fill: 50%;
+  }
+  .slider-row input[type="range"]::-webkit-slider-runnable-track {
+    height: 3px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--accent) 0 var(--fill), rgba(214, 230, 255, 0.13) var(--fill) 100%);
+  }
+  .slider-row input[type="range"]::-moz-range-track {
+    height: 3px;
+    border-radius: 999px;
+    background: rgba(214, 230, 255, 0.13);
+  }
+  .slider-row input[type="range"]::-moz-range-progress {
+    height: 3px;
+    border-radius: 999px;
+    background: var(--accent);
+  }
+  .slider-row input[type="range"]::-webkit-slider-thumb {
+    width: 11px;
+    height: 11px;
+    margin-top: -4px;
+    appearance: none;
+    -webkit-appearance: none;
+    border: 2px solid #07101f;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 7px color-mix(in srgb, var(--accent) 55%, transparent);
+  }
+  .slider-row input[type="range"]::-moz-range-thumb {
+    width: 8px;
+    height: 8px;
+    border: 2px solid #07101f;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+  .slider-row input[type="range"]:disabled { opacity: 0.4; cursor: default; }
+  .compound-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+    margin-top: 3px;
+  }
+  .compound-btn {
+    padding: 4px 2px;
+    border: 1px solid rgba(151, 193, 246, 0.13);
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.022);
+    color: var(--muted);
+    cursor: pointer;
+    font-size: clamp(5.4px, 1.1cqw, 6.5px);
+    letter-spacing: 0.03em;
+  }
+  .compound-btn:hover:not(:disabled) { color: var(--ink); background: rgba(255, 255, 255, 0.05); }
+  .compound-btn[aria-pressed="true"] { border-color: rgba(185, 166, 255, 0.44); color: var(--ink); background: rgba(185, 166, 255, 0.1); }
+  .compound-btn:disabled { opacity: 0.5; cursor: default; }
+  .compound-note {
+    margin: 5px 0 0;
+    color: var(--faint);
+    font-size: clamp(5.1px, 1.05cqw, 6.2px);
+    line-height: 1.35;
+  }
+
+  .rules {
+    margin-top: 7px;
+    border: 1px solid rgba(151, 193, 246, 0.11);
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.017);
+  }
+  .rules summary {
+    padding: 6px 7px;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: clamp(5.7px, 1.16cqw, 6.9px);
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+  }
+  .rules summary:hover { color: var(--ink); }
+  .rules-body {
+    padding: 0 7px 7px;
+    color: rgba(224, 236, 255, 0.5);
+    font-size: clamp(5.6px, 1.15cqw, 6.8px);
+    line-height: 1.45;
+  }
+  .rules-body p { margin: 4px 0 0; }
+  .rules-body b { color: var(--ink); font-weight: 600; }
+  .rules-body .formula {
+    margin-top: 5px;
+    padding: 5px 6px;
+    border-left: 2px solid rgba(185, 166, 255, 0.4);
+    background: rgba(185, 166, 255, 0.045);
+    color: rgba(225, 236, 255, 0.68);
+  }
+
+  /* ---------- result ---------- */
+  .result-card {
+    position: relative;
+    margin-top: 7px;
+    padding: 8px;
+    border: 1px solid rgba(140, 232, 196, 0.24);
+    border-radius: 9px;
+    background:
+      radial-gradient(95% 150% at 100% 0%, rgba(140, 232, 196, 0.1), transparent 65%),
+      rgba(140, 232, 196, 0.026);
+    outline: none;
+  }
+  .result-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 7px;
+  }
+  .result-head .eyebrow { color: var(--mint); }
+  .result-head h2 {
+    margin: 2px 0 0;
+    font-size: clamp(12px, 2.8cqw, 17px);
+    line-height: 1.08;
+    letter-spacing: -0.035em;
+  }
+  .round-points { flex: none; text-align: right; }
+  .round-points strong {
+    display: block;
+    color: var(--mint);
+    font-size: clamp(20px, 4.6cqw, 28px);
+    line-height: 0.9;
+    font-variant-numeric: tabular-nums;
+  }
+  .round-points span {
+    display: block;
+    margin-top: 2px;
+    color: var(--muted);
+    font-size: clamp(4.8px, 1cqw, 5.9px);
+    letter-spacing: 0.1em;
+  }
+  .result-line {
+    margin: 5px 0 0;
+    color: rgba(224, 236, 255, 0.58);
+    font-size: clamp(5.8px, 1.2cqw, 7px);
+    line-height: 1.4;
+  }
+  .result-line b { color: var(--ink); }
+  .award-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 3px;
+    margin-top: 5px;
+  }
+  .award {
+    padding: 4px 5px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.022);
+  }
+  .award span {
+    display: block;
+    color: var(--muted);
+    font-size: clamp(4.8px, 1cqw, 5.9px);
+    letter-spacing: 0.08em;
+  }
+  .award b {
+    display: block;
+    margin-top: 1px;
+    color: var(--mint);
+    font-size: clamp(8px, 1.75cqw, 10.5px);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .award.zero b { color: rgba(255, 141, 122, 0.85); }
+  .compare-people {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    margin-top: 5px;
+  }
+  .compare-person {
+    min-width: 0;
+    padding: 5px 6px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.02);
+  }
+  .compare-person span {
+    display: block;
+    color: var(--muted);
+    font-size: clamp(4.9px, 1.02cqw, 6px);
+    letter-spacing: 0.09em;
+  }
+  .compare-person strong {
+    display: block;
+    margin-top: 1px;
+    color: var(--ink);
+    font-size: clamp(8px, 1.8cqw, 10.8px);
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+  }
+  .compare-person small {
+    display: block;
+    margin-top: 2px;
+    color: var(--faint);
+    font-size: clamp(5px, 1.04cqw, 6.1px);
+    line-height: 1.3;
+  }
+  .compare-person small b { color: var(--mint); font-weight: 600; }
+  .lesson-line {
+    margin: 5px 0 0;
+    padding-top: 5px;
+    border-top: 1px dashed rgba(140, 232, 196, 0.16);
+    color: rgba(225, 243, 236, 0.6);
+    font-size: clamp(5.7px, 1.16cqw, 6.9px);
+    line-height: 1.4;
+  }
+  .lesson-line b { color: var(--mint); }
+
+  /* ---------- footer ---------- */
+  .board-actions {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 7px 9px;
+    border-top: 1px solid var(--line);
+    background: rgba(5, 10, 21, 0.97);
+  }
+  .action-hint {
+    flex: 1;
+    margin: 0;
+    color: var(--muted);
+    font-size: clamp(5.3px, 1.1cqw, 6.5px);
+    line-height: 1.35;
+  }
+  .action-hint b { color: var(--gold); }
+  .primary-btn {
+    flex: none;
+    min-height: 28px;
+    padding: 6px 10px;
+    border: 1px solid rgba(185, 166, 255, 0.45);
+    border-radius: 999px;
+    background: linear-gradient(180deg, rgba(185, 166, 255, 0.19), rgba(185, 166, 255, 0.08));
+    color: var(--ink);
+    cursor: pointer;
+    font-size: clamp(6.4px, 1.32cqw, 7.8px);
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+  }
+  .primary-btn:hover:not(:disabled) { background: rgba(185, 166, 255, 0.25); border-color: rgba(205, 190, 255, 0.7); }
+  .primary-btn:disabled { opacity: 0.34; cursor: not-allowed; }
+
+  /* ---------- overlays ---------- */
+  .overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    display: grid;
+    place-items: center;
+    padding: 13px;
+    background: rgba(3, 7, 15, 0.8);
+    backdrop-filter: blur(9px);
+    -webkit-backdrop-filter: blur(9px);
+  }
+  .overlay[hidden] { display: none; }
+  .panel {
+    width: 100%;
+    max-height: calc(100% - 4px);
+    overflow-y: auto;
+    padding: 17px 16px 16px;
+    border: 1px solid rgba(151, 193, 246, 0.18);
+    border-radius: 18px;
+    background:
+      radial-gradient(90% 50% at 100% 0%, rgba(185, 166, 255, 0.13), transparent 66%),
+      linear-gradient(180deg, #111b32 0%, #080f1e 72%, #060b16 100%);
+    box-shadow:
+      0 35px 80px -30px rgba(0, 0, 0, 0.95),
+      inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
+  .intro-panel { padding-bottom: 15px; }
+  .intro-eyebrow {
+    margin: 0;
+    color: var(--violet);
+    font-size: clamp(6px, 1.22cqw, 7.4px);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+  .intro-title {
+    margin: 5px 0 0;
+    font-size: clamp(34px, 8cqw, 50px);
+    line-height: 0.84;
+    letter-spacing: -0.075em;
+  }
+  .intro-title span { color: var(--violet); }
+  .intro-lede {
+    margin: 10px 0 0;
+    color: rgba(225, 236, 255, 0.58);
+    font-size: clamp(7px, 1.38cqw, 8.4px);
+    line-height: 1.5;
+  }
+  .intro-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    margin-top: 11px;
+  }
+  .intro-stat {
+    padding: 7px 8px;
+    border: 1px solid rgba(151, 193, 246, 0.12);
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.022);
+  }
+  .intro-stat span {
+    display: block;
+    color: var(--muted);
+    font-size: clamp(5.1px, 1.05cqw, 6.2px);
+    letter-spacing: 0.1em;
+  }
+  .intro-stat b {
+    display: block;
+    margin-top: 2px;
+    color: var(--cyan);
+    font-size: clamp(11px, 2.25cqw, 14px);
+    line-height: 1;
+    font-weight: 500;
+  }
+  .intro-stat:nth-child(2) b { color: var(--gold); }
+  .intro-stat:nth-child(3) b { color: var(--violet); }
+  .intro-stat:nth-child(4) b { color: var(--mint); }
+  .intro-roster {
+    display: grid;
+    gap: 4px;
+    margin-top: 9px;
+  }
+  .roster-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 7px;
+    padding: 6px 7px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.017);
+  }
+  .roster-mark {
+    width: 17px;
+    height: 17px;
+    flex: none;
+    display: grid;
+    place-items: center;
+    border: 1px solid currentColor;
+    border-radius: 50%;
+    color: var(--cyan);
+    font-size: clamp(7px, 1.4cqw, 8.4px);
+  }
+  .roster-row:nth-child(2) .roster-mark { color: var(--gold); }
+  .roster-row:nth-child(3) .roster-mark { color: var(--mint); }
+  .roster-row b {
+    display: block;
+    color: var(--ink);
+    font-size: clamp(7px, 1.38cqw, 8.3px);
+    font-weight: 500;
+    line-height: 1.2;
+  }
+  .roster-row p {
+    margin: 2px 0 0;
+    color: var(--muted);
+    font-size: clamp(5.8px, 1.16cqw, 7px);
+    line-height: 1.4;
+  }
+  .intro-cta {
+    width: 100%;
+    margin-top: 12px;
+    padding: 9px 10px;
+    border: 1px solid rgba(185, 166, 255, 0.48);
+    border-radius: 999px;
+    background: linear-gradient(180deg, rgba(185, 166, 255, 0.21), rgba(185, 166, 255, 0.09));
+    color: var(--ink);
+    cursor: pointer;
+    font-size: clamp(7.3px, 1.48cqw, 8.8px);
+    letter-spacing: 0.05em;
+  }
+  .intro-cta:hover { background: rgba(185, 166, 255, 0.28); }
+  .intro-foot {
+    margin: 8px 0 0;
+    color: var(--faint);
+    font-size: clamp(5.3px, 1.06cqw, 6.4px);
+    line-height: 1.45;
+    text-align: center;
+  }
+
+  .report-eyebrow {
+    margin: 0;
+    color: var(--mint);
+    font-size: clamp(5.9px, 1.18cqw, 7.1px);
+    letter-spacing: 0.17em;
+    text-transform: uppercase;
+  }
+  .report-title {
+    margin: 4px 0 0;
+    font-size: clamp(26px, 6cqw, 38px);
+    line-height: 0.95;
+    letter-spacing: -0.06em;
+  }
+  .report-title.warn { color: var(--gold); }
+  .report-title.bad { color: var(--red); }
+  .report-sub {
+    margin: 7px 0 0;
+    color: var(--muted);
+    font-size: clamp(6.6px, 1.28cqw, 7.9px);
+    line-height: 1.5;
+  }
+  .report-score {
+    display: flex;
+    align-items: baseline;
+    gap: 5px;
+    margin-top: 11px;
+    padding-top: 9px;
+    border-top: 1px solid var(--line);
+  }
+  .report-score span {
+    color: var(--muted);
+    font-size: clamp(5.3px, 1.06cqw, 6.4px);
+    letter-spacing: 0.13em;
+  }
+  .report-score strong {
+    margin-left: auto;
+    color: var(--mint);
+    font-size: clamp(34px, 7.2cqw, 46px);
+    line-height: 0.85;
+    letter-spacing: -0.065em;
+    font-variant-numeric: tabular-nums;
+  }
+  .report-score em {
+    color: var(--faint);
+    font-size: clamp(8px, 1.6cqw, 10px);
+    font-style: normal;
+  }
+  .report-rank {
+    margin-top: 5px;
+    text-align: right;
+  }
+  .report-rank b {
+    display: block;
+    color: var(--ink);
+    font-size: clamp(8.6px, 1.8cqw, 11px);
+    font-weight: 500;
+  }
+  .report-rank span {
+    display: block;
+    margin-top: 2px;
+    color: var(--muted);
+    font-size: clamp(5.6px, 1.12cqw, 6.8px);
+    line-height: 1.4;
+  }
+  .final-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+    margin-top: 9px;
+  }
+  .final-stat {
+    padding: 6px 5px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 5px;
+    background: rgba(255, 255, 255, 0.02);
+    text-align: center;
+  }
+  .final-stat span {
+    display: block;
+    color: var(--muted);
+    font-size: clamp(4.9px, 1cqw, 5.9px);
+    letter-spacing: 0.08em;
+  }
+  .final-stat b {
+    display: block;
+    margin-top: 2px;
+    color: var(--cyan);
+    font-size: clamp(9px, 1.9cqw, 11.4px);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .final-stat:nth-child(2) b { color: var(--gold); }
+  .final-stat:nth-child(3) b { color: var(--violet); }
+  .jump-report {
+    margin-top: 10px;
+    border-top: 1px solid var(--line);
+    padding-top: 7px;
+  }
+  .report-label {
+    margin: 0 0 4px;
+    color: var(--muted);
+    font-size: clamp(5.2px, 1.04cqw, 6.2px);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  .jump-row {
+    display: grid;
+    grid-template-columns: 0.6fr 1.7fr 1fr auto;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 1px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.045);
+    font-size: clamp(5.4px, 1.08cqw, 6.5px);
+    line-height: 1.25;
+  }
+  .jump-row:last-child { border-bottom: 0; }
+  .jump-row > span:first-child { color: var(--faint); letter-spacing: 0.06em; }
+  .jump-row b { color: var(--ink); font-weight: 500; }
+  .jump-row small { display: block; color: var(--muted); font-size: 0.9em; }
+  .jump-row .hit { color: var(--mint); }
+  .jump-row .miss { color: var(--red); }
+  .jump-row strong {
+    color: var(--gold);
+    font-size: clamp(7px, 1.35cqw, 8.2px);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+  .report-actions {
+    display: flex;
+    gap: 5px;
+    margin-top: 10px;
+  }
+  .report-actions .intro-cta { margin-top: 0; }
+  .report-foot {
+    margin: 7px 0 0;
+    color: var(--faint);
+    font-size: clamp(5.1px, 1.02cqw, 6.1px);
+    line-height: 1.45;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
+  @container (max-height: 590px) {
+    .mission { padding-top: 6px; padding-bottom: 6px; }
+    .chart-note { min-height: 2em; }
+    .prediction-card, .controls-card { margin-top: 6px; }
+    .slider-row { padding-top: 2px; padding-bottom: 2px; }
+  }
+</style>
+</head>
+<body>
+  <div id="stage">
+    <div id="app" inert>
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">TV</span>
+          <div>
+            <b>TIME VAULT</b>
+            <small>COMPOUNDING LAB &middot; 5 JUMPS</small>
+          </div>
+        </div>
+        <div class="hud">
+          <div class="stat"><span>JUMP</span><strong id="jumpHud">1/5</strong></div>
+          <div class="stat"><span>SCORE</span><strong id="scoreHud">0/500</strong></div>
+        </div>
+      </header>
+
+      <section class="screen" aria-label="Compounding time laboratory">
+        <div id="labScroll" class="lab-scroll">
+          <div class="mission">
+            <div class="mission-copy">
+              <p class="eyebrow" id="missionEyebrow">JUMP 01 &middot; TARGET</p>
+              <h1 id="missionName">First Fold</h1>
+              <p id="missionBrief">Two savers, one market, one finish line at age 65.</p>
+            </div>
+            <div class="target-box">
+              <span>TARGET</span>
+              <strong id="targetValue">$450K</strong>
+              <small id="targetCaption">$450,000 combined</small>
+            </div>
+          </div>
+
+          <div class="equation-line">
+            <span><b>LAB</b> monthly deposits &rarr; interest &rarr; age 65</span>
+            <span id="phaseLabel">PLAN</span>
+          </div>
+
+          <section class="chart-card" aria-labelledby="chartTitle">
+            <div class="chart-head">
+              <div>
+                <p class="eyebrow">VAULT FORECAST</p>
+                <h2 id="chartTitle">Two timelines</h2>
+              </div>
+              <div class="chart-legend" aria-label="Chart legend">
+                <span class="early"><i aria-hidden="true"></i>Mira</span>
+                <span class="later"><i aria-hidden="true"></i>Noah</span>
+              </div>
+            </div>
+            <div class="chart-wrap">
+              <svg id="chart" viewBox="0 0 640 244" role="img" aria-label="Balance timeline. Balances are locked before the jump."></svg>
+            </div>
+            <p id="chartNote" class="chart-note">Balance lines stay hidden until you run the jump. The green line is the combined target.</p>
+          </section>
+
+          <div class="balance-grid">
+            <article id="earlyCard" class="saver-card early" aria-label="Mira, the early saver">
+              <div class="saver-top">
+                <span class="saver-name"><i aria-hidden="true"></i>MIRA &middot; EARLY</span>
+                <span id="earlyCrown" class="crown" hidden>AHEAD</span>
+              </div>
+              <strong id="earlyBalance" class="saver-balance locked">LOCKED</strong>
+              <div class="saver-meta">
+                <span id="earlySchedule">Ages 22&ndash;32</span>
+                <span id="earlyContributed">$18,000 planned</span>
+              </div>
+              <p id="earlyGrowth" class="saver-growth">Run to reveal the finish.</p>
+            </article>
+
+            <article id="laterCard" class="saver-card later" aria-label="Noah, the later saver">
+              <div class="saver-top">
+                <span class="saver-name"><i aria-hidden="true"></i>NOAH &middot; LATER</span>
+                <span id="laterCrown" class="crown" hidden>AHEAD</span>
+              </div>
+              <strong id="laterBalance" class="saver-balance locked">LOCKED</strong>
+              <div class="saver-meta">
+                <span id="laterSchedule">Ages 35&ndash;65</span>
+                <span id="laterContributed">$108,000 planned</span>
+              </div>
+              <p id="laterGrowth" class="saver-growth">Run to reveal the finish.</p>
+            </article>
+          </div>
+          <p id="compareLine" class="compare-line"><b>Mira stops early. Noah keeps going.</b> Same market rate, same compounding schedule.</p>
+
+          <section id="predictionCard" class="prediction-card" aria-labelledby="predictionTitle">
+            <div class="prediction-head">
+              <div>
+                <p class="eyebrow">FORECAST LOCK</p>
+                <h2 id="predictionTitle">Call the finish</h2>
+              </div>
+              <span id="predState" class="pred-state">OPEN</span>
+            </div>
+            <p class="prediction-lede">Who ends with more at 65, and what will both accounts total?</p>
+            <div class="choice-grid" role="group" aria-label="Choose the saver with the larger final balance">
+              <button type="button" class="choice" data-pick="early" aria-pressed="false"><i aria-hidden="true"></i>Mira &middot; early</button>
+              <button type="button" class="choice" data-pick="later" aria-pressed="false"><i aria-hidden="true"></i>Noah &middot; later</button>
+            </div>
+            <div class="forecast-row">
+              <div class="forecast-field">
+                <label for="forecastInput">Combined balance at 65</label>
+                <div class="money-field"><span aria-hidden="true">$</span><input id="forecastInput" type="number" min="1" step="1000" inputmode="numeric" placeholder="450000" autocomplete="off" aria-describedby="forecastHint"></div>
+              </div>
+            </div>
+            <p id="forecastHint" class="forecast-tier">Pick a winner and enter a dollar forecast. Full forecast points land within 2% of the actual combined balance.</p>
+          </section>
+
+          <section id="resultPanel" class="result-card" tabindex="-1" aria-live="polite" hidden>
+            <div class="result-head">
+              <div>
+                <p class="eyebrow">JUMP COMPLETE</p>
+                <h2 id="resultTitle">The vault opens.</h2>
+              </div>
+              <div class="round-points">
+                <strong id="roundPoints">0</strong>
+                <span>OF 100 PTS</span>
+              </div>
+            </div>
+            <p id="resultLine" class="result-line"></p>
+            <div class="award-grid">
+              <div id="awardWinnerBox" class="award"><span>WINNER CALL</span><b id="awardWinner">+0 / 30</b></div>
+              <div id="awardForecastBox" class="award"><span>FORECAST</span><b id="awardForecast">+0 / 45</b></div>
+              <div id="awardTargetBox" class="award"><span>TARGET</span><b id="awardTarget">+0 / 25</b></div>
+            </div>
+            <div id="comparePeople" class="compare-people"></div>
+            <p id="lessonLine" class="lesson-line"></p>
+          </section>
+
+          <section class="controls-card" aria-labelledby="controlsTitle">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">CONTROL DECK</p>
+                <h2 id="controlsTitle">Set the two savers</h2>
+              </div>
+              <span id="effectiveRate" class="rate-chip">6.17% APY</span>
+            </div>
+
+            <div class="saver-block early">
+              <div class="block-head"><b>A &middot; MIRA / START EARLY</b><span>Deposits for a limited window</span></div>
+              <div class="slider-row">
+                <label for="earlyStart">First deposit age</label>
+                <output id="earlyStartOut" for="earlyStart">Age 22</output>
+                <input id="earlyStart" data-setting="earlyStart" type="range" min="18" max="28" step="1" value="22">
+              </div>
+              <div class="slider-row">
+                <label for="earlyMonthly">Monthly deposit</label>
+                <output id="earlyMonthlyOut" for="earlyMonthly">$150</output>
+                <input id="earlyMonthly" data-setting="earlyMonthly" type="range" min="25" max="500" step="25" value="150">
+              </div>
+              <div class="slider-row">
+                <label for="earlyYears">Years of deposits</label>
+                <output id="earlyYearsOut" for="earlyYears">10 years</output>
+                <input id="earlyYears" data-setting="earlyYears" type="range" min="5" max="15" step="1" value="10">
+              </div>
+            </div>
+
+            <div class="saver-block later">
+              <div class="block-head"><b>B &middot; NOAH / START LATER</b><span>Bigger deposits, longer runway</span></div>
+              <div class="slider-row">
+                <label for="lateStart">First deposit age</label>
+                <output id="lateStartOut" for="lateStart">Age 35</output>
+                <input id="lateStart" data-setting="lateStart" type="range" min="30" max="55" step="1" value="35">
+              </div>
+              <div class="slider-row">
+                <label for="lateMonthly">Monthly deposit</label>
+                <output id="lateMonthlyOut" for="lateMonthly">$300</output>
+                <input id="lateMonthly" data-setting="lateMonthly" type="range" min="25" max="800" step="25" value="300">
+              </div>
+            </div>
+
+            <div class="saver-block market">
+              <div class="block-head"><b>MARKET CONDITIONS</b><span>Shared by both accounts</span></div>
+              <div class="slider-row">
+                <label for="rate">Stated annual rate</label>
+                <output id="rateOut" for="rate">6.00%</output>
+                <input id="rate" data-setting="rate" type="range" min="3" max="10" step="0.25" value="6">
+              </div>
+              <div class="compound-grid" role="group" aria-label="Compounding schedule">
+                <button type="button" class="compound-btn" data-comp="monthly" aria-pressed="true">Monthly</button>
+                <button type="button" class="compound-btn" data-comp="quarterly" aria-pressed="false">Quarterly</button>
+                <button type="button" class="compound-btn" data-comp="annual" aria-pressed="false">Annual</button>
+              </div>
+              <p id="compoundNote" class="compound-note">Monthly compounding turns a 6.00% stated rate into a 6.17% effective annual rate. Deposits are added monthly.</p>
+            </div>
+          </section>
+
+          <details class="rules">
+            <summary>How the vault calculates and scores</summary>
+            <div class="rules-body">
+              <p><b>Deposits.</b> Mira deposits each month from her first-deposit age through her chosen number of years, then stops. Noah deposits from his first-deposit age all the way to 65. Both accounts stay invested until 65.</p>
+              <p><b>Interest.</b> The stated annual rate is divided by the compounding periods. That periodic rate is converted to an effective annual rate, then to a monthly-equivalent rate so monthly deposits compare fairly.</p>
+              <p class="formula">periodic = stated rate ÷ periods per year<br>effective annual = (1 + periodic)<sup>periods</sup> &minus; 1<br>monthly equivalent = (1 + effective annual)<sup>1/12</sup> &minus; 1</p>
+              <p><b>Timing.</b> Each month's deposit is added first; then the monthly-equivalent interest is applied. No withdrawals, taxes, inflation, or fees. All dollars are nominal.</p>
+              <p><b>Scoring each jump.</b> 30 points for naming the larger final account, up to 45 points for the combined-balance forecast (full at 2% error or less, then partial through 20%), and 25 points if the combined balance reaches that jump's target. Five jumps: 500 points maximum.</p>
+            </div>
+          </details>
+        </div>
+
+        <footer class="board-actions">
+          <p id="actionHint" class="action-hint">Call a winner and enter a combined forecast.</p>
+          <button type="button" id="runBtn" class="primary-btn" disabled>Seal &amp; run &rarr;</button>
+        </footer>
+      </section>
+    </div>
+
+    <div id="intro" class="overlay" role="dialog" aria-modal="true" aria-labelledby="introTitle">
+      <div class="panel intro-panel">
+        <p class="intro-eyebrow">A COMPOUNDING TIME-TRAVEL LAB</p>
+        <h1 class="intro-title" id="introTitle">Time<br><span>Vault</span></h1>
+        <p class="intro-lede">Two savers enter the vault. Mira starts early and stops. Noah starts later and deposits more. Tune the control deck, seal a forecast, then run the clock to 65 and find out which path wins.</p>
+        <div class="intro-grid">
+          <div class="intro-stat"><span>JUMPS</span><b>5</b></div>
+          <div class="intro-stat"><span>TARGETS</span><b>Rising</b></div>
+          <div class="intro-stat"><span>MAX SCORE</span><b>500</b></div>
+          <div class="intro-stat"><span>FINISH</span><b>Age 65</b></div>
+        </div>
+        <div class="intro-roster">
+          <div class="roster-row">
+            <span class="roster-mark" aria-hidden="true">A</span>
+            <div><b>Mira &middot; start early</b><p>Deposit for a limited window, then let the early dollars compound for decades.</p></div>
+          </div>
+          <div class="roster-row">
+            <span class="roster-mark" aria-hidden="true">B</span>
+            <div><b>Noah &middot; start later, contribute more</b><p>Begin later with larger monthly deposits and keep saving through 65.</p></div>
+          </div>
+          <div class="roster-row">
+            <span class="roster-mark" aria-hidden="true">?</span>
+            <div><b>Seal a forecast before every jump</b><p>Pick the winner, estimate the combined balance, then watch the timeline reveal the answer.</p></div>
+          </div>
+        </div>
+        <button type="button" id="startBtn" class="intro-cta">Enter the lab &rarr;</button>
+        <p class="intro-foot">Fictional money &middot; no taxes or inflation &middot; a learning game, not financial advice</p>
+      </div>
+    </div>
+
+    <div id="final" class="overlay" role="dialog" aria-modal="true" aria-labelledby="finalTitle" hidden>
+      <div class="panel report-panel">
+        <p class="report-eyebrow" id="finalEyebrow">FIVE JUMPS COMPLETE</p>
+        <h2 class="report-title" id="finalTitle">The curve bends.</h2>
+        <p class="report-sub" id="finalSub"></p>
+        <div class="report-score">
+          <span>LAB SCORE</span>
+          <strong id="finalScore">000</strong><em>/ 500</em>
+        </div>
+        <div class="report-rank">
+          <b id="finalRank">Forecast apprentice</b>
+          <span id="finalRankNote"></span>
+        </div>
+        <div class="final-stats">
+          <div class="final-stat"><span>WINNERS CALLED</span><b id="finalWinners">0 / 5</b></div>
+          <div class="final-stat"><span>TARGETS CLEARED</span><b id="finalTargets">0 / 5</b></div>
+          <div class="final-stat"><span>AVG FORECAST MISS</span><b id="finalError">0%</b></div>
+        </div>
+        <div class="jump-report">
+          <p class="report-label">Jump ledger</p>
+          <div id="jumpLedger"></div>
+        </div>
+        <div class="report-actions">
+          <button type="button" id="restartBtn" class="intro-cta">Open a new lab &rarr;</button>
+        </div>
+        <p class="report-foot" id="finalFoot">A timeline is easier to read after you have lived through it.</p>
+      </div>
+    </div>
+  </div>
+  <p class="hint">set the savers &middot; seal a forecast &middot; run the timeline</p>
+
+<script>
+(() => {
+  'use strict';
+
+  const START_AGE = 18;
+  const RETIRE_AGE = 65;
+  const MAX_SCORE = 500;
+  const DEFAULTS = {
+    earlyStart: 22,
+    earlyMonthly: 150,
+    earlyYears: 10,
+    lateStart: 35,
+    lateMonthly: 300,
+    rate: 6,
+    compounding: 'monthly',
+  };
+  const SPECS = {
+    earlyStart: { min: 18, max: 28, step: 1 },
+    earlyMonthly: { min: 25, max: 500, step: 25 },
+    earlyYears: { min: 5, max: 15, step: 1 },
+    lateStart: { min: 30, max: 55, step: 1 },
+    lateMonthly: { min: 25, max: 800, step: 25 },
+    rate: { min: 3, max: 10, step: 0.25 },
+  };
+  const COMPOUNDING = {
+    monthly: { label: 'Monthly', periods: 12 },
+    quarterly: { label: 'Quarterly', periods: 4 },
+    annual: { label: 'Annual', periods: 1 },
+  };
+  const JUMPS = [
+    {
+      name: 'First Fold',
+      target: 450000,
+      brief: 'A modest first target. The default schedules are allowed.',
+    },
+    {
+      name: 'Longer Runway',
+      target: 525000,
+      brief: 'The target rises. Change one schedule at a time to see what moves.',
+    },
+    {
+      name: 'The Gap Years',
+      target: 600000,
+      brief: 'Can early compounding or a larger later deposit close the distance?',
+    },
+    {
+      name: 'Heavy Deposits',
+      target: 675000,
+      brief: 'A higher target rewards both patience and contribution size.',
+    },
+    {
+      name: 'The Last Vault',
+      target: 750000,
+      brief: 'Final jump. Call the winner and the combined balance before the doors close.',
+    },
+  ];
+
+  const state = {
+    phase: 'intro',
+    round: 0,
+    settings: { ...DEFAULTS },
+    prediction: { winner: null, amount: null },
+    visibleAge: START_AGE,
+    sim: null,
+    roundResult: null,
+    scores: [],
+    score: 0,
+    timer: null,
+  };
+
+  const els = {
+    app: document.getElementById('app'),
+    labScroll: document.getElementById('labScroll'),
+    jumpHud: document.getElementById('jumpHud'),
+    scoreHud: document.getElementById('scoreHud'),
+    missionEyebrow: document.getElementById('missionEyebrow'),
+    missionName: document.getElementById('missionName'),
+    missionBrief: document.getElementById('missionBrief'),
+    targetValue: document.getElementById('targetValue'),
+    targetCaption: document.getElementById('targetCaption'),
+    phaseLabel: document.getElementById('phaseLabel'),
+    chart: document.getElementById('chart'),
+    chartNote: document.getElementById('chartNote'),
+    earlyCard: document.getElementById('earlyCard'),
+    laterCard: document.getElementById('laterCard'),
+    earlyCrown: document.getElementById('earlyCrown'),
+    laterCrown: document.getElementById('laterCrown'),
+    earlyBalance: document.getElementById('earlyBalance'),
+    laterBalance: document.getElementById('laterBalance'),
+    earlySchedule: document.getElementById('earlySchedule'),
+    laterSchedule: document.getElementById('laterSchedule'),
+    earlyContributed: document.getElementById('earlyContributed'),
+    laterContributed: document.getElementById('laterContributed'),
+    earlyGrowth: document.getElementById('earlyGrowth'),
+    laterGrowth: document.getElementById('laterGrowth'),
+    compareLine: document.getElementById('compareLine'),
+    predState: document.getElementById('predState'),
+    forecastInput: document.getElementById('forecastInput'),
+    forecastHint: document.getElementById('forecastHint'),
+    resultPanel: document.getElementById('resultPanel'),
+    resultTitle: document.getElementById('resultTitle'),
+    resultLine: document.getElementById('resultLine'),
+    roundPoints: document.getElementById('roundPoints'),
+    awardWinnerBox: document.getElementById('awardWinnerBox'),
+    awardForecastBox: document.getElementById('awardForecastBox'),
+    awardTargetBox: document.getElementById('awardTargetBox'),
+    awardWinner: document.getElementById('awardWinner'),
+    awardForecast: document.getElementById('awardForecast'),
+    awardTarget: document.getElementById('awardTarget'),
+    comparePeople: document.getElementById('comparePeople'),
+    lessonLine: document.getElementById('lessonLine'),
+    effectiveRate: document.getElementById('effectiveRate'),
+    compoundNote: document.getElementById('compoundNote'),
+    actionHint: document.getElementById('actionHint'),
+    runBtn: document.getElementById('runBtn'),
+    intro: document.getElementById('intro'),
+    startBtn: document.getElementById('startBtn'),
+    final: document.getElementById('final'),
+    finalTitle: document.getElementById('finalTitle'),
+    finalSub: document.getElementById('finalSub'),
+    finalScore: document.getElementById('finalScore'),
+    finalRank: document.getElementById('finalRank'),
+    finalRankNote: document.getElementById('finalRankNote'),
+    finalWinners: document.getElementById('finalWinners'),
+    finalTargets: document.getElementById('finalTargets'),
+    finalError: document.getElementById('finalError'),
+    jumpLedger: document.getElementById('jumpLedger'),
+    finalFoot: document.getElementById('finalFoot'),
+    restartBtn: document.getElementById('restartBtn'),
+  };
+
+  const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+  const roundTo = (value, step) => Math.round(value / step) * step;
+  const money = (value) => new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0,
+  }).format(Math.round(value));
+  const signedMoney = (value) => `${value >= 0 ? '+' : '\u2212'}${money(Math.abs(value))}`;
+  const compactMoney = (value) => {
+    const abs = Math.abs(value);
+    if (abs >= 1000000) {
+      const millions = value / 1000000;
+      return `$${millions >= 10 ? millions.toFixed(0) : millions.toFixed(1)}M`;
+    }
+    if (abs >= 1000) {
+      const thousands = value / 1000;
+      return `$${thousands >= 100 ? thousands.toFixed(0) : thousands.toFixed(1)}K`;
+    }
+    return `$${Math.round(value)}`;
+  };
+  const pct = (value) => `${Math.round(value)}%`;
+  const decimals = (value) => Number(value).toFixed(2);
+
+  function normalizeSettings(raw) {
+    const next = { ...DEFAULTS, ...raw };
+    Object.entries(SPECS).forEach(([key, spec]) => {
+      const value = Number(next[key]);
+      next[key] = clamp(
+        Number.isFinite(value) ? roundTo(value, spec.step) : DEFAULTS[key],
+        spec.min,
+        spec.max
+      );
+    });
+    if (!COMPOUNDING[next.compounding]) next.compounding = DEFAULTS.compounding;
+    return next;
+  }
+
+  function rateDetails(settings) {
+    const periods = COMPOUNDING[settings.compounding].periods;
+    const nominal = settings.rate / 100;
+    const periodic = nominal / periods;
+    const effectiveAnnual = Math.pow(1 + periodic, periods) - 1;
+    const monthly = Math.pow(1 + effectiveAnnual, 1 / 12) - 1;
+    return { periods, nominal, periodic, effectiveAnnual, monthly };
+  }
+
+  function simulate(rawSettings) {
+    const settings = normalizeSettings(rawSettings);
+    const details = rateDetails(settings);
+    const earlyEnd = Math.min(RETIRE_AGE, settings.earlyStart + settings.earlyYears);
+    const ages = [];
+    const earlyValues = [0];
+    const laterValues = [0];
+    let early = 0;
+    let later = 0;
+    let earlyContributed = 0;
+    let laterContributed = 0;
+
+    for (let age = START_AGE; age < RETIRE_AGE; age += 1) {
+      ages.push(age);
+      for (let month = 0; month < 12; month += 1) {
+        if (age >= settings.earlyStart && age < earlyEnd) {
+          early += settings.earlyMonthly;
+          earlyContributed += settings.earlyMonthly;
+        }
+        if (age >= settings.lateStart) {
+          later += settings.lateMonthly;
+          laterContributed += settings.lateMonthly;
+        }
+        early *= 1 + details.monthly;
+        later *= 1 + details.monthly;
+      }
+      earlyValues.push(early);
+      laterValues.push(later);
+    }
+
+    const earlyFinal = earlyValues[earlyValues.length - 1];
+    const laterFinal = laterValues[laterValues.length - 1];
+    const combined = earlyFinal + laterFinal;
+    const difference = earlyFinal - laterFinal;
+    const winner = Math.abs(difference) < 1 ? 'tie' : difference > 0 ? 'early' : 'later';
+
+    return {
+      settings,
+      details,
+      ages: [START_AGE, ...ages.map((age) => age + 1)],
+      earlyValues,
+      laterValues,
+      earlyContributed,
+      laterContributed,
+      earlyEnd,
+      final: {
+        early: earlyFinal,
+        later: laterFinal,
+        combined,
+        difference,
+        winner,
+      },
+    };
+  }
+
+  function contributedAtAge(age, settings) {
+    const earlyMonths = clamp(age - settings.earlyStart, 0, settings.earlyYears) * 12;
+    const laterMonths = clamp(age - settings.lateStart, 0, RETIRE_AGE - settings.lateStart) * 12;
+    return {
+      early: earlyMonths * settings.earlyMonthly,
+      later: laterMonths * settings.lateMonthly,
+    };
+  }
+
+  function valueAtAge(values, age) {
+    const index = clamp(age - START_AGE, 0, values.length - 1);
+    return values[index];
+  }
+
+  function niceMax(value) {
+    if (!Number.isFinite(value) || value <= 0) return 100000;
+    const power = Math.pow(10, Math.floor(Math.log10(value)));
+    const unit = value / power;
+    const steps = [1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10];
+    const stepped = steps.find((step) => unit <= step + 1e-9) || 10;
+    return stepped * power;
+  }
+
+  function scoreJump(prediction, sim, target) {
+    const actual = sim.final.combined;
+    const winner = sim.final.winner;
+    const winnerPoints = prediction.winner === winner ? 30 : 0;
+    const predicted = Number(prediction.amount);
+    const errorRatio = Number.isFinite(predicted) && predicted > 0
+      ? Math.abs(predicted - actual) / Math.max(1, actual)
+      : 1;
+    let forecastPoints = 0;
+    if (errorRatio <= 0.02 + 1e-9) forecastPoints = 45;
+    else if (errorRatio <= 0.05 + 1e-9) forecastPoints = 35;
+    else if (errorRatio <= 0.10 + 1e-9) forecastPoints = 20;
+    else if (errorRatio <= 0.20 + 1e-9) forecastPoints = 8;
+    const targetPoints = actual >= target ? 25 : 0;
+    return {
+      winner: winnerPoints,
+      forecast: forecastPoints,
+      target: targetPoints,
+      total: winnerPoints + forecastPoints + targetPoints,
+      winnerCorrect: winnerPoints > 0,
+      targetMet: targetPoints > 0,
+      predicted: Number.isFinite(predicted) ? predicted : 0,
+      actual,
+      errorRatio,
+      errorPct: errorRatio * 100,
+    };
+  }
+
+  function predictionReady() {
+    return (state.prediction.winner === 'early' || state.prediction.winner === 'later') &&
+      Number.isFinite(Number(state.prediction.amount)) &&
+      Number(state.prediction.amount) > 0;
+  }
+
+  function formatControl(key, value) {
+    if (key === 'earlyStart' || key === 'lateStart') return `Age ${value}`;
+    if (key === 'earlyMonthly' || key === 'lateMonthly') return money(value);
+    if (key === 'earlyYears') return `${value} year${value === 1 ? '' : 's'}`;
+    if (key === 'rate') return `${Number(value).toFixed(2)}%`;
+    return String(value);
+  }
+
+  function updateControlOutputs() {
+    Object.keys(SPECS).forEach((key) => {
+      const input = document.querySelector(`[data-setting="${key}"]`);
+      const output = document.getElementById(`${key}Out`);
+      const spec = SPECS[key];
+      const value = state.settings[key];
+      if (input) {
+        input.value = String(value);
+        const fill = ((value - spec.min) / (spec.max - spec.min)) * 100;
+        input.style.setProperty('--fill', `${fill}%`);
+      }
+      if (output) output.textContent = formatControl(key, value);
+    });
+    document.querySelectorAll('[data-comp]').forEach((button) => {
+      button.setAttribute('aria-pressed', String(button.dataset.comp === state.settings.compounding));
+    });
+    const effective = rateDetails(state.settings).effectiveAnnual * 100;
+    els.effectiveRate.textContent = `${effective.toFixed(2)}% APY`;
+    els.compoundNote.textContent = `${COMPOUNDING[state.settings.compounding].label} compounding turns a ${decimals(state.settings.rate)}% stated rate into a ${effective.toFixed(2)}% effective annual rate. Deposits are added monthly.`;
+  }
+
+  function setControlsEnabled(enabled) {
+    document.querySelectorAll('[data-setting], [data-comp]').forEach((control) => {
+      control.disabled = !enabled;
+    });
+    document.querySelectorAll('[data-pick]').forEach((button) => {
+      button.disabled = !enabled;
+    });
+    els.forecastInput.disabled = !enabled;
+  }
+
+  function renderHeader() {
+    els.jumpHud.textContent = `${state.round + 1}/5`;
+    els.scoreHud.textContent = `${state.score}/${MAX_SCORE}`;
+  }
+
+  function renderMission() {
+    const jump = JUMPS[state.round];
+    els.missionEyebrow.textContent = `JUMP ${String(state.round + 1).padStart(2, '0')} \u00b7 TARGET`;
+    els.missionName.textContent = jump.name;
+    els.missionBrief.textContent = jump.brief;
+    els.targetValue.textContent = compactMoney(jump.target);
+    els.targetCaption.textContent = `${money(jump.target)} combined`;
+    els.phaseLabel.textContent = state.phase === 'run'
+      ? `AGE ${state.visibleAge}`
+      : state.phase === 'result' || state.phase === 'final'
+        ? 'COMPLETE'
+        : 'PLAN';
+  }
+
+  function chartPointX(age) {
+    return 57 + ((age - START_AGE) / (RETIRE_AGE - START_AGE)) * (640 - 57 - 16);
+  }
+
+  function chartPointY(value, max) {
+    return 18 + (1 - value / max) * (244 - 18 - 31);
+  }
+
+  function chartPath(values, max, upToAge) {
+    const points = [];
+    for (let age = START_AGE; age <= upToAge; age += 1) {
+      const value = valueAtAge(values, age);
+      points.push(`${chartPointX(age).toFixed(1)},${chartPointY(value, max).toFixed(1)}`);
+    }
+    if (points.length === 0) return '';
+    return `M ${points.join(' L ')}`;
+  }
+
+  function renderChart() {
+    const jump = JUMPS[state.round];
+    const sim = state.sim;
+    const viewAge = state.phase === 'plan' ? START_AGE : state.visibleAge;
+    const maxValue = sim
+      ? Math.max(jump.target * 1.15, sim.final.early, sim.final.later) * 1.06
+      : jump.target * 1.55;
+    const yMax = niceMax(maxValue);
+    const yTicks = [0, 0.25, 0.5, 0.75, 1].map((fraction) => yMax * fraction);
+    const ageTicks = [18, 25, 35, 45, 55, 65];
+    let markup = '';
+
+    yTicks.forEach((value) => {
+      const y = chartPointY(value, yMax);
+      markup += `<line x1="57" y1="${y.toFixed(1)}" x2="624" y2="${y.toFixed(1)}" stroke="rgba(151,193,246,0.09)" stroke-width="1"/>`;
+      markup += `<text x="50" y="${(y + 3).toFixed(1)}" class="chart-axis" text-anchor="end">${compactMoney(value)}</text>`;
+    });
+
+    ageTicks.forEach((age) => {
+      const x = chartPointX(age);
+      markup += `<line x1="${x.toFixed(1)}" y1="18" x2="${x.toFixed(1)}" y2="213" stroke="rgba(151,193,246,0.055)" stroke-width="1"/>`;
+      markup += `<text x="${x.toFixed(1)}" y="235" class="chart-axis small" text-anchor="middle">${age}</text>`;
+    });
+
+    const targetY = chartPointY(jump.target, yMax);
+    markup += `<line x1="57" y1="${targetY.toFixed(1)}" x2="624" y2="${targetY.toFixed(1)}" class="chart-target-line"/>`;
+    markup += `<text x="621" y="${(targetY - 5).toFixed(1)}" class="chart-target-label">TARGET ${compactMoney(jump.target)}</text>`;
+
+    if (sim) {
+      const earlyPath = chartPath(sim.earlyValues, yMax, viewAge);
+      const laterPath = chartPath(sim.laterValues, yMax, viewAge);
+      if (earlyPath) {
+        markup += `<path d="${earlyPath}" class="chart-line" stroke="#7dd8ff"/>`;
+        const earlyEndX = chartPointX(viewAge);
+        const earlyEndY = chartPointY(valueAtAge(sim.earlyValues, viewAge), yMax);
+        markup += `<circle cx="${earlyEndX.toFixed(1)}" cy="${earlyEndY.toFixed(1)}" r="3.3" fill="#7dd8ff" class="chart-end" stroke="#07101f"/>`;
+      }
+      if (laterPath) {
+        markup += `<path d="${laterPath}" class="chart-line" stroke="#ffc86d"/>`;
+        const laterEndX = chartPointX(viewAge);
+        const laterEndY = chartPointY(valueAtAge(sim.laterValues, viewAge), yMax);
+        markup += `<circle cx="${laterEndX.toFixed(1)}" cy="${laterEndY.toFixed(1)}" r="3.3" fill="#ffc86d" class="chart-end" stroke="#07101f"/>`;
+      }
+      if (state.phase === 'run') {
+        const markerX = chartPointX(viewAge);
+        markup += `<line x1="${markerX.toFixed(1)}" y1="18" x2="${markerX.toFixed(1)}" y2="213" class="chart-marker"/>`;
+        markup += `<text x="${markerX.toFixed(1)}" y="13" class="chart-marker-label">AGE ${viewAge}</text>`;
+      }
+    } else {
+      markup += `<text x="340" y="110" class="chart-locked">BALANCES LOCKED</text>`;
+      markup += `<text x="340" y="127" class="chart-locked-sub">SEAL A FORECAST, THEN RUN TO 65</text>`;
+    }
+
+    els.chart.innerHTML = markup;
+
+    if (!sim) {
+      els.chart.setAttribute(
+        'aria-label',
+        `Balance timeline from age 18 to 65. Target ${money(jump.target)}. Account balances are hidden until the jump runs.`
+      );
+      els.chartNote.innerHTML = `Balance lines stay hidden until you run the jump. The green line is the combined target at <b>${money(jump.target)}</b>.`;
+      return;
+    }
+
+    const early = valueAtAge(sim.earlyValues, viewAge);
+    const later = valueAtAge(sim.laterValues, viewAge);
+    const combined = early + later;
+    els.chart.setAttribute(
+      'aria-label',
+      `Balance timeline at age ${viewAge}. Mira ${money(early)}, Noah ${money(later)}, combined ${money(combined)}. Target ${money(jump.target)}.`
+    );
+    if (state.phase === 'result' || state.phase === 'final') {
+      els.chartNote.innerHTML = `At <b>65</b>: Mira <b>${money(early)}</b> \u00b7 Noah <b>${money(later)}</b> \u00b7 combined <b>${money(combined)}</b>.`;
+    } else {
+      els.chartNote.innerHTML = `At <b>age ${viewAge}</b>: Mira <b>${money(early)}</b> \u00b7 Noah <b>${money(later)}</b> \u00b7 combined <b>${money(combined)}</b>.`;
+    }
+  }
+
+  function renderCards() {
+    const settings = state.settings;
+    const sim = state.sim;
+    const viewAge = state.phase === 'plan' ? START_AGE : state.visibleAge;
+    const earlyEnd = Math.min(RETIRE_AGE, settings.earlyStart + settings.earlyYears);
+    const plannedEarly = settings.earlyMonthly * 12 * settings.earlyYears;
+    const plannedLater = settings.lateMonthly * 12 * (RETIRE_AGE - settings.lateStart);
+
+    els.earlySchedule.textContent = `Ages ${settings.earlyStart}\u2013${earlyEnd} \u00b7 ${money(settings.earlyMonthly)}/mo`;
+    els.laterSchedule.textContent = `Ages ${settings.lateStart}\u2013${RETIRE_AGE} \u00b7 ${money(settings.lateMonthly)}/mo`;
+
+    if (!sim) {
+      [els.earlyBalance, els.laterBalance].forEach((element) => {
+        element.textContent = 'LOCKED';
+        element.classList.add('locked');
+      });
+      els.earlyContributed.textContent = `${money(plannedEarly)} planned`;
+      els.laterContributed.textContent = `${money(plannedLater)} planned`;
+      els.earlyGrowth.textContent = 'Run to reveal the finish.';
+      els.laterGrowth.textContent = 'Run to reveal the finish.';
+      els.earlyCrown.hidden = true;
+      els.laterCrown.hidden = true;
+      els.earlyCard.classList.remove('leading');
+      els.laterCard.classList.remove('leading');
+      els.compareLine.innerHTML = `<b>Mira stops early. Noah keeps going.</b> Same market rate, same compounding schedule. The finish stays hidden until you seal a forecast.`;
+      return;
+    }
+
+    const early = valueAtAge(sim.earlyValues, viewAge);
+    const later = valueAtAge(sim.laterValues, viewAge);
+    const contributed = contributedAtAge(viewAge, settings);
+    const earlyGrowth = early - contributed.early;
+    const laterGrowth = later - contributed.later;
+
+    els.earlyBalance.textContent = money(early);
+    els.laterBalance.textContent = money(later);
+    els.earlyBalance.classList.remove('locked');
+    els.laterBalance.classList.remove('locked');
+    els.earlyContributed.textContent = `${money(contributed.early)} in by ${viewAge}`;
+    els.laterContributed.textContent = `${money(contributed.later)} in by ${viewAge}`;
+    els.earlyGrowth.innerHTML = `Growth <b>${signedMoney(earlyGrowth)}</b>`;
+    els.laterGrowth.innerHTML = `Growth <b>${signedMoney(laterGrowth)}</b>`;
+
+    const isFinal = state.phase === 'result' || state.phase === 'final';
+    els.earlyCrown.hidden = !(isFinal && sim.final.winner === 'early');
+    els.laterCrown.hidden = !(isFinal && sim.final.winner === 'later');
+    els.earlyCard.classList.toggle('leading', isFinal && sim.final.winner === 'early');
+    els.laterCard.classList.toggle('leading', isFinal && sim.final.winner === 'later');
+
+    if (isFinal) {
+      const gap = Math.abs(sim.final.difference);
+      const leader = sim.final.winner === 'early' ? 'Mira' : sim.final.winner === 'later' ? 'Noah' : 'The two accounts';
+      els.compareLine.innerHTML = sim.final.winner === 'tie'
+        ? `<b>The accounts finish level.</b> Combined balance <b>${money(sim.final.combined)}</b>.`
+        : `<b>${leader} finishes ${money(gap)} ahead.</b> Combined balance <b>${money(sim.final.combined)}</b>.`;
+    } else {
+      els.compareLine.innerHTML = `At <b>age ${viewAge}</b>, the two accounts hold <b>${money(early + later)}</b> together. The finish stays hidden.`;
+    }
+  }
+
+  function renderPrediction() {
+    const locked = state.phase !== 'plan';
+    document.querySelectorAll('[data-pick]').forEach((button) => {
+      const picked = button.dataset.pick === state.prediction.winner;
+      button.setAttribute('aria-pressed', String(picked));
+      button.disabled = locked;
+    });
+    if (document.activeElement !== els.forecastInput) {
+      els.forecastInput.value = state.prediction.amount === null ? '' : String(state.prediction.amount);
+    }
+    els.forecastInput.disabled = locked;
+
+    if (state.phase === 'run') {
+      els.predState.textContent = 'SEALED';
+      els.forecastHint.className = 'forecast-tier';
+      els.forecastHint.innerHTML = `Forecast sealed: <b>${state.prediction.winner === 'early' ? 'Mira' : 'Noah'}</b> wins, combined balance <b>${money(state.prediction.amount)}</b>.`;
+      return;
+    }
+
+    if (state.phase === 'result' || state.phase === 'final') {
+      els.predState.textContent = 'SCORED';
+      if (state.roundResult) {
+        els.forecastHint.className = 'forecast-tier';
+        els.forecastHint.innerHTML = `Your <b>${money(state.roundResult.predicted)}</b> forecast missed the actual <b>${money(state.roundResult.actual)}</b> by <b>${state.roundResult.errorPct.toFixed(1)}%</b>. Forecast points: <b>${state.roundResult.forecast} / 45</b>.`;
+      }
+      return;
+    }
+
+    els.predState.textContent = 'OPEN';
+    if (predictionReady()) {
+      els.forecastHint.className = 'forecast-tier';
+      els.forecastHint.innerHTML = `Ready. Winner: <b>${state.prediction.winner === 'early' ? 'Mira' : 'Noah'}</b>. Forecast: <b>${money(state.prediction.amount)}</b>. The finish stays hidden until the jump.`;
+    } else if (state.prediction.winner && !state.prediction.amount) {
+      els.forecastHint.className = 'forecast-tier';
+      els.forecastHint.innerHTML = 'Add a combined balance forecast to unlock the jump.';
+    } else if (!state.prediction.winner && state.prediction.amount) {
+      els.forecastHint.className = 'forecast-tier';
+      els.forecastHint.innerHTML = 'Now pick the account that finishes ahead.';
+    } else {
+      els.forecastHint.className = 'forecast-tier';
+      els.forecastHint.innerHTML = 'Pick a winner and enter a dollar forecast. Full forecast points land within 2% of the actual combined balance.';
+    }
+  }
+
+  function renderResult() {
+    if (!state.roundResult || (state.phase !== 'result' && state.phase !== 'final')) {
+      els.resultPanel.hidden = true;
+      return;
+    }
+    const result = state.roundResult;
+    const sim = state.sim;
+    const jump = JUMPS[state.round];
+    const gap = Math.abs(sim.final.difference);
+    const leader = sim.final.winner === 'early' ? 'Mira' : sim.final.winner === 'later' ? 'Noah' : null;
+
+    els.resultPanel.hidden = false;
+    els.resultTitle.textContent = leader
+      ? `${leader} finishes ${money(gap)} ahead.`
+      : 'The accounts finish level.';
+    els.roundPoints.textContent = String(result.total);
+    els.resultLine.innerHTML = result.targetMet
+      ? `Combined <b>${money(result.actual)}</b> cleared the <b>${money(jump.target)}</b> target by <b>${money(result.actual - jump.target)}</b>.`
+      : `Combined <b>${money(result.actual)}</b> missed the <b>${money(jump.target)}</b> target by <b>${money(jump.target - result.actual)}</b>.`;
+
+    els.awardWinner.textContent = `+${result.winner} / 30`;
+    els.awardForecast.textContent = `+${result.forecast} / 45`;
+    els.awardTarget.textContent = `+${result.target} / 25`;
+    els.awardWinnerBox.classList.toggle('zero', result.winner === 0);
+    els.awardForecastBox.classList.toggle('zero', result.forecast === 0);
+    els.awardTargetBox.classList.toggle('zero', result.target === 0);
+
+    const earlyPerDollar = sim.earlyContributed > 0
+      ? (sim.final.early - sim.earlyContributed) / sim.earlyContributed
+      : 0;
+    const laterPerDollar = sim.laterContributed > 0
+      ? (sim.final.later - sim.laterContributed) / sim.laterContributed
+      : 0;
+
+    els.comparePeople.innerHTML = `
+      <div class="compare-person">
+        <span>MIRA &middot; EARLY</span>
+        <strong>${money(sim.final.early)}</strong>
+        <small>Put in ${money(sim.earlyContributed)}. Growth <b>${money(sim.final.early - sim.earlyContributed)}</b> &middot; <b>${earlyPerDollar.toFixed(2)}</b> per $1.</small>
+      </div>
+      <div class="compare-person">
+        <span>NOAH &middot; LATER</span>
+        <strong>${money(sim.final.later)}</strong>
+        <small>Put in ${money(sim.laterContributed)}. Growth <b>${money(sim.final.later - sim.laterContributed)}</b> &middot; <b>${laterPerDollar.toFixed(2)}</b> per $1.</small>
+      </div>
+    `;
+
+    if (earlyPerDollar > laterPerDollar) {
+      els.lessonLine.innerHTML = `Each early dollar earned <b>$${earlyPerDollar.toFixed(2)}</b> of growth; each later dollar earned <b>$${laterPerDollar.toFixed(2)}</b>. More time can make a smaller early deposit punch above a larger late one.`;
+    } else if (laterPerDollar > earlyPerDollar) {
+      els.lessonLine.innerHTML = `Each later dollar earned <b>$${laterPerDollar.toFixed(2)}</b> of growth; each early dollar earned <b>$${earlyPerDollar.toFixed(2)}</b>. Larger deposits and a long runway can outweigh an early start.`;
+    } else {
+      els.lessonLine.innerHTML = `Both schedules produced <b>$${earlyPerDollar.toFixed(2)}</b> of growth per dollar contributed. Contribution timing mattered less than the shared market rate in this run.`;
+    }
+  }
+
+  function renderFooter() {
+    if (state.phase === 'run') {
+      els.actionHint.innerHTML = `Time machine running to <b>age 65</b>. Skip ahead whenever you are ready.`;
+      els.runBtn.textContent = 'Skip to 65 \u2192';
+      els.runBtn.disabled = false;
+      return;
+    }
+    if (state.phase === 'result') {
+      const last = state.round === JUMPS.length - 1;
+      els.actionHint.innerHTML = `Jump complete: <b>+${state.roundResult.total} points</b>. ${state.roundResult.targetMet ? 'Target cleared.' : 'Target missed.'}`;
+      els.runBtn.textContent = last ? 'Read the lab report \u2192' : 'Next jump \u2192';
+      els.runBtn.disabled = false;
+      return;
+    }
+    if (state.phase === 'final') {
+      els.runBtn.textContent = 'Report open';
+      els.runBtn.disabled = true;
+      return;
+    }
+    const ready = predictionReady();
+    els.runBtn.textContent = 'Seal & run \u2192';
+    els.runBtn.disabled = !ready;
+    if (ready) {
+      els.actionHint.innerHTML = `Forecast ready. <b>Run the jump</b> to reveal both balances at 65.`;
+    } else if (state.prediction.winner) {
+      els.actionHint.textContent = 'Now enter your combined balance forecast.';
+    } else if (state.prediction.amount) {
+      els.actionHint.textContent = 'Now pick the saver with the larger finish.';
+    } else {
+      els.actionHint.textContent = 'Call a winner and enter a combined forecast.';
+    }
+  }
+
+  function renderAll() {
+    renderHeader();
+    renderMission();
+    updateControlOutputs();
+    renderChart();
+    renderCards();
+    renderPrediction();
+    renderResult();
+    renderFooter();
+  }
+
+  function setSettings(next) {
+    state.settings = normalizeSettings({ ...state.settings, ...next });
+    if (state.phase !== 'plan') return;
+    updateControlOutputs();
+    renderCards();
+    renderChart();
+  }
+
+  function chooseWinner(winner) {
+    if (state.phase !== 'plan') return;
+    if (winner !== 'early' && winner !== 'later') return;
+    state.prediction.winner = winner;
+    renderPrediction();
+    renderFooter();
+  }
+
+  function setForecast(value) {
+    if (state.phase !== 'plan') return;
+    const numeric = Number(value);
+    state.prediction.amount = value === '' || !Number.isFinite(numeric) || numeric <= 0 ? null : numeric;
+    renderPrediction();
+    renderFooter();
+  }
+
+  function startLab() {
+    els.intro.hidden = true;
+    els.app.inert = false;
+    if (state.phase === 'intro') state.phase = 'plan';
+    renderAll();
+    setControlsEnabled(true);
+    const slider = document.getElementById('earlyStart');
+    if (slider) slider.focus({ preventScroll: true });
+  }
+
+  function sealAndRun(instant = false) {
+    if (state.phase !== 'plan' || !predictionReady()) return false;
+    state.sim = simulate(state.settings);
+    state.phase = 'run';
+    state.visibleAge = START_AGE;
+    state.roundResult = null;
+    setControlsEnabled(false);
+    renderAll();
+    if (state.timer) clearInterval(state.timer);
+
+    const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (instant || reduced) {
+      finishRun();
+      return true;
+    }
+
+    state.timer = setInterval(() => {
+      state.visibleAge += 1;
+      if (state.visibleAge >= RETIRE_AGE) {
+        finishRun();
+        return;
+      }
+      renderMission();
+      renderChart();
+      renderCards();
+    }, 46);
+    return true;
+  }
+
+  function finishRun() {
+    if (state.phase !== 'run' || !state.sim) return false;
+    if (state.timer) {
+      clearInterval(state.timer);
+      state.timer = null;
+    }
+    state.visibleAge = RETIRE_AGE;
+    const result = scoreJump(state.prediction, state.sim, JUMPS[state.round].target);
+    state.roundResult = result;
+    state.scores.push({
+      round: state.round,
+      jump: JUMPS[state.round],
+      result,
+    });
+    state.score += result.total;
+    state.phase = 'result';
+    renderAll();
+    els.resultPanel.focus({ preventScroll: true });
+    if (typeof els.resultPanel.scrollIntoView === 'function') {
+      const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      els.resultPanel.scrollIntoView({ block: 'nearest', behavior: reduced ? 'auto' : 'smooth' });
+    }
+    return true;
+  }
+
+  function nextJump() {
+    if (state.phase !== 'result') return false;
+    if (state.round >= JUMPS.length - 1) {
+      openFinal();
+      return true;
+    }
+    state.round += 1;
+    state.phase = 'plan';
+    state.sim = null;
+    state.roundResult = null;
+    state.visibleAge = START_AGE;
+    state.prediction = { winner: null, amount: null };
+    els.forecastInput.value = '';
+    setControlsEnabled(true);
+    renderAll();
+    els.labScroll.scrollTop = 0;
+    const slider = document.getElementById('earlyStart');
+    if (slider) slider.focus({ preventScroll: true });
+    return true;
+  }
+
+  function rankFor(score, targets, winners) {
+    if (score >= 470 && targets === 5) {
+      return ['Chronomancer', 'You read both the clock and the compound curve. Every target fell.'];
+    }
+    if (score >= 410) {
+      return ['Compound navigator', 'Strong forecasts and a steady grip on the two schedules.'];
+    }
+    if (score >= 310) {
+      return ['Forecast apprentice', 'The curve is starting to make sense. A few calls slipped away.'];
+    }
+    if (score >= 200 || winners >= 3) {
+      return ['Time tourist', 'You saw the shape of compounding, but the final balances surprised you.'];
+    }
+    return ['First jump', 'The vault is patient. Try starting earlier and watching the growth per dollar.'];
+  }
+
+  function openFinal() {
+    if (state.phase === 'final') return;
+    state.phase = 'final';
+    if (state.timer) {
+      clearInterval(state.timer);
+      state.timer = null;
+    }
+    const winners = state.scores.filter((entry) => entry.result.winnerCorrect).length;
+    const targets = state.scores.filter((entry) => entry.result.targetMet).length;
+    const averageError = state.scores.length
+      ? state.scores.reduce((sum, entry) => sum + entry.result.errorPct, 0) / state.scores.length
+      : 0;
+    const rank = rankFor(state.score, targets, winners);
+    const perfectTargets = targets === JUMPS.length;
+    const strongScore = state.score >= 410;
+
+    els.finalTitle.textContent = perfectTargets && state.score >= 470
+      ? 'Time, mastered.'
+      : strongScore
+        ? 'The curve bends.'
+        : targets >= 3
+          ? 'Targets in sight.'
+          : 'The vault stays open.';
+    els.finalTitle.className = 'report-title' + (state.score < 250 ? ' bad' : state.score < 350 ? ' warn' : '');
+    els.finalSub.textContent = `Five jumps, ${JUMPS.length} targets, and one long compound curve. You called ${winners} of 5 winners, cleared ${targets} of 5 targets, and finished with ${state.score} of ${MAX_SCORE} points.`;
+    els.finalScore.textContent = String(state.score).padStart(3, '0');
+    els.finalRank.textContent = rank[0];
+    els.finalRankNote.textContent = rank[1];
+    els.finalWinners.textContent = `${winners} / 5`;
+    els.finalTargets.textContent = `${targets} / 5`;
+    els.finalError.textContent = `${averageError.toFixed(1)}%`;
+
+    els.jumpLedger.innerHTML = state.scores.map((entry, index) => {
+      const result = entry.result;
+      return `
+        <div class="jump-row">
+          <span>${String(index + 1).padStart(2, '0')}</span>
+          <div><b>${entry.jump.name}</b><small>${compactMoney(result.actual)} actual \u00b7 ${compactMoney(result.target)} target</small></div>
+          <span class="${result.targetMet ? 'hit' : 'miss'}">${result.targetMet ? 'TARGET HIT' : 'TARGET MISS'}</span>
+          <strong>${result.total}</strong>
+        </div>
+      `;
+    }).join('');
+
+    els.finalFoot.textContent = perfectTargets
+      ? 'Every target cleared. Now try beating the same targets with less contributed money.'
+      : winners >= 4
+        ? 'You can read the finish. The next experiment is to reach the same target with fewer deposits.'
+        : 'Try shifting one lever at a time: start age, contribution size, or the compounding schedule.';
+    els.final.hidden = false;
+    els.app.inert = true;
+    els.restartBtn.focus({ preventScroll: true });
+  }
+
+  function resetAll(showIntro) {
+    if (state.timer) {
+      clearInterval(state.timer);
+      state.timer = null;
+    }
+    state.phase = showIntro ? 'intro' : 'plan';
+    state.round = 0;
+    state.settings = { ...DEFAULTS };
+    state.prediction = { winner: null, amount: null };
+    state.visibleAge = START_AGE;
+    state.sim = null;
+    state.roundResult = null;
+    state.scores = [];
+    state.score = 0;
+    els.forecastInput.value = '';
+    els.final.hidden = true;
+    els.intro.hidden = !showIntro;
+    els.app.inert = showIntro;
+    setControlsEnabled(!showIntro);
+    renderAll();
+    els.labScroll.scrollTop = 0;
+    if (showIntro) {
+      els.startBtn.focus({ preventScroll: true });
+    } else {
+      const slider = document.getElementById('earlyStart');
+      if (slider) slider.focus({ preventScroll: true });
+    }
+  }
+
+  /* ---------- events ---------- */
+
+  els.startBtn.addEventListener('click', startLab);
+  els.restartBtn.addEventListener('click', () => resetAll(true));
+
+  document.querySelectorAll('[data-setting]').forEach((input) => {
+    input.addEventListener('input', () => {
+      if (state.phase !== 'plan') return;
+      const key = input.dataset.setting;
+      if (!SPECS[key]) return;
+      setSettings({ [key]: Number(input.value) });
+      renderFooter();
+    });
+  });
+
+  document.querySelectorAll('[data-comp]').forEach((button) => {
+    button.addEventListener('click', () => {
+      if (state.phase !== 'plan') return;
+      setSettings({ compounding: button.dataset.comp });
+      renderFooter();
+    });
+  });
+
+  document.querySelectorAll('[data-pick]').forEach((button) => {
+    button.addEventListener('click', () => chooseWinner(button.dataset.pick));
+  });
+
+  els.forecastInput.addEventListener('input', () => setForecast(els.forecastInput.value));
+  els.forecastInput.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' && predictionReady()) {
+      event.preventDefault();
+      sealAndRun(false);
+    }
+  });
+
+  els.runBtn.addEventListener('click', () => {
+    if (state.phase === 'plan') sealAndRun(false);
+    else if (state.phase === 'run') finishRun();
+    else if (state.phase === 'result') nextJump();
+  });
+
+  window.addEventListener('pagehide', () => {
+    if (state.timer) clearInterval(state.timer);
+  });
+
+  /* ---------- boot ---------- */
+
+  resetAll(true);
+
+  /* ---------- test hook ---------- */
+
+  window.__TIMEVAULT__ = {
+    start: startLab,
+    restart: () => resetAll(true),
+    getState() {
+      return {
+        phase: state.phase,
+        round: state.round,
+        settings: { ...state.settings },
+        prediction: { ...state.prediction },
+        visibleAge: state.visibleAge,
+        sim: state.sim,
+        roundResult: state.roundResult,
+        scores: state.scores.map((entry) => ({ ...entry })),
+        score: state.score,
+      };
+    },
+    getSettings: () => ({ ...state.settings }),
+    setSettings(next) {
+      setSettings(next);
+      return { ...state.settings };
+    },
+    simulate,
+    rateDetails,
+    setPrediction(winner, amount) {
+      if (winner === 'early' || winner === 'later') state.prediction.winner = winner;
+      const numeric = Number(amount);
+      state.prediction.amount = Number.isFinite(numeric) && numeric > 0 ? numeric : null;
+      renderPrediction();
+      renderFooter();
+    },
+    sealAndRun(instant = true) {
+      return sealAndRun(instant);
+    },
+    finishRun,
+    nextJump,
+    scoreJump,
+    getJumps: () => JUMPS.map((jump) => ({ ...jump })),
+    maxScore: MAX_SCORE,
+    defaults: { ...DEFAULTS },
+  };
+})();
+</script>
+</body>
+</html>
