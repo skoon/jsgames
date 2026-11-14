@@ -25,14 +25,11 @@
   }
   body { padding: 10px; gap: 7px; }
   #stage {
-    width: min(100%, 520px, calc((100dvh - 48px) * 0.75));
     background:
       radial-gradient(115% 80% at 50% -10%, rgba(65, 96, 78, 0.26), transparent 55%),
       #081012;
   }
   .game {
-    position: absolute;
-    inset: 0;
     z-index: 2;
     display: flex;
     flex-direction: column;
@@ -65,7 +62,7 @@
   }
   .brand small {
     margin-top: 2px;
-    font-size: 5.8px;
+    font-size: var(--text-2xs);
     letter-spacing: 0.14em;
   }
   .stats {
@@ -78,7 +75,7 @@
   .stat span {
     display: block;
     color: var(--muted);
-    font-size: 5.8px;
+    font-size: var(--text-2xs);
     letter-spacing: 0.13em;
   }
   .stat strong {
@@ -105,7 +102,7 @@
     min-width: 0;
     padding: 0 3px;
     color: var(--muted);
-    font-size: 6.5px;
+    font-size: var(--text-2xs);
     letter-spacing: 0.13em;
     text-transform: uppercase;
     white-space: nowrap;
@@ -127,7 +124,7 @@
   #modeTag {
     margin-left: auto;
     color: rgba(224, 240, 232, 0.25);
-    font-size: 5.8px;
+    font-size: var(--text-2xs);
   }
 
   /* ---------- week brief ---------- */
@@ -163,7 +160,7 @@
   .brief-eyebrow {
     margin: 0;
     color: var(--amber);
-    font-size: 6px;
+    font-size: var(--text-2xs);
     letter-spacing: 0.2em;
     text-transform: uppercase;
   }
@@ -174,7 +171,7 @@
     border-radius: 4px;
     background: rgba(110, 231, 207, 0.07);
     color: var(--teal);
-    font-size: 6.5px;
+    font-size: var(--text-2xs);
     font-weight: 700;
     letter-spacing: 0.06em;
     white-space: nowrap;
@@ -189,7 +186,7 @@
   .brief-copy {
     margin: 3px 0 0;
     color: rgba(226, 240, 232, 0.56);
-    font-size: 7.5px;
+    font-size: var(--text-2xs);
     line-height: 1.42;
     display: -webkit-box;
     -webkit-line-clamp: 2;
@@ -211,7 +208,7 @@
     border-radius: 999px;
     background: rgba(255, 255, 255, 0.025);
     color: rgba(226, 240, 232, 0.48);
-    font-size: 5.9px;
+    font-size: var(--text-2xs);
     letter-spacing: 0.035em;
     white-space: nowrap;
   }
@@ -239,7 +236,7 @@
   .wallet-head .label {
     display: block;
     color: var(--muted);
-    font-size: 5.8px;
+    font-size: var(--text-2xs);
     letter-spacing: 0.13em;
     text-transform: uppercase;
   }
@@ -254,12 +251,12 @@
   .wallet-head .pay-from {
     margin-left: 4px;
     color: rgba(226, 240, 232, 0.32);
-    font-size: 5.8px;
+    font-size: var(--text-2xs);
     letter-spacing: 0.02em;
   }
   .wallet-side {
     text-align: right;
-    font-size: 5.8px;
+    font-size: var(--text-2xs);
     letter-spacing: 0.07em;
     color: var(--muted);
     white-space: nowrap;
@@ -268,7 +265,7 @@
     display: inline-block;
     margin-left: 3px;
     color: var(--teal);
-    font-size: 9px;
+    font-size: var(--text-xs);
     font-variant-numeric: tabular-nums;
   }
   .wallet-side b.warn { color: var(--red); }
@@ -317,7 +314,7 @@
     box-shadow: 0 2px 0 rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.07);
     color: #ffde9d;
     font: inherit;
-    font-size: 7.5px;
+    font-size: var(--text-2xs);
     font-weight: 700;
     letter-spacing: 0.02em;
     font-variant-numeric: tabular-nums;
@@ -355,7 +352,7 @@
   .bill.in-cat {
     width: 34px;
     height: 20px;
-    font-size: 6.5px;
+    font-size: var(--text-2xs);
     border-color: rgba(var(--cat-rgb), 0.36);
     background: rgba(var(--cat-rgb), 0.08);
     color: var(--cat);
@@ -375,7 +372,7 @@
     background: #16312c;
     color: #d1fff5;
     font: inherit;
-    font-size: 7.5px;
+    font-size: var(--text-2xs);
     font-weight: 700;
     pointer-events: none;
     box-shadow: 0 10px 24px -8px rgba(0, 0, 0, 0.9), 0 0 0 2px rgba(110, 231, 207, 0.15);
@@ -434,13 +431,13 @@
     border-radius: 5px;
     background: rgba(var(--cat-rgb), 0.08);
     color: var(--cat);
-    font-size: 9px;
+    font-size: var(--text-xs);
     line-height: 1;
   }
   .cat-name { min-width: 0; flex: 1; }
   .cat-name h2 {
     margin: 0;
-    font-size: 9px;
+    font-size: var(--text-xs);
     line-height: 1.1;
     letter-spacing: 0.02em;
     color: var(--ink);
@@ -449,7 +446,7 @@
     margin: 1px 0 0;
     overflow: hidden;
     color: var(--muted);
-    font-size: 5.6px;
+    font-size: var(--text-2xs);
     line-height: 1.25;
     letter-spacing: 0.01em;
     text-overflow: ellipsis;
@@ -462,7 +459,7 @@
     border-radius: 3px;
     background: rgba(var(--cat-rgb), 0.06);
     color: var(--cat);
-    font-size: 5.2px;
+    font-size: var(--text-2xs);
     font-weight: 700;
     letter-spacing: 0.08em;
     white-space: nowrap;
@@ -474,13 +471,13 @@
     gap: 5px;
     margin-top: 5px;
     color: var(--muted);
-    font-size: 5.8px;
+    font-size: var(--text-2xs);
     line-height: 1.1;
     white-space: nowrap;
   }
   .cat-numbers b {
     color: rgba(240, 247, 239, 0.82);
-    font-size: 7.5px;
+    font-size: var(--text-2xs);
     font-variant-numeric: tabular-nums;
   }
   .cat-numbers .short { color: var(--red); }
@@ -505,7 +502,7 @@
     margin-top: 3px;
     min-height: 9px;
     color: rgba(var(--cat-rgb), 0.72);
-    font-size: 5.5px;
+    font-size: var(--text-2xs);
     line-height: 1.3;
     letter-spacing: 0.01em;
     overflow: hidden;
@@ -530,7 +527,7 @@
     width: 100%;
     padding: 2px 0;
     color: rgba(var(--cat-rgb), 0.3);
-    font-size: 5.4px;
+    font-size: var(--text-2xs);
     letter-spacing: 0.05em;
     text-align: center;
   }
@@ -545,7 +542,7 @@
     background: rgba(7, 16, 18, 0.94);
     color: var(--cat);
     font: inherit;
-    font-size: 5.5px;
+    font-size: var(--text-2xs);
     font-weight: 700;
     letter-spacing: 0.04em;
     cursor: pointer;
@@ -569,7 +566,7 @@
     min-width: 0;
     flex: 1;
     color: rgba(226, 240, 232, 0.36);
-    font-size: 5.9px;
+    font-size: var(--text-2xs);
     line-height: 1.35;
     letter-spacing: 0.015em;
   }
@@ -583,7 +580,7 @@
     background: rgba(255, 255, 255, 0.03);
     color: var(--muted);
     font: inherit;
-    font-size: 6px;
+    font-size: var(--text-2xs);
     letter-spacing: 0.07em;
     text-transform: uppercase;
     cursor: pointer;
@@ -602,7 +599,7 @@
     box-shadow: 0 7px 18px -9px rgba(94, 231, 199, 0.9), inset 0 -2px 0 rgba(0, 0, 0, 0.16);
     color: #06211c;
     font: inherit;
-    font-size: 6.5px;
+    font-size: var(--text-2xs);
     font-weight: 700;
     letter-spacing: 0.075em;
     text-transform: uppercase;
@@ -647,7 +644,7 @@
   .eyebrow {
     margin: 0 0 5px;
     color: var(--amber);
-    font-size: 6.5px;
+    font-size: var(--text-2xs);
     letter-spacing: 0.21em;
     text-transform: uppercase;
   }
@@ -664,7 +661,7 @@
   .lead {
     margin: 0;
     color: rgba(226, 240, 232, 0.6);
-    font-size: 8.5px;
+    font-size: var(--text-xs);
     line-height: 1.5;
     letter-spacing: 0.005em;
   }
@@ -679,7 +676,7 @@
     position: relative;
     padding-left: 12px;
     color: rgba(226, 240, 232, 0.56);
-    font-size: 7.2px;
+    font-size: var(--text-2xs);
     line-height: 1.4;
   }
   .rule::before {
@@ -704,7 +701,7 @@
   .score-rule span {
     display: block;
     color: var(--muted);
-    font-size: 5.2px;
+    font-size: var(--text-2xs);
     letter-spacing: 0.07em;
     text-transform: uppercase;
   }
@@ -712,7 +709,7 @@
     display: block;
     margin-top: 2px;
     color: var(--teal);
-    font-size: 9px;
+    font-size: var(--text-xs);
     line-height: 1.15;
     font-variant-numeric: tabular-nums;
   }
@@ -729,7 +726,7 @@
       inset 0 -2px 0 rgba(0, 0, 0, 0.16);
     color: #06211c;
     font: inherit;
-    font-size: 8.5px;
+    font-size: var(--text-xs);
     font-weight: 700;
     letter-spacing: 0.14em;
     text-transform: uppercase;
@@ -741,7 +738,7 @@
   .fine {
     margin: 7px 0 0;
     color: rgba(226, 240, 232, 0.27);
-    font-size: 5.8px;
+    font-size: var(--text-2xs);
     letter-spacing: 0.07em;
     text-transform: uppercase;
   }
@@ -752,7 +749,7 @@
     color: var(--ink);
   }
   .event-title em { color: var(--red); font-style: normal; }
-  .event-copy { margin: 0; color: rgba(226, 240, 232, 0.58); font-size: 8px; line-height: 1.5; }
+  .event-copy { margin: 0; color: rgba(226, 240, 232, 0.58); font-size: var(--text-xs); line-height: 1.5; }
   .expense-figure {
     margin: 10px 0 0;
     padding: 8px;
@@ -763,7 +760,7 @@
   .expense-figure span {
     display: block;
     color: rgba(255, 180, 172, 0.65);
-    font-size: 5.5px;
+    font-size: var(--text-2xs);
     letter-spacing: 0.15em;
   }
   .expense-figure strong {
@@ -785,8 +782,8 @@
     border-radius: 5px;
     background: rgba(255, 255, 255, 0.02);
   }
-  .source span { display: block; color: var(--muted); font-size: 5.1px; letter-spacing: 0.07em; text-transform: uppercase; }
-  .source strong { display: block; margin-top: 2px; color: var(--ink); font-size: 9px; }
+  .source span { display: block; color: var(--muted); font-size: var(--text-2xs); letter-spacing: 0.07em; text-transform: uppercase; }
+  .source strong { display: block; margin-top: 2px; color: var(--ink); font-size: var(--text-xs); }
   .source.hit strong { color: var(--teal); }
   .source.zero strong { color: rgba(226, 240, 232, 0.28); }
   .source.raid strong { color: var(--red); }
@@ -797,7 +794,7 @@
     border-radius: 0 5px 5px 0;
     background: rgba(110, 231, 207, 0.04);
     color: rgba(226, 240, 232, 0.52);
-    font-size: 6.8px;
+    font-size: var(--text-2xs);
     line-height: 1.4;
     text-align: left;
   }
@@ -813,16 +810,16 @@
     gap: 5px;
     margin-top: 7px;
     color: var(--teal);
-    font-size: 6.2px;
+    font-size: var(--text-2xs);
     letter-spacing: 0.05em;
   }
-  .event-gain b { font-size: 9px; }
+  .event-gain b { font-size: var(--text-xs); }
   .week-preview {
     margin-top: 9px;
     padding-top: 7px;
     border-top: 1px dashed rgba(255, 255, 255, 0.08);
     color: var(--muted);
-    font-size: 6px;
+    font-size: var(--text-2xs);
     line-height: 1.4;
     letter-spacing: 0.05em;
     text-transform: uppercase;
@@ -831,7 +828,7 @@
   .rank {
     margin: 8px 0 0;
     color: var(--amber);
-    font-size: 8px;
+    font-size: var(--text-xs);
     font-weight: 700;
     letter-spacing: 0.11em;
     text-transform: uppercase;
@@ -846,7 +843,7 @@
   .final-score span {
     display: block;
     color: var(--muted);
-    font-size: 5.5px;
+    font-size: var(--text-2xs);
     letter-spacing: 0.17em;
   }
   .final-score strong {
@@ -863,7 +860,7 @@
     display: block;
     margin-top: 4px;
     color: var(--muted);
-    font-size: 5.8px;
+    font-size: var(--text-2xs);
     letter-spacing: 0.08em;
   }
   .report-grid {
@@ -878,8 +875,8 @@
     border-radius: 6px;
     background: rgba(255, 255, 255, 0.02);
   }
-  .report-stat span { display: block; color: var(--muted); font-size: 5.1px; letter-spacing: 0.06em; text-transform: uppercase; }
-  .report-stat strong { display: block; margin-top: 2px; color: var(--ink); font-size: 10px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .report-stat span { display: block; color: var(--muted); font-size: var(--text-2xs); letter-spacing: 0.06em; text-transform: uppercase; }
+  .report-stat strong { display: block; margin-top: 2px; color: var(--ink); font-size: var(--text-sm); line-height: 1.1; font-variant-numeric: tabular-nums; }
   .report-stat:nth-child(2) strong { color: var(--teal); }
   .report-stat:nth-child(3) strong { color: var(--amber); }
   .breakdown {
@@ -897,14 +894,14 @@
     justify-content: space-between;
     gap: 6px;
     color: rgba(226, 240, 232, 0.5);
-    font-size: 6.1px;
+    font-size: var(--text-2xs);
     line-height: 1.4;
   }
   .break-line b { color: var(--ink); font-weight: 700; font-variant-numeric: tabular-nums; }
   .outro {
     margin: 8px 0 0;
     color: rgba(226, 240, 232, 0.55);
-    font-size: 6.9px;
+    font-size: var(--text-2xs);
     line-height: 1.45;
     text-align: left;
   }
@@ -916,7 +913,7 @@
     .hud { padding: 4px 7px; }
     .brand small { display: none; }
     .brief { padding: 6px 8px 6px 10px; }
-    .brief-copy { -webkit-line-clamp: 1; font-size: 7px; }
+    .brief-copy { -webkit-line-clamp: 1; font-size: var(--text-2xs); }
     .brief h1 { font-size: 12.5px; }
     .schedule { margin-top: 4px; }
     .chip { padding: 1px 4px; }
@@ -934,12 +931,12 @@
     .brief-copy { display: none; }
     .brief h1 { font-size: 11.5px; }
     .schedule { margin-top: 3px; }
-    .chip { font-size: 5.4px; }
+    .chip { font-size: var(--text-2xs); }
     .wallet-head .pay-from { display: none; }
     .cat-note { display: none; }
     .cat-head { gap: 4px; }
-    .cat-icon { width: 16px; height: 16px; font-size: 8px; }
-    .cat-name h2 { font-size: 8px; }
+    .cat-icon { width: 16px; height: 16px; font-size: var(--text-xs); }
+    .cat-name h2 { font-size: var(--text-xs); }
     .cat-numbers { margin-top: 3px; }
     .cat-tokens { max-height: 32px; }
     .actionbar { min-height: 23px; }
@@ -954,7 +951,7 @@
 </head>
 <body>
 <p class="hint">Drag the money &middot; cover the week &middot; keep a cushion</p>
-<main id="stage">
+<main id="stage" class="stage-fluid">
   <div class="game" id="game">
     <header class="hud">
       <div class="brand">

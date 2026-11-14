@@ -17,22 +17,23 @@
   }
   .controls { display: flex; gap: 8px; }
   .ghost {
-    padding: 9px 20px;
+    min-height: 40px;
+    padding: 10px 22px;
     border: 1px solid rgba(233, 241, 255, 0.16);
     border-radius: 999px;
     background: rgba(255, 255, 255, 0.035);
-    color: rgba(233, 241, 255, 0.7);
+    color: rgba(233, 241, 255, 0.78);
     cursor: pointer;
     font: inherit;
-    font-size: 10px;
+    font-size: 12px;
     font-weight: 700;
-    letter-spacing: 0.18em;
+    letter-spacing: 0.16em;
     text-transform: uppercase;
     transition: background 120ms ease, color 120ms ease, border-color 120ms ease, transform 100ms ease;
   }
   .ghost:hover { background: rgba(255, 255, 255, 0.08); color: #ffffff; border-color: rgba(233, 241, 255, 0.28); }
   .ghost:active { transform: translateY(1px); }
-  .panel { max-width: 300px; }
+  .panel { max-width: 360px; }
   .title { margin-bottom: 18px; color: #c4a7ff; text-shadow: 0 0 26px rgba(179, 136, 255, 0.35); }
   .score {
     font-size: 54px;
@@ -41,8 +42,8 @@
     color: #5ee7c7;
     text-shadow: 0 0 30px rgba(94, 231, 199, 0.35);
   }
-  .best { margin-top: 10px; font-size: 11px; letter-spacing: 0.18em; }
-  .btn { margin-top: 22px; padding: 15px 32px; font-size: 12px; font-weight: 700; letter-spacing: 0.18em; }
+  .best { margin-top: 10px; font-size: 13px; letter-spacing: 0.16em; }
+  .btn { margin-top: 22px; padding: 15px 32px; font-size: 13px; font-weight: 700; letter-spacing: 0.16em; }
 </style>
 </head>
 <body>

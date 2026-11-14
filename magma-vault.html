@@ -17,23 +17,24 @@
   }
   .controls { display: flex; gap: 8px; }
   .ghost {
-    padding: 9px 22px;
+    min-height: 40px;
+    padding: 10px 22px;
     border: 1px solid rgba(243, 236, 255, 0.16);
     border-radius: 999px;
     background: rgba(255, 255, 255, 0.035);
-    color: rgba(243, 236, 255, 0.7);
+    color: rgba(243, 236, 255, 0.78);
     cursor: pointer;
     font: inherit;
-    font-size: 10px;
+    font-size: 12px;
     font-weight: 700;
-    letter-spacing: 0.18em;
+    letter-spacing: 0.16em;
     text-transform: uppercase;
     transition: background 120ms ease, color 120ms ease, border-color 120ms ease, transform 100ms ease;
   }
   .ghost:hover { background: rgba(255, 255, 255, 0.08); color: #fff; border-color: rgba(243, 236, 255, 0.28); }
   .ghost:active { transform: translateY(1px); }
   .ghost:focus-visible { outline: 2px solid #ffd166; outline-offset: 3px; }
-  .panel { max-width: 300px; }
+  .panel { max-width: 360px; }
   .title { margin-bottom: 18px; color: #ffb703; text-shadow: 0 0 26px rgba(255, 183, 3, 0.3); }
   .overlay.dead .title { color: #ff7a4d; text-shadow: 0 0 26px rgba(255, 90, 40, 0.35); }
   .overlay.won .title { color: #5ee7c7; text-shadow: 0 0 26px rgba(94, 231, 199, 0.35); }
@@ -45,13 +46,13 @@
     text-shadow: 0 0 30px rgba(255, 183, 3, 0.3);
   }
   .overlay.won .score { color: #5ee7c7; text-shadow: 0 0 30px rgba(94, 231, 199, 0.35); }
-  .best { margin-top: 10px; font-size: 11px; letter-spacing: 0.18em; }
+  .best { margin-top: 10px; font-size: 13px; letter-spacing: 0.16em; }
   .btn {
     margin-top: 22px;
     padding: 15px 32px;
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 700;
-    letter-spacing: 0.18em;
+    letter-spacing: 0.16em;
     color: #241104;
     background: linear-gradient(180deg, #ffd27a, #ff9f43);
     box-shadow:

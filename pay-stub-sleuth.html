@@ -49,7 +49,7 @@
   }
   .brand small {
     margin-top: 2px;
-    font-size: clamp(5px, 1.15cqw, 6.5px);
+    font-size: var(--text-2xs);
     letter-spacing: 0.13em;
   }
   .hud { gap: clamp(8px, 2.4cqw, 14px); }
@@ -57,7 +57,7 @@
   .stat span {
     display: block;
     color: var(--muted);
-    font-size: clamp(5px, 1.1cqw, 6.4px);
+    font-size: var(--text-2xs);
     letter-spacing: 0.13em;
   }
   .stat strong {
@@ -125,7 +125,7 @@
   .eyebrow {
     margin: 0;
     color: var(--amber);
-    font-size: clamp(5px, 1.08cqw, 6.2px);
+    font-size: var(--text-2xs);
     letter-spacing: 0.18em;
     line-height: 1.3;
     text-transform: uppercase;
@@ -140,7 +140,7 @@
   .period-copy > p:last-child {
     margin: 4px 0 0;
     color: rgba(239, 233, 215, 0.58);
-    font-size: clamp(5.8px, 1.24cqw, 7.1px);
+    font-size: var(--text-xs);
     line-height: 1.43;
   }
   .check-badge {
@@ -151,7 +151,7 @@
   .check-badge span, .check-badge small {
     display: block;
     color: rgba(255, 224, 166, 0.5);
-    font-size: clamp(4.6px, 0.98cqw, 5.6px);
+    font-size: var(--text-2xs);
     letter-spacing: 0.1em;
     line-height: 1.3;
   }
@@ -169,7 +169,7 @@
     border: 1px solid rgba(255, 201, 107, 0.22);
     border-radius: 3px;
     color: rgba(255, 224, 166, 0.65);
-    font-size: clamp(4.2px, 0.88cqw, 5.1px);
+    font-size: var(--text-2xs);
     letter-spacing: 0.08em;
   }
   .status-pill.logged {
@@ -201,12 +201,12 @@
   }
   .context-title span {
     color: var(--mint);
-    font-size: clamp(4.6px, 0.97cqw, 5.65px);
+    font-size: var(--text-2xs);
     letter-spacing: 0.13em;
   }
   .context-title b {
     color: rgba(239, 233, 215, 0.62);
-    font-size: clamp(4.6px, 0.97cqw, 5.65px);
+    font-size: var(--text-2xs);
     letter-spacing: 0.06em;
     font-weight: 600;
   }
@@ -219,7 +219,7 @@
   .hour-grid span, .rate-line span {
     display: block;
     color: var(--muted);
-    font-size: clamp(4.4px, 0.92cqw, 5.3px);
+    font-size: var(--text-2xs);
     letter-spacing: 0.08em;
   }
   .hour-grid strong {
@@ -240,19 +240,19 @@
   }
   .rate-line b {
     color: var(--amber);
-    font-size: clamp(7.5px, 1.65cqw, 9.4px);
+    font-size: var(--text-sm);
     font-variant-numeric: tabular-nums;
   }
   .mini-note {
     margin: 4px 0 0;
     color: rgba(239, 233, 215, 0.36);
-    font-size: clamp(4.55px, 0.95cqw, 5.45px);
+    font-size: var(--text-2xs);
     line-height: 1.37;
   }
   .clue-quote {
     margin: 4px 0 0;
     color: rgba(239, 233, 215, 0.7);
-    font-size: clamp(5.6px, 1.18cqw, 6.7px);
+    font-size: var(--text-2xs);
     line-height: 1.45;
   }
   .handbook-line {
@@ -260,7 +260,7 @@
     padding-top: 3px;
     border-top: 1px dashed rgba(255, 255, 255, 0.08);
     color: rgba(255, 214, 134, 0.62);
-    font-size: clamp(4.75px, 1cqw, 5.75px);
+    font-size: var(--text-2xs);
     line-height: 1.4;
   }
   .handbook-line b { color: var(--amber); letter-spacing: 0.05em; }
@@ -293,7 +293,7 @@
   .stub-kicker {
     margin: 0;
     color: #9c4a2e;
-    font-size: clamp(4.5px, 0.94cqw, 5.4px);
+    font-size: var(--text-2xs);
     font-weight: 700;
     letter-spacing: 0.14em;
     line-height: 1.3;
@@ -308,20 +308,20 @@
   .stub-role {
     margin: 2px 0 0;
     color: var(--paper-muted);
-    font-size: clamp(4.55px, 0.95cqw, 5.45px);
+    font-size: var(--text-2xs);
     line-height: 1.3;
   }
   .check-meta {
     flex: none;
     text-align: right;
     color: var(--paper-muted);
-    font-size: clamp(4.4px, 0.9cqw, 5.2px);
+    font-size: var(--text-2xs);
     line-height: 1.45;
   }
   .check-meta b {
     display: block;
     color: #7d3825;
-    font-size: clamp(6.4px, 1.35cqw, 7.6px);
+    font-size: var(--text-xs);
     line-height: 1.2;
     letter-spacing: 0.04em;
   }
@@ -333,7 +333,7 @@
     background: rgba(109, 96, 64, 0.08);
     border-bottom: 1px solid rgba(63, 57, 44, 0.13);
     color: var(--paper-muted);
-    font-size: clamp(4.25px, 0.87cqw, 5.05px);
+    font-size: var(--text-2xs);
     line-height: 1.3;
   }
   .stub-key b { color: #37452d; }
@@ -344,7 +344,7 @@
     gap: 5px;
     padding: 4px 9px 2px;
     color: #7e7059;
-    font-size: clamp(4.1px, 0.85cqw, 4.9px);
+    font-size: var(--text-2xs);
     font-weight: 700;
     letter-spacing: 0.16em;
   }
@@ -377,7 +377,7 @@
   .line-label {
     display: block;
     color: #2b2d27;
-    font-size: clamp(5.2px, 1.08cqw, 6.2px);
+    font-size: var(--text-2xs);
     font-weight: 600;
     line-height: 1.25;
   }
@@ -385,14 +385,14 @@
     display: block;
     margin-top: 1px;
     color: var(--paper-muted);
-    font-size: clamp(4.15px, 0.85cqw, 4.9px);
+    font-size: var(--text-2xs);
     line-height: 1.25;
   }
   .line-right { text-align: right; white-space: nowrap; }
   .line-amount {
     display: block;
     color: #272b25;
-    font-size: clamp(5.9px, 1.2cqw, 6.9px);
+    font-size: var(--text-xs);
     font-weight: 700;
     line-height: 1.2;
     font-variant-numeric: tabular-nums;
@@ -401,7 +401,7 @@
     display: block;
     margin-top: 1px;
     color: #99836a;
-    font-size: clamp(3.8px, 0.76cqw, 4.4px);
+    font-size: var(--text-2xs);
     letter-spacing: 0.08em;
     line-height: 1.2;
   }
@@ -421,14 +421,14 @@
   }
   .stub-row.net-row .line-label {
     color: #263c2a;
-    font-size: clamp(6px, 1.25cqw, 7.2px);
+    font-size: var(--text-xs);
     font-weight: 800;
     letter-spacing: 0.04em;
     text-transform: uppercase;
   }
   .stub-row.net-row .line-amount {
     color: #1f3e2b;
-    font-size: clamp(8px, 1.7cqw, 9.8px);
+    font-size: var(--text-sm);
   }
   .stub-row.net-row .line-tag { color: #56715a; }
   .stub-row.deduction-row .line-amount { color: #7c3c2c; }
@@ -437,7 +437,7 @@
     padding: 4px 9px 5px;
     background: rgba(109, 96, 64, 0.08);
     color: #8b806d;
-    font-size: clamp(3.9px, 0.79cqw, 4.6px);
+    font-size: var(--text-2xs);
     line-height: 1.3;
     text-align: center;
     letter-spacing: 0.03em;
@@ -452,7 +452,7 @@
     border-radius: 6px;
     background: rgba(255, 201, 107, 0.03);
     color: rgba(239, 233, 215, 0.45);
-    font-size: clamp(4.95px, 1.02cqw, 5.9px);
+    font-size: var(--text-2xs);
     line-height: 1.4;
   }
   .pin-box.has-pin {
@@ -474,7 +474,7 @@
     border-radius: 4px;
     background: rgba(130, 227, 190, 0.035);
     color: rgba(189, 241, 220, 0.56);
-    font-size: clamp(4.35px, 0.9cqw, 5.2px);
+    font-size: var(--text-2xs);
     cursor: pointer;
   }
   .no-error-btn:hover { border-color: rgba(130, 227, 190, 0.4); color: var(--mint); }
@@ -502,13 +502,13 @@
   .panel-title h2 {
     margin: 0;
     color: var(--ink);
-    font-size: clamp(6.2px, 1.3cqw, 7.5px);
+    font-size: var(--text-xs);
     letter-spacing: 0.05em;
     text-transform: uppercase;
   }
   .panel-title span {
     color: var(--muted);
-    font-size: clamp(4.2px, 0.87cqw, 5px);
+    font-size: var(--text-2xs);
     letter-spacing: 0.05em;
   }
   .calc-grid {
@@ -524,7 +524,7 @@
     justify-content: space-between;
     gap: 4px;
     color: rgba(239, 233, 215, 0.7);
-    font-size: clamp(4.55px, 0.94cqw, 5.4px);
+    font-size: var(--text-2xs);
     line-height: 1.2;
   }
   .calc-field label span {
@@ -543,7 +543,7 @@
     top: 50%;
     transform: translateY(-50%);
     color: rgba(255, 201, 107, 0.55);
-    font-size: clamp(6px, 1.3cqw, 7.2px);
+    font-size: var(--text-xs);
     pointer-events: none;
   }
   .calc-field input {
@@ -554,7 +554,7 @@
     border-radius: 4px;
     background: rgba(3, 8, 6, 0.6);
     color: var(--ink);
-    font-size: clamp(7px, 1.5cqw, 8.5px);
+    font-size: var(--text-xs);
     font-variant-numeric: tabular-nums;
     -webkit-user-select: text;
     user-select: text;
@@ -567,7 +567,7 @@
   .calc-help {
     margin: 4px 0 0;
     color: rgba(239, 233, 215, 0.28);
-    font-size: clamp(4.15px, 0.84cqw, 4.85px);
+    font-size: var(--text-2xs);
     line-height: 1.35;
   }
 
@@ -584,7 +584,7 @@
     border-radius: 5px;
     background: rgba(255, 255, 255, 0.02);
     color: rgba(239, 233, 215, 0.6);
-    font-size: clamp(4.9px, 1.01cqw, 5.85px);
+    font-size: var(--text-2xs);
     line-height: 1.4;
     text-align: left;
     cursor: pointer;
@@ -604,7 +604,7 @@
     border: 1px solid rgba(255, 201, 107, 0.22);
     border-radius: 50%;
     color: var(--amber);
-    font-size: clamp(4.7px, 0.95cqw, 5.55px);
+    font-size: var(--text-2xs);
     font-weight: 700;
     line-height: 1;
   }
@@ -625,7 +625,7 @@
     flex: 1;
     margin: 0;
     color: rgba(239, 233, 215, 0.36);
-    font-size: clamp(4.9px, 1.01cqw, 5.9px);
+    font-size: var(--text-2xs);
     line-height: 1.35;
   }
   .notice.ready { color: rgba(130, 227, 190, 0.7); }
@@ -637,7 +637,7 @@
     background: linear-gradient(180deg, #ffd887, #e7ab43);
     box-shadow: 0 8px 18px -10px rgba(255, 201, 107, 0.8), inset 0 -2px 0 rgba(0, 0, 0, 0.17);
     color: #2c210b;
-    font-size: clamp(5.7px, 1.16cqw, 6.8px);
+    font-size: var(--text-2xs);
     font-weight: 800;
     letter-spacing: 0.07em;
     text-transform: uppercase;
@@ -691,7 +691,7 @@
   .intro-lede {
     margin: 0;
     color: rgba(239, 233, 215, 0.64);
-    font-size: clamp(7.3px, 1.5cqw, 8.6px);
+    font-size: var(--text-sm);
     line-height: 1.5;
   }
   .intro-lede b { color: rgba(255, 223, 156, 0.94); }
@@ -706,13 +706,13 @@
   .intro-card span {
     display: block;
     color: var(--amber);
-    font-size: clamp(4.8px, 1cqw, 5.7px);
+    font-size: var(--text-2xs);
     letter-spacing: 0.14em;
   }
   .intro-card p {
     margin: 3px 0 0;
     color: rgba(255, 242, 213, 0.72);
-    font-size: clamp(5.8px, 1.2cqw, 6.8px);
+    font-size: var(--text-2xs);
     line-height: 1.47;
   }
   .intro-card b { color: var(--ink); }
@@ -721,7 +721,7 @@
     position: relative;
     padding-left: 12px;
     color: rgba(239, 233, 215, 0.55);
-    font-size: clamp(5.6px, 1.16cqw, 6.6px);
+    font-size: var(--text-2xs);
     line-height: 1.4;
   }
   .intro-rule::before { content: "\25B8"; position: absolute; left: 1px; color: var(--amber); }
@@ -736,7 +736,7 @@
   .score-cell span {
     display: block;
     color: var(--muted);
-    font-size: clamp(4.1px, 0.82cqw, 4.8px);
+    font-size: var(--text-2xs);
     letter-spacing: 0.05em;
     line-height: 1.2;
     text-transform: uppercase;
@@ -745,7 +745,7 @@
     display: block;
     margin-top: 2px;
     color: var(--amber);
-    font-size: clamp(8px, 1.65cqw, 9.5px);
+    font-size: var(--text-sm);
     line-height: 1.1;
   }
   .score-cell:nth-child(2) strong { color: var(--mint); }
@@ -758,7 +758,7 @@
     background: linear-gradient(180deg, #ffd989, #e5a73e);
     box-shadow: 0 14px 30px -14px rgba(255, 201, 107, 0.75), inset 0 -2px 0 rgba(0, 0, 0, 0.17);
     color: #2c210b;
-    font-size: clamp(7px, 1.42cqw, 8.3px);
+    font-size: var(--text-xs);
     font-weight: 800;
     letter-spacing: 0.11em;
     text-transform: uppercase;
@@ -769,7 +769,7 @@
   .fine {
     margin: 7px 0 0;
     color: rgba(239, 233, 215, 0.27);
-    font-size: clamp(4.7px, 0.94cqw, 5.4px);
+    font-size: var(--text-2xs);
     letter-spacing: 0.07em;
     line-height: 1.4;
     text-transform: uppercase;
@@ -789,7 +789,7 @@
   .result-score-line {
     margin: 5px 0 0;
     color: rgba(239, 233, 215, 0.58);
-    font-size: clamp(6px, 1.2cqw, 6.9px);
+    font-size: var(--text-xs);
   }
   .result-score-line strong { color: var(--amber); font-size: 1.7em; }
   .result-chips { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; margin-top: 7px; }
@@ -802,7 +802,7 @@
   .result-chip span {
     display: block;
     color: var(--muted);
-    font-size: clamp(4.1px, 0.82cqw, 4.8px);
+    font-size: var(--text-2xs);
     letter-spacing: 0.06em;
     text-transform: uppercase;
   }
@@ -810,7 +810,7 @@
     display: block;
     margin-top: 1px;
     color: var(--mint);
-    font-size: clamp(7.4px, 1.5cqw, 8.7px);
+    font-size: var(--text-sm);
     font-variant-numeric: tabular-nums;
   }
   .result-gap {
@@ -820,7 +820,7 @@
     border-radius: 0 5px 5px 0;
     background: rgba(255, 201, 107, 0.045);
     color: rgba(255, 236, 196, 0.75);
-    font-size: clamp(5.4px, 1.1cqw, 6.3px);
+    font-size: var(--text-2xs);
     line-height: 1.45;
     text-align: left;
   }
@@ -837,18 +837,18 @@
   }
   .review-row span {
     color: rgba(239, 233, 215, 0.58);
-    font-size: clamp(5px, 1.03cqw, 5.9px);
+    font-size: var(--text-2xs);
   }
   .review-row span small { display: block; color: rgba(239, 233, 215, 0.3); font-size: 0.85em; }
   .review-row b {
     color: var(--ink);
-    font-size: clamp(5.5px, 1.13cqw, 6.5px);
+    font-size: var(--text-2xs);
     font-variant-numeric: tabular-nums;
   }
   .review-points {
     text-align: right;
     color: var(--mint);
-    font-size: clamp(4.8px, 0.98cqw, 5.6px);
+    font-size: var(--text-2xs);
   }
   .review-points.miss { color: var(--red); }
   .result-explain {
@@ -856,7 +856,7 @@
     padding-top: 5px;
     border-top: 1px solid rgba(255, 255, 255, 0.07);
     color: rgba(239, 233, 215, 0.53);
-    font-size: clamp(5.2px, 1.06cqw, 6px);
+    font-size: var(--text-2xs);
     line-height: 1.45;
     text-align: left;
   }
@@ -876,7 +876,7 @@
   .rank {
     margin: 5px 0 0;
     color: var(--amber);
-    font-size: clamp(6px, 1.25cqw, 7.1px);
+    font-size: var(--text-xs);
     letter-spacing: 0.11em;
     text-transform: uppercase;
   }
@@ -890,7 +890,7 @@
   .final-score span {
     display: block;
     color: var(--muted);
-    font-size: clamp(4.5px, 0.9cqw, 5.2px);
+    font-size: var(--text-2xs);
     letter-spacing: 0.16em;
     text-transform: uppercase;
   }
@@ -910,8 +910,8 @@
     border-radius: 4px;
     background: rgba(255, 255, 255, 0.02);
   }
-  .final-stat span { display: block; color: var(--muted); font-size: clamp(3.9px, 0.79cqw, 4.6px); letter-spacing: 0.05em; text-transform: uppercase; }
-  .final-stat b { display: block; margin-top: 1px; color: var(--ink); font-size: clamp(6.2px, 1.27cqw, 7.4px); }
+  .final-stat span { display: block; color: var(--muted); font-size: var(--text-2xs); letter-spacing: 0.05em; text-transform: uppercase; }
+  .final-stat b { display: block; margin-top: 1px; color: var(--ink); font-size: var(--text-xs); }
   .final-stat:nth-child(1) b { color: var(--mint); }
   .final-stat:nth-child(2) b { color: var(--amber); }
   .final-stat:nth-child(3) b { color: var(--blue); }
@@ -924,7 +924,7 @@
     padding: 3px 0;
     border-bottom: 1px dotted rgba(255, 255, 255, 0.07);
     color: rgba(239, 233, 215, 0.5);
-    font-size: clamp(4.7px, 0.96cqw, 5.5px);
+    font-size: var(--text-2xs);
     text-align: left;
   }
   .ledger-row b { color: rgba(255, 201, 107, 0.8); font-weight: 600; }
@@ -934,7 +934,7 @@
   .final-copy {
     margin: 7px 0 0;
     color: rgba(239, 233, 215, 0.54);
-    font-size: clamp(5.4px, 1.1cqw, 6.25px);
+    font-size: var(--text-2xs);
     line-height: 1.47;
     text-align: left;
   }
@@ -954,7 +954,7 @@
 </style>
 </head>
 <body>
-<div id="stage">
+<div id="stage" class="stage-fluid">
   <div id="app" inert>
     <header class="topbar">
       <div class="brand">

@@ -20,15 +20,16 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 10px 17px;
+    min-height: 40px;
+    padding: 10px 18px;
     border: 1px solid rgba(234, 255, 246, 0.15);
     border-radius: 999px;
     background: rgba(255, 255, 255, 0.035);
     cursor: pointer;
     font: inherit;
-    font-size: 10px;
+    font-size: 12px;
     font-weight: 700;
-    letter-spacing: 0.16em;
+    letter-spacing: 0.14em;
     text-transform: uppercase;
     transition: background 120ms ease, border-color 120ms ease, transform 100ms ease;
   }
@@ -46,7 +47,7 @@
   .act:active:not(:disabled) { transform: translateY(1px); }
   .act:focus-visible { outline: 2px solid #bff9ec; outline-offset: 3px; }
   .act:disabled { opacity: 0.34; cursor: default; }
-  .panel { max-width: 310px; }
+  .panel { max-width: 380px; }
   .title { color: #8fffdc; }
   .score {
     font-size: 50px;
@@ -57,17 +58,17 @@
   }
   .best {
     margin: 10px 0 0;
-    font-size: 11px;
+    font-size: 13px;
     line-height: 1.5;
     letter-spacing: 0.03em;
     text-transform: none;
-    color: rgba(234, 255, 246, 0.58);
+    color: rgba(234, 255, 246, 0.66);
   }
   .dex {
     margin-top: 16px;
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 6px 12px;
+    gap: 8px 12px;
     padding: 12px;
     border-radius: 12px;
     background: rgba(255, 255, 255, 0.035);
@@ -77,10 +78,10 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 9px;
-    letter-spacing: 0.1em;
+    font-size: 11px;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: rgba(234, 255, 246, 0.28);
+    color: rgba(234, 255, 246, 0.36);
     text-align: left;
   }
   .dex-item.found { color: #bff9ec; }

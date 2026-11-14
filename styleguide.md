@@ -8,11 +8,17 @@ This style guide documents the shared visual language and CSS architecture defin
 
 All colors, fonts, radii, shadows, and layout offsets are exposed as CSS custom properties in `:root`. Individual games should **override tokens in their own `<style>` block** rather than duplicating base layout or component rules.
 
-### Typography
+### Typography & Readable Type Scale
 | Token | Value / Purpose |
 | :--- | :--- |
 | `--font-mono` | `ui-monospace, "SF Mono", Menlo, Consolas, monospace` — default font for all `#stage` games and numeric readouts. |
 | `--font-sans` | `"Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif` — used by wide-layout document/dashboard games (`body.layout-wide`). |
+| `--text-2xs` | `clamp(10.5px, 1.5cqw, 12px)` — micro-labels, `.stat span`, `.eyebrow`, `.hint` (10.5px minimum floor). |
+| `--text-xs` | `clamp(11.5px, 1.7cqw, 13px)` — secondary metadata, badges, `.btn`, `.notice`. |
+| `--text-sm` | `clamp(12.5px, 1.9cqw, 14px)` — card body text, `.rule`, `.breakdown`, `.brand b`. |
+| `--text-base` | `clamp(13.5px, 2.1cqw, 15.5px)` — primary interactive text, `.lead`, `.intro-lede`. |
+| `--text-lg` | `clamp(16px, 2.6cqw, 20px)` — section headings, `.stat strong`. |
+| `--text-xl` | `clamp(24px, 4.5cqw, 34px)` — `.title`, `.score`, hero numbers. |
 
 ### Surfaces & Ink
 | Token | Default | Purpose |
@@ -47,14 +53,16 @@ Games that simulate physical paperwork (e.g., `pay-stub-sleuth.html`, `smart-car
 
 ## 2. Layout Primitives
 
-### Portrait Stage (`#stage`) — *Default for 15 of 16 games*
-- **Viewport lock**: `body` uses `min-height: 100dvh`, `overflow: hidden`, `overscroll-behavior: none`, and `user-select: none` so touch/pointer gameplay feels native.
-- **`#stage`**: Centered `3:4` aspect-ratio container (`width: min(100%, calc((100dvh - var(--stage-offset)) * 0.75))`), `border-radius: 20px`, `container-type: size`, and `touch-action: none`.
+### Portrait Stage (`#stage`) & Fluid Responsive Stage (`#stage.stage-fluid`)
+- **Canvas-first games (`#stage`)**: Uses a centered `3:4` aspect-ratio container (`width: min(100%, calc((100dvh - var(--stage-offset)) * 0.75))`), `border-radius: 20px`, `container-type: size`, and `touch-action: none`.
   - Override `--stage-offset` (default `56px`) if your bottom `.hint` or outer chrome needs slightly more/less vertical breathing room.
-  - Because `container-type: size` is set on `#stage`, child components can use `cqw` units (e.g., `clamp(8px, 2cqw, 11px)`) to scale proportionally with the stage width.
+- **DOM / Hybrid games (`#stage.stage-fluid`)**: Add `class="stage-fluid"` to `#stage` so the layout adapts across devices:
+  - **PC (`>= 1024px`)**: Expands up to `920px` wide (`height: min(92dvh, 860px)`) for comfortable multi-column layouts.
+  - **Tablet (`640px–1023px`)**: Expands up to `720px` wide (`height: min(90dvh, 880px)`).
+  - **Mobile (`< 640px`)**: Full width (`100%`), `height: auto`, and vertical page scrolling enabled so readable `12.5px–15.5px` text never clips.
 - **`canvas`**: Fills `#stage` (`width: 100%; height: 100%`) with `touch-action: none`.
 - **`#app`**: Full-bleed flex column inside `#stage` for DOM-based games.
-- **`.hint`**: Single-line uppercase micro-caption centered below `#stage` for keyboard/mouse controls.
+- **`.hint`**: Uppercase micro-caption centered below `#stage` for keyboard/mouse controls.
 
 ### Wide Layout (`body.layout-wide` + `.app-wide`)
 For multi-column dashboard or shopping/simulation games that need more horizontal room (e.g., `smart-cart.html`):
