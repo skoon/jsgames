@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#131a12">
+<title>Dungeon Delicacy</title>
+<link rel="stylesheet" href="../common.css">
+<style>
+  :root {
+    --bg-top: #2c3a24;
+    --bg-mid: #0d130c;
+    --bg-bottom: #050805;
+    --stage-bg: #0b110a;
+    --ink: #f4f8ea;
+    --line: rgba(190, 230, 140, 0.2);
+    --teal: #6ef0c8;
+    --amber: #ffc86b;
+    --red: #ff7d86;
+    --blue: #8cc6ff;
+    --leaf: #b6e07a;
+  }
+  body { overflow: hidden; }
+
+  #app {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: 7px;
+    padding: 8px;
+    height: 100%;
+    min-height: 0;
+  }
+  .topbar { margin: 0; }
+
+  .flavors { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .fv { display: grid; gap: 2px; min-width: 52px; }
+  .fv span {
+    font-family: var(--font-mono); font-size: 7.5px; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .fv .track { height: 6px; border-radius: 999px; background: rgba(255,255,255,0.09); overflow: hidden; }
+  .fv .track i { display: block; height: 100%; width: 0%; border-radius: 999px; transition: width 120ms linear; }
+  .fv.spicy i { background: #ff7d6a; }
+  .fv.sweet i { background: #ffb3d9; }
+  .fv.savory i { background: #ffc86b; }
+  .fv.umami i { background: #8fe0b0; }
+  .fv .n { font-family: var(--font-mono); font-size: 9px; color: #fff; }
+
+  .arena {
+    position: relative; border: 1px solid var(--line); border-radius: 12px;
+    background: #080d07; overflow: hidden; min-height: 0;
+  }
+  canvas { display: block; width: 100%; height: 100%; }
+
+  .actionbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 2px; flex-wrap: wrap; }
+  .actionbar .note-line {
+    font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--faint);
+  }
+  .actionbar .btn { margin: 0; }
+  .btn.small { min-height: 30px; padding: 6px 13px; font-size: 9.5px; }
+
+  @media (max-width: 760px) {
+    .flavors { width: 100%; gap: 6px; }
+    .fv { min-width: 44px; }
+    .topbar { flex-wrap: wrap; row-gap: 6px; }
+    .arena { aspect-ratio: 900 / 560; }
+  }
+</style>
+</head>
+<body>
+<h1 class="sr-only">Dungeon Delicacy: parry monster attacks into ingredients and serve the bosses</h1>
+<div id="stage" class="stage-fluid">
+  <div id="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">DD</span>
+        <span>
+          <b>Dungeon Delicacy</b>
+          <small>Monster chef &middot; course 1/5</small>
+        </span>
+      </div>
+      <div class="flavors">
+        <div class="fv spicy"><span>Spicy</span><div class="track"><i id="fSpicy"></i></div></div>
+        <div class="fv sweet"><span>Sweet</span><div class="track"><i id="fSweet"></i></div></div>
+        <div class="fv savory"><span>Savory</span><div class="track"><i id="fSavory"></i></div></div>
+        <div class="fv umami"><span>Umami</span><div class="track"><i id="fUmami"></i></div></div>
+        <div class="fv"><span>Score</span><div class="n" id="hudScore">0</div></div>
+      </div>
+    </header>
+
+    <main class="arena" id="arena">
+      <canvas id="cv" width="900" height="560"></canvas>
+    </main>
+
+    <footer class="actionbar">
+      <span class="note-line" id="noteLine">WASD move &middot; click parry &middot; 1&ndash;4 season &middot; space serve</span>
+      <button id="restart" class="btn small" type="button">New service</button>
+    </footer>
+  </div>
+
+  <div id="overlay" class="overlay" role="dialog" aria-modal="true" aria-labelledby="ovTitle" hidden>
+    <div class="panel panel-card">
+      <p class="eyebrow" id="ovKicker">Service over</p>
+      <h2 id="ovTitle" class="title"></h2>
+      <p id="ovLead" class="lead"></p>
+      <ul id="ovRules" class="rules"></ul>
+      <div id="ovScore" class="final-score" hidden>
+        <span>Flavor score</span>
+        <strong id="ovScoreValue">0</strong>
+        <p id="ovRank" class="rank"></p>
+        <p id="ovBest" class="best"></p>
+      </div>
+      <button id="ovBtn" class="btn" type="button">Cook again</button>
+    </div>
+  </div>
+</div>
+<p class="hint">parry converts an attack into an ingredient &middot; serve before it burns</p>
+
+<script>
+(() => {
+  'use strict';
+
+  const cv = document.getElementById('cv');
+  const ctx = cv.getContext('2d');
+  const $ = (s) => document.querySelector(s);
+  const W = 900, H = 560;
+  const BEST_KEY = 'dungeonDelicacy.best.v1';
+  const POT = { x: 450, y: 470, r: 56 };
+
+  const FLAVORS = ['spicy', 'sweet', 'savory', 'umami'];
+  const KIND = {
+    garlic: { flavor: 'savory', color: '#ffc86b', label: 'garlic' },
+    truffle: { flavor: 'umami', color: '#8fe0b0', label: 'truffle' },
+    honey: { flavor: 'sweet', color: '#ffb3d9', label: 'honey' },
+    chili: { flavor: 'spicy', color: '#ff7d6a', label: 'chili' }
+  };
+
+  const state = {
+    player: { x: 450, y: 330, r: 15, dash: 0, dashDir: 1 },
+    projs: [], pot: { spicy: 0, sweet: 0, savory: 0, umami: 0 },
+    course: 1, courses: 5, score: 0, best: 0,
+    craving: 'savory', allergy: 'spicy',
+    spawnT: 1.4, burn: 8, burnMax: 8, cooking: false,
+    running: false, over: false, msg: null, msgT: 0,
+    hits: 0, perfect: 0
+  };
+
+  const keys = {};
+  let mouse = { x: 0, y: 0 };
+
+  function newCourse() {
+    state.pot = { spicy: 0, sweet: 0, savory: 0, umami: 0 };
+    state.cooking = false;
+    state.burn = state.burnMax;
+    state.craving = FLAVORS[Math.floor(Math.random() * 4)];
+    let a = FLAVORS[Math.floor(Math.random() * 4)];
+    while (a === state.craving) a = FLAVORS[Math.floor(Math.random() * 4)];
+    state.allergy = a;
+    state.projs = [];
+    state.spawnT = 1.1;
+    state.player.x = 450;
+    state.player.y = 330;
+    document.getElementById('noteLine').textContent = 'Course ' + state.course + ': craving ' + state.craving + ' \u00b7 allergy ' + state.allergy;
+  }
+
+  function reset() {
+    state.player = { x: 450, y: 330, r: 15, dash: 0, dashDir: 1 };
+    state.projs = [];
+    state.course = 1; state.score = 0; state.hits = 0; state.perfect = 0;
+    state.running = true; state.over = false; state.msg = null;
+    newCourse();
+    updateHud();
+  }
+
+  function say(text, ms) {
+    state.msg = text;
+    state.msgT = (ms || 1600) / 1000;
+  }
+
+  function totalPot() {
+    return FLAVORS.reduce((n, f) => n + state.pot[f], 0);
+  }
+
+  function spawnProj() {
+    const side = Math.floor(Math.random() * 4);
+    const kinds = Object.keys(KIND);
+    const kind = kinds[Math.floor(Math.random() * kinds.length)];
+    let x, y;
+    if (side === 0) { x = Math.random() * W; y = 70; }
+    else if (side === 1) { x = W - 40; y = 90 + Math.random() * (H - 220); }
+    else if (side === 2) { x = Math.random() * W; y = H - 60; }
+    else { x = 40; y = 90 + Math.random() * (H - 220); }
+    const p = state.player;
+    const ang = Math.atan2(p.y - y, p.x - x);
+    const speed = 145 + state.course * 22;
+    state.projs.push({ x, y, vx: Math.cos(ang) * speed, vy: Math.sin(ang) * speed, kind, r: 11, t: 0 });
+  }
+
+  function parry(wx, wy) {
+    let best = null, bd = 86;
+    for (const p of state.projs) {
+      const d = Math.hypot(p.x - wx, p.y - wy);
+      if (d < bd) { best = p; bd = d; }
+    }
+    if (!best) return;
+    const k = KIND[best.kind];
+    state.pot[k.flavor] = Math.min(9, state.pot[k.flavor] + 1);
+    state.projs.splice(state.projs.indexOf(best), 1);
+    state.cooking = true;
+    say('parried ' + k.label + ' \u2192 ' + k.flavor + ' +1', 1100);
+    updateHud();
+  }
+
+  function serve() {
+    if (!state.cooking || totalPot() === 0) { say('nothing in the pot yet', 1200); return; }
+    const t = totalPot();
+    if (state.pot[state.allergy] >= 2) {
+      state.score = Math.max(0, state.score - 220);
+      state.course += 1;
+      say('allergy! the boss enrages. \u2212220', 2000);
+      finishCourse(false);
+      return;
+    }
+    let pts = 60 + t * 18 + state.pot[state.craving] * 45;
+    const speedBonus = Math.round(Math.max(0, state.burn) * 22);
+    pts += speedBonus;
+    if (state.pot[state.craving] >= 3 && state.pot[state.allergy] === 0) {
+      pts += 120;
+      state.perfect += 1;
+      say('perfect dish +' + pts, 1800);
+    } else {
+      say('served +' + pts, 1500);
+    }
+    state.score += pts;
+    state.course += 1;
+    finishCourse(true);
+  }
+
+  function finishCourse(good) {
+    state.cooking = false;
+    state.projs = [];
+    updateHud();
+    if (state.course > state.courses) {
+      end(good);
+      return;
+    }
+    setTimeout(() => {
+      if (!state.over) newCourse();
+    }, 900);
+  }
+
+  function end() {
+    state.over = true;
+    state.running = false;
+    if (state.score > state.best) {
+      state.best = state.score;
+      try { localStorage.setItem(BEST_KEY, String(state.score)); } catch (e) { /* ignore */ }
+    }
+    const rank = state.score >= 1100 ? 'Dungeon Delicacy'
+      : state.score >= 750 ? 'Head chef'
+      : state.score >= 400 ? 'Line cook'
+      : 'Dishwasher';
+    document.getElementById('ovKicker').textContent = 'Five courses';
+    document.getElementById('ovTitle').innerHTML = 'Service <span class="accent">complete.</span>';
+    document.getElementById('ovLead').textContent =
+      'Final flavor score ' + state.score + '. ' + state.perfect + ' perfect dish(es), ' + state.hits + ' hit(s). The bosses never learned what hit them.';
+    document.getElementById('ovRules').innerHTML = [
+      'Parrying a projectile converts it into the ingredient it was made of.',
+      'Seasoning keys add flavor instantly, but the pot still burns in eight seconds.',
+      'Serving the allergy flavor enrages the boss and voids the course.',
+      'Match the craving, avoid the allergy, and speed pays on top.'
+    ].map((t) => '<li class="rule">' + t + '</li>').join('');
+    document.getElementById('ovScore').hidden = false;
+    document.getElementById('ovScoreValue').textContent = String(state.score);
+    document.getElementById('ovRank').textContent = rank;
+    document.getElementById('ovBest').textContent = 'Best ' + state.best;
+    document.getElementById('overlay').hidden = false;
+    document.getElementById('ovBtn').focus();
+  }
+
+  function updateHud() {
+    document.getElementById('hudScore').textContent = state.score;
+    for (const f of FLAVORS) {
+      const el = document.getElementById('f' + f.charAt(0).toUpperCase() + f.slice(1));
+      if (el) el.style.width = Math.round(Math.min(1, state.pot[f] / 6) * 100) + '%';
+    }
+  }
+
+  /* ---------------- loop ---------------- */
+  function update(dt) {
+    if (!state.running || state.over) return;
+    const p = state.player;
+
+    if (p.dash > 0) p.dash -= dt;
+    else {
+      let ax = 0, ay = 0;
+      if (keys.a || keys.ArrowLeft) ax -= 1;
+      if (keys.d || keys.ArrowRight) ax += 1;
+      if (keys.w || keys.ArrowUp) ay -= 1;
+      if (keys.s || keys.ArrowDown) ay += 1;
+      const len = Math.hypot(ax, ay) || 1;
+      p.x += (ax / len) * 250 * dt;
+      p.y += (ay / len) * 250 * dt;
+    }
+    p.x = Math.max(30, Math.min(W - 30, p.x));
+    p.y = Math.max(80, Math.min(H - 50, p.y));
+
+    state.spawnT -= dt;
+    if (state.spawnT <= 0) {
+      spawnProj();
+      state.spawnT = Math.max(0.55, 1.5 - state.course * 0.14);
+    }
+
+    for (let i = state.projs.length - 1; i >= 0; i--) {
+      const pr = state.projs[i];
+      pr.x += pr.vx * dt;
+      pr.y += pr.vy * dt;
+      pr.t += dt;
+      if (pr.x < -40 || pr.x > W + 40 || pr.y < -40 || pr.y > H + 40) {
+        state.projs.splice(i, 1);
+        continue;
+      }
+      if (Math.hypot(pr.x - p.x, pr.y - p.y) < pr.r + p.r) {
+        state.projs.splice(i, 1);
+        if (p.dash > 0) continue;
+        state.hits += 1;
+        state.score = Math.max(0, state.score - 40);
+        say('slime contamination \u221240', 1200);
+        updateHud();
+      }
+    }
+
+    if (state.cooking) {
+      state.burn -= dt;
+      if (state.burn <= 0) {
+        state.burn = 0;
+        state.cooking = false;
+        for (const f of FLAVORS) state.pot[f] = Math.max(0, state.pot[f] - 1);
+        state.score = Math.max(0, state.score - 60);
+        say('burnt! \u221260 and the flavor is gone', 1800);
+        state.course += 1;
+        updateHud();
+        if (state.course > state.courses) { end(); return; }
+        setTimeout(() => { if (!state.over) newCourse(); }, 900);
+      }
+    }
+
+    if (state.msgT > 0) state.msgT -= dt;
+    updateHud();
+  }
+
+  /* ---------------- render ---------------- */
+  function draw() {
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, '#1b2417');
+    g.addColorStop(0.6, '#101609');
+    g.addColorStop(1, '#070b05');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+
+    // floor stones
+    ctx.strokeStyle = 'rgba(190,230,140,0.06)';
+    for (let y = 60; y < H; y += 70) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+    }
+    for (let x = 0; x < W; x += 90) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+    }
+
+    // boss
+    const bx = 450, by = 54;
+    ctx.fillStyle = '#2a1a1a';
+    ctx.beginPath();
+    ctx.ellipse(bx, by + 22, 92, 44, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#ff9d6e';
+    ctx.beginPath(); ctx.arc(bx - 34, by + 8, 7, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(bx + 34, by + 8, 7, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#f4f8ea';
+    ctx.font = '11px ui-monospace, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('CRAVING ' + state.craving.toUpperCase(), bx - 120, by + 82);
+    ctx.fillStyle = '#ff7d86';
+    ctx.fillText('ALLERGY ' + state.allergy.toUpperCase(), bx + 120, by + 82);
+    ctx.textAlign = 'left';
+
+    // pot
+    ctx.fillStyle = '#1d1a18';
+    ctx.beginPath();
+    ctx.ellipse(POT.x, POT.y, POT.r, POT.r * 0.55, 0, 0, Math.PI * 2);
+    ctx.fill();
+    const total = FLAVORS.reduce((n, f) => n + state.pot[f], 0);
+    const dom = FLAVORS.slice().sort((a, b) => state.pot[b] - state.pot[a])[0];
+    ctx.fillStyle = total ? KIND[Object.keys(KIND).find((k) => KIND[k].flavor === dom)].color : '#3a3a2a';
+    ctx.globalAlpha = 0.75;
+    ctx.beginPath();
+    ctx.ellipse(POT.x, POT.y, POT.r - 8, (POT.r - 8) * 0.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    for (let i = 0; i < 4; i++) {
+      const t = performance.now() / 400 + i;
+      ctx.beginPath();
+      ctx.arc(POT.x + Math.sin(t) * 26, POT.y - 4 + Math.cos(t * 1.4) * 8, 2 + (i % 2), 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(244,248,234,0.5)';
+      ctx.fill();
+    }
+    ctx.fillStyle = 'rgba(244,248,234,0.4)';
+    ctx.font = '9px ui-monospace, monospace';
+    ctx.fillText('CAULDRON', POT.x - 30, POT.y + 42);
+
+    // burn ring
+    if (state.cooking) {
+      const pct = state.burn / state.burnMax;
+      ctx.strokeStyle = pct < 0.3 ? '#ff7d86' : '#ffc86b';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(POT.x, POT.y, POT.r + 10, -Math.PI / 2, -Math.PI / 2 + pct * Math.PI * 2);
+      ctx.stroke();
+      ctx.lineWidth = 1;
+    }
+
+    // projectiles
+    for (const pr of state.projs) {
+      const k = KIND[pr.kind];
+      ctx.save();
+      ctx.shadowColor = k.color;
+      ctx.shadowBlur = 12;
+      ctx.fillStyle = k.color;
+      ctx.beginPath();
+      ctx.arc(pr.x, pr.y, pr.r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+      ctx.beginPath();
+      ctx.arc(pr.x, pr.y, pr.r + 6, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    // player chef
+    const p = state.player;
+    ctx.fillStyle = p.dash > 0 ? '#8cc6ff' : '#e8f3d8';
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#1b2417';
+    ctx.beginPath();
+    ctx.arc(p.x - 5, p.y - 3, 2.4, 0, Math.PI * 2);
+    ctx.arc(p.x + 5, p.y - 3, 2.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(p.x - 9, p.y - 22, 18, 6);
+
+    if (state.msgT > 0 && state.msg) {
+      ctx.fillStyle = 'rgba(7,11,5,0.75)';
+      const w = ctx.measureText(state.msg).width;
+      ctx.fillRect(W / 2 - 190, H - 74, 380, 30);
+      ctx.fillStyle = '#f4f8ea';
+      ctx.font = '12px ui-monospace, monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(state.msg, W / 2, H - 54);
+      ctx.textAlign = 'left';
+    }
+  }
+
+  /* ---------------- input ---------------- */
+  function toLocal(e) {
+    const r = cv.getBoundingClientRect();
+    return { x: (e.clientX - r.left) / r.width * W, y: (e.clientY - r.top) / r.height * H };
+  }
+  cv.addEventListener('mousemove', (e) => { mouse = toLocal(e); });
+  cv.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    if (!state.running) return;
+    const p = toLocal(e);
+    if (e.button === 2) {
+      state.player.dash = 0.18;
+      state.player.x += (p.x > state.player.x ? 1 : -1) * 44;
+      return;
+    }
+    parry(p.x, p.y);
+  });
+  cv.addEventListener('contextmenu', (e) => e.preventDefault());
+
+  window.addEventListener('keydown', (e) => {
+    keys[e.key] = true;
+    if (!state.running) return;
+    if (e.key === ' ') { e.preventDefault(); serve(); }
+    if (e.key >= '1' && e.key <= '4') {
+      e.preventDefault();
+      const f = FLAVORS[Number(e.key) - 1];
+      state.pot[f] = Math.min(9, state.pot[f] + 1);
+      state.cooking = true;
+      say(f + ' +1', 900);
+      updateHud();
+    }
+  });
+  window.addEventListener('keyup', (e) => { keys[e.key] = false; });
+
+  document.getElementById('ovBtn').addEventListener('click', () => {
+    document.getElementById('overlay').hidden = true;
+    reset();
+  });
+  document.getElementById('restart').addEventListener('click', () => {
+    document.getElementById('overlay').hidden = true;
+    reset();
+  });
+
+  try { state.best = parseInt(localStorage.getItem(BEST_KEY) || '0', 10) || 0; } catch (e) { state.best = 0; }
+
+  state.craving = 'savory';
+  state.allergy = 'spicy';
+  state.running = false;
+
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.033, (now - last) / 1000);
+    last = now;
+    if (state.running) update(dt);
+    draw();
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  document.getElementById('ovTitle').innerHTML = 'Dungeon <span class="accent">Delicacy</span>';
+  document.getElementById('ovLead').textContent = 'You are the dungeon\u2019s only chef. Parry the monsters\u2019 attacks into ingredients, season the pot, and serve each boss what it craves \u2014 never what it is allergic to.';
+  document.getElementById('ovRules').innerHTML = [
+    'Click near an incoming projectile to parry it into an ingredient.',
+    'Number keys 1\u20134 add spicy, sweet, savory and umami.',
+    'Space serves. The pot burns eight seconds after the first ingredient.',
+    'Craving pays; allergy voids the course and costs 220.'
+  ].map((t) => '<li class="rule">' + t + '</li>').join('');
+  document.getElementById('ovScore').hidden = true;
+  document.getElementById('ovBtn').textContent = 'Light the fire';
+  document.getElementById('overlay').hidden = false;
+})();
+</script>
+</body>
+</html>

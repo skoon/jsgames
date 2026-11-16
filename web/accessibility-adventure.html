@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d1117">
+<title>Accessibility Adventure</title>
+<link rel="stylesheet" href="../common.css">
+<style>
+  :root {
+    --bg-top: #2b2340;
+    --bg-mid: #0d1018;
+    --bg-bottom: #05070a;
+    --stage-bg: #0a0d14;
+    --ink: #f2eefb;
+    --line: rgba(193, 166, 255, 0.2);
+    --teal: #70e7c8;
+    --amber: #ffc86b;
+    --violet: #c1a6ff;
+  }
+  body { overflow-y: auto; }
+
+  #app {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: 8px;
+    padding: 8px;
+    height: 100%;
+    min-height: 0;
+  }
+  .topbar { margin: 0; }
+
+  .workspace {
+    display: grid;
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.75fr);
+    gap: 9px;
+    min-height: 0;
+  }
+
+  .pane {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: rgba(8, 11, 18, 0.72);
+    overflow: hidden;
+  }
+  .pane-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--line);
+    background: rgba(255, 255, 255, 0.02);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .pane-head b { color: var(--violet); font-weight: 700; }
+
+  .pane-body {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    padding: 12px;
+    scrollbar-width: thin;
+  }
+
+  /* ---------- room page ---------- */
+  .page-head { margin-bottom: 12px; }
+  .page-head h2 {
+    margin: 0 0 4px;
+    font-size: 21px;
+    letter-spacing: 0.01em;
+    color: #f6f2ff;
+  }
+  .page-lede {
+    margin: 0;
+    max-width: 46ch;
+    font-size: 12.5px;
+    line-height: 1.55;
+    color: rgba(242, 238, 251, 0.62);
+  }
+  .page-grid { display: grid; gap: 10px; }
+
+  .photo-card {
+    margin: 0;
+    display: grid;
+    gap: 6px;
+    padding: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.02);
+  }
+  .photo {
+    display: grid;
+    place-items: center;
+    height: 120px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    background:
+      radial-gradient(120% 140% at 20% 0%, rgba(193, 166, 255, 0.28), transparent 62%),
+      linear-gradient(135deg, #1c2740, #2c3b58 60%, #4f6a8c);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    color: rgba(255, 255, 255, 0.72);
+  }
+  button.photo { cursor: pointer; font: inherit; color: rgba(255, 255, 255, 0.72); }
+  figcaption { font-size: 11.5px; line-height: 1.5; }
+
+  .warn-line { color: #ffbfb6; }
+  .ok-line { color: #a9efd9; font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.02em; }
+
+  .field-card {
+    display: grid;
+    gap: 6px;
+    padding: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.02);
+  }
+  .field-label {
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: rgba(242, 238, 251, 0.72);
+  }
+  .field-card input {
+    padding: 9px 10px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 7px;
+    background: #0b1018;
+    color: var(--ink);
+    font: inherit;
+    font-size: 13px;
+  }
+  .field-card input::placeholder { color: rgba(242, 238, 251, 0.35); }
+
+  .shelf { display: grid; gap: 8px; }
+  .shelf-line {
+    padding: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 9px;
+    background: rgba(255, 255, 255, 0.02);
+    font-size: 13px;
+    line-height: 1.6;
+  }
+  .shelf-line a { color: #9fd0ff; }
+  .hours {
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: #12161f;
+    font-family: var(--font-mono);
+    font-size: 13px;
+  }
+  .hours-lofi { color: #5b6470; }
+  .hours-hifi { color: #e6eef8; }
+
+  .menu-btn {
+    min-height: 38px;
+    padding: 9px 16px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--ink);
+    font: inherit;
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+  }
+  .focus-broken:focus-visible { outline: none !important; box-shadow: none !important; }
+  .focus-fixed:focus-visible { outline: 3px solid var(--amber) !important; outline-offset: 3px; }
+
+  .icon-row { display: flex; align-items: center; gap: 10px; }
+  .icon-btn {
+    width: 42px;
+    height: 42px;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    font-size: 18px;
+    cursor: pointer;
+  }
+  .icon-btn.fixed { border-color: rgba(112, 231, 200, 0.5); }
+
+  .small-text {
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: #12161f;
+    font-size: 16px;
+    line-height: 1.5;
+  }
+  .small-text-lofi { color: #5a6570; font-size: 10.5px; }
+  .small-text-hifi { color: #e9f1fa; font-size: 16px; }
+
+  /* issue / repaired markers */
+  .has-issue {
+    position: relative;
+    border-color: rgba(255, 200, 107, 0.55) !important;
+    box-shadow: 0 0 0 1px rgba(255, 200, 107, 0.18);
+  }
+  .has-issue::after {
+    content: "!";
+    position: absolute;
+    top: -7px;
+    right: -7px;
+    width: 17px;
+    height: 17px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--amber);
+    color: #241a05;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 800;
+  }
+  input.has-issue::after { content: none; }
+
+  .fixed-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--teal);
+  }
+
+  /* ---------- repair panel ---------- */
+  .repair { display: grid; gap: 8px; }
+  .repair h3 {
+    margin: 0;
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--violet);
+  }
+  .repair p {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.55;
+    color: rgba(242, 238, 251, 0.76);
+  }
+  .opts { display: grid; gap: 6px; }
+  .opt {
+    display: grid;
+    gap: 3px;
+    text-align: left;
+    padding: 9px 10px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.03);
+    color: rgba(242, 238, 251, 0.86);
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    line-height: 1.5;
+    cursor: pointer;
+  }
+  .opt:hover { border-color: rgba(193, 166, 255, 0.55); }
+  .opt[disabled] { cursor: default; opacity: 0.65; }
+  .opt.ok { border-color: rgba(112, 231, 200, 0.65); background: rgba(112, 231, 200, 0.1); }
+  .opt.no { border-color: rgba(255, 132, 116, 0.5); background: rgba(255, 132, 116, 0.08); }
+  .opt small {
+    font-family: var(--font-sans);
+    font-size: 11px;
+    line-height: 1.45;
+    color: rgba(242, 238, 251, 0.6);
+  }
+  .swap {
+    padding: 8px 10px;
+    border: 1px dashed rgba(255, 255, 255, 0.14);
+    border-radius: 8px;
+    font-size: 11.5px;
+    line-height: 1.5;
+    color: var(--muted);
+  }
+
+  /* ---------- lock ---------- */
+  .lock {
+    display: grid;
+    gap: 12px;
+    padding: 16px;
+    border: 1px solid rgba(255, 200, 107, 0.32);
+    border-radius: 12px;
+    background: rgba(255, 200, 107, 0.05);
+    text-align: center;
+  }
+  .lock h3 { margin: 0; font-size: 18px; color: #ffe4b0; }
+  .lock p { margin: 0; font-size: 12px; line-height: 1.55; color: rgba(255, 240, 214, 0.8); }
+  .code {
+    font-family: var(--font-mono);
+    font-size: 26px;
+    letter-spacing: 0.4em;
+    color: var(--amber);
+  }
+  .digits { display: flex; justify-content: center; gap: 8px; }
+  .digit {
+    width: 46px;
+    height: 56px;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 9px;
+    background: #0a0e16;
+    color: var(--ink);
+    font-family: var(--font-mono);
+    font-size: 22px;
+    font-weight: 700;
+    cursor: default;
+  }
+  .digit:focus-visible { outline: 3px solid var(--teal); outline-offset: 2px; }
+  .lock-note {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    color: rgba(255, 240, 214, 0.66);
+  }
+  .lock-msg { min-height: 17px; font-size: 12px; color: var(--amber); }
+  .lock-msg.bad { color: var(--red); }
+
+  .actionbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 0 2px;
+  }
+  .progressline {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .progressline b { color: var(--ink); }
+  .actionbar .btn { margin: 0; }
+
+  @media (max-width: 900px) {
+    .workspace { grid-template-columns: minmax(0, 1fr); }
+    #app { height: auto; }
+    #stage.stage-fluid { height: auto; }
+    .pane-body { overflow: visible; }
+  }
+</style>
+</head>
+<body>
+<h1 class="sr-only">Accessibility Adventure: repair barriers in a virtual school</h1>
+<div id="stage" class="stage-fluid">
+  <div id="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">A11Y</span>
+        <span>
+          <b>Accessibility Adventure</b>
+          <small>Northside virtual school</small>
+        </span>
+      </div>
+      <div class="hud">
+        <div class="stat"><span>Room</span><strong id="hudRoom">1/4</strong></div>
+        <div class="stat"><span>Score</span><strong id="hudScore">0000</strong></div>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <section class="pane" aria-label="Room page">
+        <div class="pane-head">
+          <span id="paneRoom">Room 01 &middot; Front lobby</span>
+          <b id="paneStatus">2 barriers</b>
+        </div>
+        <div class="pane-body" id="roomBody"></div>
+      </section>
+
+      <section class="pane" aria-label="Repair tools">
+        <div class="pane-head">
+          <span>Repair tools</span>
+          <b id="toolState">idle</b>
+        </div>
+        <div class="pane-body">
+          <div id="repair" class="repair">
+            <h3>No barrier selected</h3>
+            <p>Use <b>Tab</b> to walk the room. Each barrier gets a focus outline; press <b>Enter</b> (or click) to open its repair card.</p>
+            <p class="swap">Rule of thumb: a barrier is anything a keyboard, screen reader, or low-vision visitor cannot use.</p>
+          </div>
+          <p id="feedback" class="notice" role="status" aria-live="polite"></p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="actionbar">
+      <span class="progressline">Barriers repaired <b id="hudFixed">0</b> / <b id="hudTotal">8</b></span>
+      <button id="advance" class="btn" type="button" disabled>Next room</button>
+    </footer>
+  </div>
+
+  <div id="overlay" class="overlay" role="dialog" aria-modal="true" aria-labelledby="ovTitle" hidden>
+    <div class="panel panel-card">
+      <p id="ovKicker" class="eyebrow"></p>
+      <h2 id="ovTitle" class="title"></h2>
+      <p id="ovLead" class="lead"></p>
+      <ul id="ovRules" class="rules"></ul>
+      <div id="ovScore" class="final-score" hidden>
+        <span>Accessibility score</span>
+        <strong id="ovScoreValue">0</strong>
+        <p id="ovRank" class="rank"></p>
+        <p id="ovBest" class="best"></p>
+      </div>
+      <button id="ovBtn" class="btn" type="button">Enter the school</button>
+    </div>
+  </div>
+</div>
+<p class="hint">tab through the room &middot; enter to repair &middot; finish with the keyboard only</p>
+
+<script>
+(() => {
+  'use strict';
+
+  const $ = (s) => document.querySelector(s);
+  const BEST_KEY = 'a11yadventure.best.v1';
+  const LOCK_CODE = [4, 2, 7, 1];
+
+  const BARRIERS = {
+    alt1: {
+      prompt: 'This photo of the front desk has no alt text. Which description belongs in alt?',
+      options: [
+        { t: 'alt="Photo"', ok: false, why: 'Naming the medium tells a screen reader nothing about the picture.' },
+        { t: 'alt="Students queuing at the front desk before first bell"', ok: true, why: 'It describes the content and context of the image in a short phrase.' },
+        { t: 'alt="" so it is treated as decorative', ok: false, why: 'This photo carries information — the queue at the front desk — so empty alt hides it.' }
+      ]
+    },
+    label1: {
+      prompt: 'The search box only has a placeholder. What makes it usable?',
+      options: [
+        { t: 'Add a visible <label for="lobbySearch">Search the school site</label>', ok: true, why: 'A persistent visible label survives typing and is announced by screen readers.' },
+        { t: 'Keep the placeholder only', ok: false, why: 'Placeholders vanish as soon as you type, and many screen readers skip them.' },
+        { t: 'Add a title attribute instead', ok: false, why: 'title is not reliably announced and disappears from view.' }
+      ]
+    },
+    link1: {
+      prompt: 'A screen reader user hears a list of links. "Click here" is one of them. What should the link say?',
+      options: [
+        { t: '"Click here"', ok: false, why: 'Out of context it says nothing. Link lists are read without surrounding sentences.' },
+        { t: '"Borrow the chemistry textbook"', ok: true, why: 'The link text describes its destination, so it makes sense on its own.' },
+        { t: '"Link"', ok: false, why: 'Naming the element is not naming the destination.' }
+      ]
+    },
+    contrast1: {
+      prompt: 'The opening hours are grey on near-black. What fixes the contrast?',
+      options: [
+        { t: 'Lighten the text to #e6eef8 and keep the size', ok: true, why: 'The text now has a strong contrast ratio against the dark panel.' },
+        { t: 'Make the text bolder but keep the same grey', ok: false, why: 'Weight helps a little, but the colour pair still fails contrast.' },
+        { t: 'Move the hours to the footer', ok: false, why: 'Moving unreadable text does not make it readable.' }
+      ]
+    },
+    focus1: {
+      prompt: 'The "View menu" button has no visible focus ring. What repairs it?',
+      options: [
+        { t: 'Restore a strong focus outline', ok: true, why: 'Keyboard users need to see where focus is at all times.' },
+        { t: 'Remove the outline to keep the design clean', ok: false, why: 'That is the bug: without a ring, keyboard users are lost.' },
+        { t: 'Add a hover colour instead', ok: false, why: 'Hover is for pointers; focus must be visible without a mouse.' }
+      ]
+    },
+    label2: {
+      prompt: 'The student ID field has a placeholder and nothing else. Pick the repair.',
+      options: [
+        { t: 'Add a visible "Student ID" label tied to the field', ok: true, why: 'Label plus for/id gives every visitor a persistent name for the field.' },
+        { t: 'Add placeholder="Student ID"', ok: false, why: 'That is the current state: the name disappears on typing.' },
+        { t: 'Rely on the heading above the form', ok: false, why: 'A heading describes the group, not the individual field.' }
+      ]
+    },
+    name1: {
+      prompt: 'This speaker icon button has no usable name. What should it get?',
+      options: [
+        { t: 'aria-label="Play the welcome speech"', ok: true, why: 'The icon becomes a named button, announced as its action.' },
+        { t: 'Leave it — the icon is self-explanatory', ok: false, why: 'A screen reader announces the emoji, not the action.' },
+        { t: 'Add a title with the file name', ok: false, why: 'A file name does not describe the action and titles are inconsistently announced.' }
+      ]
+    },
+    contrast2: {
+      prompt: 'The door notice is tiny and low contrast. Pick the repair that fixes both.',
+      options: [
+        { t: 'Raise the colour to #e9f1fa and the size to 16px', ok: true, why: 'Both readability factors are addressed: contrast and text size.' },
+        { t: 'Only raise the contrast, keep 10.5px', ok: false, why: 'Contrast passes, but the text is still too small for many readers.' },
+        { t: 'Only raise the size, keep the grey', ok: false, why: 'Larger but still low-contrast text remains hard to read.' }
+      ]
+    }
+  };
+
+  const ROOMS = [
+    {
+      name: 'Front lobby',
+      blurb: 'Where visitors arrive. A photo and a search box.',
+      barriers: ['alt1', 'label1'],
+      html: () => `
+        <div class="page-head">
+          <p class="eyebrow">Room 01 &middot; Virtual school</p>
+          <h2>Front lobby</h2>
+          <p class="page-lede">The front desk, a search box, and the first two barriers of the building.</p>
+        </div>
+        <div class="page-grid">
+          <figure class="photo-card">
+            ${fixed('alt1')
+              ? `<div class="photo" role="img" aria-label="Students queuing at the front desk before first bell">FRONT DESK</div>
+                 <figcaption class="ok-line">alt="Students queuing at the front desk before first bell"</figcaption>`
+              : `<button type="button" class="photo has-issue" data-barrier="alt1">FRONT DESK</button>
+                 <figcaption class="warn-line">No alt text. A screen reader reaches the image and announces nothing useful.</figcaption>`}
+          </figure>
+          <div class="field-card">
+            ${fixed('label1')
+              ? `<label class="field-label" for="lobbySearch">Search the school site</label>
+                 <input id="lobbySearch" type="text">
+                 <p class="ok-line">Visible label, tied with for/id.</p>`
+              : `<input id="lobbySearch" type="text" class="has-issue" data-barrier="label1" placeholder="Search the school site">
+                 <p class="warn-line">Placeholder only. The name vanishes the moment someone types.</p>`}
+          </div>
+        </div>`
+    },
+    {
+      name: 'Library',
+      blurb: 'A reading list with an unhelpful link and a dim shelf sign.',
+      barriers: ['link1', 'contrast1'],
+      html: () => `
+        <div class="page-head">
+          <p class="eyebrow">Room 02 &middot; Virtual school</p>
+          <h2>Library</h2>
+          <p class="page-lede">Two quiet barriers: one in the link text, one in the contrast.</p>
+        </div>
+        <div class="shelf">
+          <div class="shelf-line">
+            Chemistry textbook, second edition.
+            ${fixed('link1')
+              ? `<a href="#" onclick="return false">Borrow the chemistry textbook</a>
+                 <p class="ok-line">Link text describes the destination.</p>`
+              : `<a href="#" class="has-issue" data-barrier="link1" onclick="return false">Click here</a>
+                 <p class="warn-line">"Click here" means nothing in a list of links.</p>`}
+          </div>
+          <div class="shelf-line">
+            <p class="hours ${fixed('contrast1') ? 'hours-hifi' : 'hours-lofi has-issue'}" data-barrier="${fixed('contrast1') ? '' : 'contrast1'}">Open until 18:00</p>
+            ${fixed('contrast1')
+              ? '<p class="ok-line">Contrast repaired: #e6eef8 on #12161f.</p>'
+              : '<p class="warn-line">Grey on near-black: the hours are technically present and practically invisible.</p>'}
+          </div>
+        </div>`
+    },
+    {
+      name: 'Cafeteria',
+      blurb: 'A menu button that swallows the focus ring, and an unlabelled ID field.',
+      barriers: ['focus1', 'label2'],
+      html: () => `
+        <div class="page-head">
+          <p class="eyebrow">Room 03 &middot; Virtual school</p>
+          <h2>Cafeteria</h2>
+          <p class="page-lede">This room is about keyboard confidence: can you tell where you are?</p>
+        </div>
+        <div class="page-grid">
+          <div class="field-card">
+            <button type="button"
+              class="menu-btn ${fixed('focus1') ? 'focus-fixed' : 'focus-broken has-issue'}"
+              ${fixed('focus1') ? '' : 'data-barrier="focus1"'}>View menu</button>
+            ${fixed('focus1')
+              ? '<p class="ok-line">Focus ring restored. Tab to the button to see it.</p>'
+              : '<p class="warn-line">Tab to this button. Nothing shows where focus went.</p>'}
+          </div>
+          <div class="field-card">
+            ${fixed('label2')
+              ? `<label class="field-label" for="studentId">Student ID</label>
+                 <input id="studentId" type="text" inputmode="numeric">
+                 <p class="ok-line">Visible label tied with for/id.</p>`
+              : `<input id="studentId" type="text" class="has-issue" data-barrier="label2" placeholder="Student ID">
+                 <p class="warn-line">The field's only name is a placeholder.</p>`}
+          </div>
+        </div>`
+    },
+    {
+      name: 'Auditorium',
+      blurb: 'The stage door. An unnamed button and an unreadable notice.',
+      barriers: ['name1', 'contrast2'],
+      html: () => `
+        <div class="page-head">
+          <p class="eyebrow">Room 04 &middot; Virtual school</p>
+          <h2>Auditorium</h2>
+          <p class="page-lede">Clear the last two barriers, then open the stage door — with the keyboard alone.</p>
+        </div>
+        <div class="page-grid">
+          <div class="field-card">
+            <div class="icon-row">
+              <button type="button" class="icon-btn ${fixed('name1') ? 'fixed' : 'has-issue'}"
+                ${fixed('name1') ? 'aria-label="Play the welcome speech"' : 'data-barrier="name1"'}
+                aria-label="${fixed('name1') ? 'Play the welcome speech' : ''}">&#128266;</button>
+              <span>${fixed('name1') ? '<span class="fixed-badge">named: play the welcome speech</span>' : '<span class="warn-line">An icon button with no announced name.</span>'}</span>
+            </div>
+          </div>
+          <div class="field-card">
+            <p class="small-text ${fixed('contrast2') ? 'small-text-hifi' : 'small-text-lofi has-issue'}"
+              ${fixed('contrast2') ? '' : 'data-barrier="contrast2"'}>Doors close at 18:55</p>
+            ${fixed('contrast2')
+              ? '<p class="ok-line">16px text at #e9f1fa on #12161f.</p>'
+              : '<p class="warn-line">Small and dim: two failures stacked on one line.</p>'}
+          </div>
+        </div>`
+    }
+  ];
+
+  const state = {
+    room: 0,
+    score: 0,
+    best: 0,
+    fixed: new Set(),
+    active: null,
+    lockOpen: false,
+    lock: [0, 0, 0, 0],
+    lockIndex: 0,
+    lockDone: false
+  };
+
+  const els = {
+    roomBody: $('#roomBody'),
+    repair: $('#repair'),
+    feedback: $('#feedback'),
+    paneRoom: $('#paneRoom'),
+    paneStatus: $('#paneStatus'),
+    toolState: $('#toolState'),
+    hudRoom: $('#hudRoom'),
+    hudScore: $('#hudScore'),
+    hudFixed: $('#hudFixed'),
+    hudTotal: $('#hudTotal'),
+    advance: $('#advance'),
+    overlay: $('#overlay'),
+    ovKicker: $('#ovKicker'),
+    ovTitle: $('#ovTitle'),
+    ovLead: $('#ovLead'),
+    ovRules: $('#ovRules'),
+    ovScore: $('#ovScore'),
+    ovScoreValue: $('#ovScoreValue'),
+    ovRank: $('#ovRank'),
+    ovBest: $('#ovBest'),
+    ovBtn: $('#ovBtn')
+  };
+
+  const fixed = (id) => state.fixed.has(id);
+  const pad = (n) => String(n).padStart(4, '0');
+  const totalBarriers = ROOMS.reduce((sum, r) => sum + r.barriers.length, 0);
+  const room = () => ROOMS[state.room];
+  const roomFixed = () => room().barriers.filter((b) => fixed(b)).length;
+
+  function feedback(text, tone) {
+    els.feedback.textContent = text || '';
+    els.feedback.className = 'notice' + (tone ? ' ' + tone : '');
+  }
+
+  function renderRoom() {
+    const r = room();
+    els.roomBody.innerHTML = r.html();
+    els.paneRoom.textContent = 'Room 0' + (state.room + 1) + ' \u00b7 ' + r.name;
+    els.paneStatus.textContent = (r.barriers.length - roomFixed()) + ' barrier' + (r.barriers.length - roomFixed() === 1 ? '' : 's');
+    els.hudRoom.textContent = (state.room + 1) + '/' + ROOMS.length;
+    els.hudFixed.textContent = String(state.fixed.size);
+    els.hudScore.textContent = pad(state.score);
+    els.toolState.textContent = state.active ? 'open' : 'idle';
+
+    els.roomBody.querySelectorAll('[data-barrier]').forEach((el) => {
+      if (!el.dataset.barrier) return;
+      const open = () => selectBarrier(el.dataset.barrier);
+      el.addEventListener('click', (e) => {
+        e.preventDefault();
+        open();
+      });
+      el.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          open();
+        }
+      });
+    });
+
+    els.advance.disabled = roomFixed() < r.barriers.length || state.lockOpen === false && roomFixed() < r.barriers.length;
+    const complete = roomFixed() === r.barriers.length;
+    els.advance.disabled = !complete;
+    els.advance.textContent = state.room === ROOMS.length - 1 ? 'Open the stage door' : 'Next room';
+  }
+
+  function selectBarrier(id) {
+    const b = BARRIERS[id];
+    if (!b || fixed(id)) return;
+    state.active = id;
+    els.toolState.textContent = 'open';
+    els.repair.innerHTML = '<h3>Repair card</h3><p>' + b.prompt + '</p>' + '<div class="opts" id="opts"></div>';
+    const opts = $('#opts');
+    b.options.forEach((o) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'opt';
+      btn.innerHTML = '<span>' + o.t + '</span>';
+      btn.addEventListener('click', () => choose(id, o, btn));
+      opts.appendChild(btn);
+    });
+    feedback('Barrier open. Choose the repair.', '');
+  }
+
+  function choose(id, option, btn) {
+    if (!option.ok) {
+      state.score = Math.max(0, state.score - 20);
+      els.hudScore.textContent = pad(state.score);
+      btn.classList.add('no');
+      btn.disabled = true;
+      btn.innerHTML += '<small>' + option.why + ' &minus;20</small>';
+      feedback('Not that one. ' + option.why, 'bad');
+      return;
+    }
+    state.fixed.add(id);
+    state.score += 100;
+    state.active = null;
+    btn.classList.add('ok');
+    btn.disabled = true;
+    btn.innerHTML += '<small>' + option.why + ' +100</small>';
+    els.hudScore.textContent = pad(state.score);
+    els.hudFixed.textContent = String(state.fixed.size);
+    feedback('Repaired. ' + option.why, 'good');
+    els.toolState.textContent = 'fixed';
+    setTimeout(() => {
+      renderRoom();
+      const box = document.createElement('p');
+      box.className = 'swap';
+      box.innerHTML = 'Barrier repaired. Walk the rest of the room with <b>Tab</b>, or continue when the room is clear.';
+      els.repair.innerHTML = '<h3>Repair card</h3>';
+      els.repair.appendChild(box);
+      els.toolState.textContent = 'idle';
+    }, 420);
+  }
+
+  function advance() {
+    if (state.lockOpen) return;
+    if (roomFixed() < room().barriers.length) return;
+    if (state.room < ROOMS.length - 1) {
+      state.room += 1;
+      renderRoom();
+      feedback('Room cleared. New barriers ahead.', 'good');
+      els.roomBody.focus();
+    } else {
+      openLock();
+    }
+  }
+
+  /* ---------- final keyboard challenge ---------- */
+  function openLock() {
+    state.lockOpen = true;
+    state.lock = [0, 0, 0, 0];
+    state.lockIndex = 0;
+    els.advance.disabled = true;
+    els.paneRoom.textContent = 'Room 04 \u00b7 Stage door';
+    els.paneStatus.textContent = 'keyboard only';
+    els.toolState.textContent = 'locked';
+    els.roomBody.innerHTML = `
+      <div class="page-head">
+        <p class="eyebrow">Final challenge</p>
+        <h2>The stage door</h2>
+        <p class="page-lede">The door code is <b>4 2 7 1</b>. This lock ignores the mouse on purpose — repair it the way a keyboard user would open it.</p>
+      </div>
+      <div class="lock" id="lock">
+        <div>
+          <p class="eyebrow" style="margin-bottom:4px">Remember this code</p>
+          <p class="code">4 2 7 1</p>
+        </div>
+        <div class="digits" id="digits" role="group" aria-label="Stage door lock digits"></div>
+        <p class="lock-note">Tab to a digit &middot; Arrow Up / Down to change &middot; Enter to test the code</p>
+        <p class="lock-msg" id="lockMsg" role="status" aria-live="polite"></p>
+      </div>`;
+    const digits = $('#digits');
+    state.lock.forEach((v, i) => {
+      const d = document.createElement('button');
+      d.type = 'button';
+      d.className = 'digit';
+      d.dataset.i = String(i);
+      d.setAttribute('aria-label', 'Digit ' + (i + 1));
+      d.textContent = String(v);
+      digits.appendChild(d);
+    });
+    digits.children[0].focus();
+
+    const lockMsg = $('#lockMsg');
+    const setMsg = (text, bad) => {
+      lockMsg.textContent = text;
+      lockMsg.className = 'lock-msg' + (bad ? ' bad' : '');
+    };
+
+    const paint = () => {
+      [...digits.children].forEach((d, i) => {
+        d.textContent = String(state.lock[i]);
+        d.setAttribute('aria-label', 'Digit ' + (i + 1) + ', value ' + state.lock[i]);
+      });
+    };
+
+    const lock = $('#lock');
+    lock.addEventListener('pointerdown', () => {
+      state.lock = [0, 0, 0, 0];
+      paint();
+      setMsg('The lock reset: this challenge is keyboard only.', true);
+      digits.children[0].focus();
+    });
+
+    digits.addEventListener('keydown', (e) => {
+      const focused = document.activeElement;
+      const idx = focused && focused.classList.contains('digit') ? Number(focused.dataset.i) : 0;
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        state.lock[idx] = (state.lock[idx] + 1) % 10;
+        paint();
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        state.lock[idx] = (state.lock[idx] + 9) % 10;
+        paint();
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        digits.children[(idx + 1) % 4].focus();
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        digits.children[(idx + 3) % 4].focus();
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (state.lock.join('') === LOCK_CODE.join('')) {
+          state.lockDone = true;
+          state.score += 200;
+          els.hudScore.textContent = pad(state.score);
+          setMsg('The door opens. +200', false);
+          setTimeout(finish, 700);
+        } else {
+          setMsg('Wrong code. Use Arrow Up and Down on each digit.', true);
+        }
+      }
+    });
+  }
+
+  function finish() {
+    if (state.score > state.best) {
+      state.best = state.score;
+      try { localStorage.setItem(BEST_KEY, String(state.score)); } catch (e) { /* ignore */ }
+    }
+    const rank = state.score >= 900 ? 'Accessibility lead'
+      : state.score >= 700 ? 'Barrier breaker'
+      : state.score >= 500 ? 'Repair apprentice'
+      : 'Visitor';
+    els.ovKicker.textContent = 'School reopened';
+    els.ovTitle.innerHTML = 'Every room <span class="accent">reachable.</span>';
+    els.ovLead.textContent = 'Eight barriers repaired and the stage door opened by keyboard alone. Alt text, labels, focus and contrast are the four habits to keep.';
+    els.ovRules.innerHTML = '';
+    els.ovScore.hidden = false;
+    els.ovScoreValue.textContent = String(state.score);
+    els.ovRank.textContent = rank;
+    els.ovBest.textContent = 'Best ' + pad(state.best);
+    els.overlay.hidden = false;
+    els.ovBtn.focus();
+  }
+
+  function start() {
+    state.room = 0;
+    state.score = 0;
+    state.fixed = new Set();
+    state.active = null;
+    state.lockOpen = false;
+    state.lockDone = false;
+    els.overlay.hidden = true;
+    renderRoom();
+    feedback('Walk the room with Tab. Barriers are outlined in amber.', '');
+    els.roomBody.setAttribute('tabindex', '-1');
+    els.roomBody.focus();
+  }
+
+  els.advance.addEventListener('click', advance);
+  els.ovBtn.addEventListener('click', start);
+  els.hudTotal.textContent = String(totalBarriers);
+
+  try { state.best = parseInt(localStorage.getItem(BEST_KEY) || '0', 10) || 0; } catch (e) { state.best = 0; }
+  els.hudTotal.textContent = String(totalBarriers);
+  els.hudFixed.textContent = '0';
+  els.hudScore.textContent = pad(0);
+
+  els.ovKicker.textContent = 'Northside virtual school';
+  els.ovTitle.innerHTML = 'Accessibility <span class="accent">Adventure</span>';
+  els.ovLead.textContent = 'The virtual school is open, but half its rooms lock people out. Explore each room, find the barriers, and repair them. The stage door will only open for a keyboard.';
+  els.ovRules.innerHTML = [
+    'Tab through each room; barriers wear an amber outline.',
+    'Press Enter (or click) on a barrier to open its repair card.',
+    'Alt text, labels, focus rings and contrast all earn points.',
+    'The final stage-door lock must be solved with the keyboard alone.'
+  ].map((t) => '<li class="rule">' + t + '</li>').join('');
+  els.ovBtn.textContent = 'Enter the school';
+  els.overlay.hidden = false;
+})();
+</script>
+</body>
+</html>

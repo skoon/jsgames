@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b1018">
+<title>Safety Quiz</title>
+<link rel="stylesheet" href="../common.css">
+<style>
+  :root {
+    --bg-top: #23303c;
+    --bg-mid: #0a0f15;
+    --bg-bottom: #05080b;
+    --stage-bg: #071014;
+    --ink: #eef6fb;
+    --line: rgba(136, 202, 255, 0.18);
+    --teal: #70e7c8;
+    --amber: #ffc86b;
+    --red: #ff8474;
+    --blue: #88caff;
+    --coral: #ff9d8a;
+  }
+  body { overflow-y: auto; }
+
+  #app {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: 8px;
+    padding: 8px;
+    height: 100%;
+    min-height: 0;
+  }
+  .topbar { margin: 0; }
+
+  .pane {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: rgba(5, 12, 16, 0.78);
+    overflow: hidden;
+  }
+  .pane-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--line);
+    background: rgba(255, 255, 255, 0.02);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .pane-head b { color: var(--coral); font-weight: 700; }
+  .pane-head span { color: rgba(238, 246, 251, 0.55); }
+  .pane-head a { color: var(--blue); text-decoration: none; border-bottom: 1px dotted rgba(136, 202, 255, 0.5); }
+  .pane-head a:hover { color: #fff; }
+
+  .pane-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    scrollbar-width: thin;
+  }
+
+  .qtext {
+    margin: 0;
+    font-size: clamp(15px, 2.2vw, 19px);
+    line-height: 1.4;
+    font-weight: 600;
+    color: #fff;
+    max-width: 62ch;
+  }
+
+  .opts { display: grid; gap: 7px; max-width: 70ch; }
+  .qopt {
+    display: grid;
+    grid-template-columns: 22px 1fr;
+    gap: 9px;
+    align-items: start;
+    padding: 10px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.03);
+    color: rgba(238, 246, 251, 0.9);
+    text-align: left;
+    font: inherit;
+    font-size: 13px;
+    line-height: 1.45;
+    cursor: pointer;
+  }
+  .qopt:hover:not(:disabled) { border-color: rgba(136, 202, 255, 0.5); background: rgba(136, 202, 255, 0.06); }
+  .qopt i {
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: 5px;
+    font-family: var(--font-mono);
+    font-style: normal;
+    font-size: 10px;
+    color: rgba(238, 246, 251, 0.7);
+  }
+  .qopt:disabled { cursor: default; }
+  .qopt.correct { border-color: rgba(112, 231, 200, 0.6); background: rgba(112, 231, 200, 0.1); }
+  .qopt.correct i { border-color: rgba(112, 231, 200, 0.7); color: #b6ffe9; }
+  .qopt.wrong { border-color: rgba(255, 132, 116, 0.6); background: rgba(255, 132, 116, 0.09); }
+  .qopt.wrong i { border-color: rgba(255, 132, 116, 0.7); color: #ffc3bb; }
+  .qopt.dim { opacity: 0.5; }
+
+  .fb {
+    max-width: 70ch;
+    padding: 10px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.03);
+    font-size: 12px;
+    line-height: 1.55;
+    color: rgba(238, 246, 251, 0.78);
+  }
+  .fb[hidden] { display: none; }
+  .fb.ok { border-color: rgba(112, 231, 200, 0.4); background: rgba(112, 231, 200, 0.06); }
+  .fb.no { border-color: rgba(255, 132, 116, 0.4); background: rgba(255, 132, 116, 0.05); }
+  .fb b { display: block; margin-bottom: 3px; font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.12em; text-transform: uppercase; }
+  .fb.ok b { color: var(--teal); }
+  .fb.no b { color: var(--red); }
+  .fb a { color: var(--blue); }
+
+  .actionbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 2px; }
+  .actionbar .note-line { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint); }
+  .actionbar .btn { margin: 0; }
+  .btn.small { min-height: 34px; padding: 8px 16px; font-size: 10.5px; }
+  .btn[disabled] { opacity: 0.45; cursor: default; }
+
+  .dots { display: flex; gap: 4px; }
+  .dots i {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.16);
+  }
+  .dots i.on { background: var(--coral); }
+  .dots i.ok { background: var(--teal); }
+  .dots i.no { background: var(--red); }
+
+  .game-list { display: grid; gap: 4px; margin: 4px 0 0; padding: 0; list-style: none; }
+  .game-list a {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 7px 10px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 7px;
+    color: rgba(238, 246, 251, 0.85);
+    text-decoration: none;
+    font-size: 12px;
+  }
+  .game-list a:hover { border-color: rgba(136, 202, 255, 0.5); background: rgba(136, 202, 255, 0.06); }
+  .game-list a em { font-style: normal; color: var(--faint); font-family: var(--font-mono); font-size: 10px; }
+
+  @media (max-width: 700px) {
+    #app { height: auto; }
+    #stage.stage-fluid { height: auto; }
+    .pane-body { overflow: visible; }
+    .pane-head { flex-wrap: wrap; }
+  }
+</style>
+</head>
+<body>
+<h1 class="sr-only">Safety Quiz: one question from each game in the safety track</h1>
+<div id="stage" class="stage-fluid">
+  <div id="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">SQ</span>
+        <span>
+          <b>Safety Quiz</b>
+          <small>Mixed &middot; eight questions</small>
+        </span>
+      </div>
+      <div class="hud">
+        <div class="stat"><span>Question</span><strong id="hudQ">1/8</strong></div>
+        <div class="stat"><span>Score</span><strong id="hudScore">000</strong></div>
+      </div>
+    </header>
+
+    <main class="pane" aria-label="Question">
+      <div class="pane-head">
+        <span>From <a id="fromLink" href="#">the safety track</a></span>
+        <b id="qIndex">1 / 8</b>
+      </div>
+      <div class="pane-body">
+        <h2 id="qText" class="qtext"></h2>
+        <div id="opts" class="opts"></div>
+        <div id="fb" class="fb" hidden></div>
+      </div>
+    </main>
+
+    <footer class="actionbar">
+      <span class="note-line" id="noteLine">One question per game</span>
+      <button id="next" class="btn small" type="button" disabled>Choose an answer</button>
+    </footer>
+  </div>
+
+  <div id="overlay" class="overlay" role="dialog" aria-modal="true" aria-labelledby="ovTitle" hidden>
+    <div class="panel panel-card">
+      <p class="eyebrow">Quiz complete</p>
+      <h2 id="ovTitle" class="title"></h2>
+      <p id="ovLead" class="lead"></p>
+      <div id="ovScore" class="final-score" hidden>
+        <span>Quiz score</span>
+        <strong id="ovScoreValue">0</strong>
+        <p id="ovRank" class="rank"></p>
+        <p id="ovBest" class="best"></p>
+      </div>
+      <p id="ovGamesLabel" class="lead" style="margin-top:14px" hidden>Play any of them in full:</p>
+      <ul id="ovGames" class="game-list"></ul>
+      <button id="ovBtn" class="btn" type="button">Run the quiz again</button>
+    </div>
+  </div>
+</div>
+<p class="hint">eight questions &middot; one from each safety game &middot; each answer links to the full version</p>
+
+<script>
+(() => {
+  'use strict';
+
+  const $ = (s) => document.querySelector(s);
+  const BEST_KEY = 'safetyQuiz.best.v1';
+
+  const QUIZ = [
+    {
+      game: 'First Day', href: 'first-day.html',
+      q: 'It is your first shift at Northlight Market and you are asked to do something you have never done. What is the best first move?',
+      opts: [
+        'Guess, and sort out any problems as you go',
+        'Ask your supervisor to walk you through it before you start',
+        'Watch a colleague do it once, then copy them exactly',
+        'Refuse to do the task at all'
+      ],
+      answer: 1,
+      why: 'Asking costs a few minutes. A new starter who guesses spends the shift unlearning bad habits, and nobody gets a chance to correct a misunderstanding before it becomes an injury.'
+    },
+    {
+      game: 'First Week', href: 'first-week.html',
+      q: 'A shortcut would save ten minutes, but it means reaching past a machine guard. What do you do?',
+      opts: [
+        'Take the shortcut if nobody is watching',
+        'Use the guarded way, and raise the shortcut with your supervisor',
+        'Take the shortcut, then report it afterwards',
+        'Ask a colleague to hold the guard open'
+      ],
+      answer: 1,
+      why: 'The guard matters on the day something slips, not on the days it goes fine. Working the safe way and reporting the time pressure is what eventually gets the process fixed.'
+    },
+    {
+      game: 'PPE Match Lab', href: 'ppe-match-lab.html',
+      q: 'Solvent tank task: gloves, goggles and an apron are all fitted correctly. What is still missing?',
+      opts: [
+        'Nothing \u2014 the full kit is on',
+        'Local exhaust ventilation at the tank',
+        'A second pair of gloves',
+        'A longer apron'
+      ],
+      answer: 1,
+      why: 'Solvent vapour fills the space whether or not you are wearing PPE. Ventilation removes it before anyone breathes it; extra layers of PPE only change what the worker is wearing while they breathe it.'
+    },
+    {
+      game: 'Control the Hazard', href: 'control-the-hazard.html',
+      q: 'Four proposed controls for a noisy press. Which sits highest in the hierarchy of controls?',
+      opts: [
+        'Ear defenders for the operator',
+        'A screen around the press',
+        'Replace the press with a quieter model',
+        'A rotation system so no one is exposed all shift'
+      ],
+      answer: 2,
+      why: 'Elimination and substitution come first because they stop the hazard existing. A screen and rotation reduce exposure, and PPE is the last line \u2014 it depends on fit, use and maintenance for every single shift.'
+    },
+    {
+      game: 'Safety Data Detectives', href: 'safety-data-detectives.html',
+      q: 'You find an unlabelled jug of clear liquid on a storeroom shelf. What is the correct action?',
+      opts: [
+        'Smell it to work out what it is',
+        'Guess from the shelf it was on, and label it',
+        'Keep people away, do not open it, and report it for controlled identification',
+        'Pour it down the sink to remove the risk'
+      ],
+      answer: 2,
+      why: 'An unlabelled container has no evidence attached to it, so any guess is a guess about someone else\u2019s exposure. Quarantine and report is the only answer the documents support.'
+    },
+    {
+      game: 'Exit Route Architect', href: 'exit-route-architect.html',
+      q: 'A delivery cage is now sitting across the evacuation route you cleared this morning. What does a correct drill require?',
+      opts: [
+        'Run the drill anyway and note the blockage in the report',
+        'Clear the cage and re-check the whole route before the drill runs',
+        'Assume staff will step around it',
+        'Mark the nearest exit unavailable and close the area'
+      ],
+      answer: 1,
+      why: 'The emergency plan describes a route, not a map on a wall. If the route is blocked, the plan is wrong until the route is clear again \u2014 which is exactly what the drill is there to catch.'
+    },
+    {
+      game: 'Ergonomics Workshop', href: 'ergonomics-workshop.html',
+      q: 'A bench was set up for a 1.62 m worker. A 1.92 m colleague takes over the shift. What has to change?',
+      opts: [
+        'Nothing \u2014 the bench already meets the standard',
+        'The bench is raised to the new worker\u2019s elbow height',
+        'The worker is told to stand further back',
+        'A taller chair is added'
+      ],
+      answer: 1,
+      why: 'There is no universal bench height. A set-up that fitted one body makes the next worker stoop or reach, and the exposure only shows up as strain over a whole shift.'
+    },
+    {
+      game: 'Near-Miss Mystery', href: 'near-miss-mystery.html',
+      q: 'A pallet truck stops 30 cm short of a picker. Nobody is hurt, and nobody reports it. What should happen?',
+      opts: [
+        'Nothing \u2014 if there is no injury there is no problem',
+        'A note in the accident book is enough',
+        'Investigate the conditions that allowed it, and fix them',
+        'Retrain the picker on awareness'
+      ],
+      answer: 2,
+      why: 'A near miss is a free lesson. The broken light, the pallets stacked at the corner and the spotter who was pulled away are all still there the next time a truck rounds that corner.'
+    }
+  ];
+
+  const state = { i: 0, score: 0, answered: false, pick: -1, best: 0, log: [] };
+
+  const els = {
+    qText: $('#qText'),
+    opts: $('#opts'),
+    fb: $('#fb'),
+    fromLink: $('#fromLink'),
+    qIndex: $('#qIndex'),
+    hudQ: $('#hudQ'),
+    hudScore: $('#hudScore'),
+    noteLine: $('#noteLine'),
+    next: $('#next'),
+    overlay: $('#overlay'),
+    ovTitle: $('#ovTitle'),
+    ovLead: $('#ovLead'),
+    ovScore: $('#ovScore'),
+    ovScoreValue: $('#ovScoreValue'),
+    ovRank: $('#ovRank'),
+    ovBest: $('#ovBest'),
+    ovGames: $('#ovGames'),
+    ovGamesLabel: $('#ovGamesLabel'),
+    ovBtn: $('#ovBtn')
+  };
+
+  const pad = (n) => String(n).padStart(3, '0');
+  const current = () => QUIZ[state.i];
+
+  function render() {
+    const q = current();
+    state.answered = false;
+    state.pick = -1;
+    els.qText.textContent = q.q;
+    els.fromLink.textContent = q.game;
+    els.fromLink.href = q.href;
+    els.qIndex.textContent = (state.i + 1) + ' / ' + QUIZ.length;
+    els.hudQ.textContent = (state.i + 1) + '/' + QUIZ.length;
+    els.hudScore.textContent = pad(state.score);
+    els.fb.hidden = true;
+    els.fb.className = 'fb';
+    els.next.textContent = 'Choose an answer';
+    els.next.disabled = true;
+    els.noteLine.textContent = 'From ' + q.game + ' \u00b7 question ' + (state.i + 1) + ' of ' + QUIZ.length;
+
+    els.opts.innerHTML = '';
+    q.opts.forEach((text, idx) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'qopt';
+      b.innerHTML = '<i aria-hidden="true">' + 'ABCD'[idx] + '</i><span>' + text + '</span>';
+      b.addEventListener('click', () => answer(idx));
+      els.opts.appendChild(b);
+    });
+  }
+
+  function answer(idx) {
+    if (state.answered) return;
+    const q = current();
+    state.answered = true;
+    state.pick = idx;
+    const right = idx === q.answer;
+    if (right) state.score += 100;
+    state.log.push(right);
+
+    [...els.opts.children].forEach((b, i) => {
+      b.disabled = true;
+      if (i === q.answer) b.classList.add('correct');
+      else if (i === idx) b.classList.add('wrong');
+      else b.classList.add('dim');
+    });
+
+    els.fb.hidden = false;
+    els.fb.className = 'fb ' + (right ? 'ok' : 'no');
+    els.fb.innerHTML = '<b>' + (right ? 'Correct \u00b7 +100' : 'Not this one') + '</b>' + q.why +
+      '<br><a href="' + q.href + '">Play ' + q.game + ' in full &rarr;</a>';
+
+    els.hudScore.textContent = pad(state.score);
+    els.next.disabled = false;
+    els.next.textContent = state.i === QUIZ.length - 1 ? 'See results' : 'Next question';
+    els.noteLine.textContent = right ? 'Correct. +100' : 'The right answer is highlighted.';
+  }
+
+  function nextQuestion() {
+    if (state.i === QUIZ.length - 1) {
+      finish();
+      return;
+    }
+    state.i += 1;
+    render();
+  }
+
+  function finish() {
+    if (state.score > state.best) {
+      state.best = state.score;
+      try { localStorage.setItem(BEST_KEY, String(state.score)); } catch (e) { /* ignore */ }
+    }
+    const rank = state.score >= 800 ? 'Safety lead'
+      : state.score >= 600 ? 'Shift supervisor'
+      : state.score >= 400 ? 'Trained starter'
+      : 'Still learning';
+    els.ovTitle.innerHTML = 'You scored <span class="accent">' + state.score + '</span> of 800.';
+    els.ovLead.textContent = 'Eight questions, one from each safety game. Every one of these had more than a single right-looking option \u2014 the full games are where that gets tested properly.';
+    els.ovScore.hidden = false;
+    els.ovScoreValue.textContent = String(state.score);
+    els.ovRank.textContent = rank;
+    els.ovBest.textContent = 'Best ' + pad(state.best);
+    els.ovGamesLabel.hidden = false;
+    els.ovBtn.textContent = 'Run the quiz again';
+    els.ovGames.innerHTML = QUIZ.map((q, i) => {
+      const mark = state.log[i] ? '\u2713' : '\u00d7';
+      return '<li><a href="' + q.href + '">' + q.game + '<em>' + mark + ' \u00b7 play \u2192</em></a></li>';
+    }).join('');
+    els.overlay.hidden = false;
+    els.ovBtn.focus();
+  }
+
+  function start() {
+    state.i = 0;
+    state.score = 0;
+    state.log = [];
+    els.overlay.hidden = true;
+    render();
+  }
+
+  els.next.addEventListener('click', nextQuestion);
+  els.ovBtn.addEventListener('click', start);
+
+  try { state.best = parseInt(localStorage.getItem(BEST_KEY) || '0', 10) || 0; } catch (e) { state.best = 0; }
+
+  render();
+  els.ovTitle.innerHTML = 'Safety <span class="accent">Quiz</span>';
+  els.ovLead.textContent = 'Eight questions, one from each game in the safety track. Answer one, read the reason, and follow the link if you want the full version.';
+  els.ovGamesLabel.hidden = true;
+  els.ovGames.innerHTML = '';
+  els.ovBtn.textContent = 'Start the quiz';
+  els.ovScore.hidden = true;
+  els.overlay.hidden = false;
+})();
+</script>
+</body>
+</html>

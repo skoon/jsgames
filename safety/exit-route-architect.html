@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a1210">
+<title>Exit Route Architect</title>
+<link rel="stylesheet" href="../common.css">
+<style>
+  :root {
+    --bg-top: #22352c;
+    --bg-mid: #091310;
+    --bg-bottom: #040a08;
+    --stage-bg: #07110e;
+    --ink: #eefaf3;
+    --line: rgba(112, 231, 200, 0.18);
+    --teal: #70e7c8;
+    --amber: #ffc86b;
+    --red: #ff8474;
+    --blue: #88caff;
+  }
+  body { overflow-y: auto; }
+
+  #app {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: 8px;
+    padding: 8px;
+    height: 100%;
+    min-height: 0;
+  }
+  .topbar { margin: 0; }
+
+  .workspace {
+    display: grid;
+    grid-template-columns: minmax(0, 1.3fr) minmax(0, 0.7fr);
+    gap: 9px;
+    min-height: 0;
+  }
+
+  .pane {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: rgba(5, 12, 9, 0.76);
+    overflow: hidden;
+  }
+  .pane-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--line);
+    background: rgba(255, 255, 255, 0.02);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .pane-head b { color: var(--teal); font-weight: 700; }
+
+  .pane-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 10px;
+    scrollbar-width: thin;
+  }
+
+  /* ---------- floor plan ---------- */
+  .plan-wrap {
+    padding: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 10px;
+    background:
+      radial-gradient(120% 120% at 50% 0%, rgba(112, 231, 200, 0.07), transparent 60%),
+      #08120f;
+  }
+  .plan {
+    display: grid;
+    gap: 2px;
+    width: 100%;
+  }
+  .cell {
+    position: relative;
+    aspect-ratio: 1 / 1;
+    border-radius: 3px;
+    border: 1px solid transparent;
+    background: transparent;
+  }
+  .cell.wall { background: #0c1815; border-color: rgba(255, 255, 255, 0.035); }
+  .cell.floor {
+    background: rgba(112, 231, 200, 0.09);
+    border-color: rgba(112, 231, 200, 0.16);
+  }
+  .cell.start {
+    background: rgba(136, 202, 255, 0.22);
+    border-color: rgba(136, 202, 255, 0.6);
+  }
+  .cell.exit {
+    background: rgba(112, 231, 200, 0.32);
+    border-color: rgba(112, 231, 200, 0.8);
+  }
+  .cell.exit::after {
+    content: "EXIT";
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    font-family: var(--font-mono);
+    font-size: 7px;
+    letter-spacing: 0.06em;
+    color: #06211c;
+    font-weight: 800;
+  }
+  .cell.start::after {
+    content: "IN";
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    font-family: var(--font-mono);
+    font-size: 7px;
+    color: #06211c;
+    font-weight: 800;
+  }
+  .cell.blocked {
+    padding: 0;
+    background: rgba(255, 132, 116, 0.45);
+    border-color: rgba(255, 132, 116, 0.9);
+    cursor: pointer;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: #2a0b06;
+    font-weight: 800;
+  }
+  .cell.blocked:hover, .cell.blocked:focus-visible {
+    background: rgba(255, 200, 107, 0.75);
+    border-color: #ffc86b;
+  }
+  .cell.blocked.selected { box-shadow: 0 0 0 2px var(--amber); }
+  .cell.route {
+    background: rgba(112, 231, 200, 0.42);
+    border-color: rgba(112, 231, 200, 0.7);
+  }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 8px;
+    font-family: var(--font-mono);
+    font-size: 8.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+  .legend i {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    margin-right: 4px;
+    border-radius: 2px;
+    vertical-align: middle;
+  }
+  .legend .f { background: rgba(112, 231, 200, 0.3); }
+  .legend .b { background: rgba(255, 132, 116, 0.7); }
+  .legend .e { background: var(--teal); }
+  .legend .r { background: rgba(112, 231, 200, 0.42); }
+
+  /* ---------- changes ---------- */
+  .change-list { display: grid; gap: 5px; }
+  .change {
+    text-align: left;
+    padding: 8px 9px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.03);
+    font-family: var(--font-sans);
+    font-size: 11px;
+    line-height: 1.45;
+    color: rgba(238, 250, 243, 0.86);
+    cursor: pointer;
+  }
+  .change:hover { border-color: rgba(112, 231, 200, 0.5); }
+  .change:disabled { cursor: default; opacity: 0.6; }
+
+  .note {
+    margin: 8px 0 0;
+    font-size: 10.5px;
+    line-height: 1.5;
+    color: rgba(238, 250, 243, 0.6);
+  }
+  .note b { color: var(--ink); }
+
+  .status {
+    margin-top: 9px;
+    padding: 8px 9px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    line-height: 1.5;
+    color: var(--muted);
+  }
+  .status.good { border-color: rgba(112, 231, 200, 0.45); background: rgba(112, 231, 200, 0.06); color: #c9fdec; }
+  .status.bad { border-color: rgba(255, 132, 116, 0.45); background: rgba(255, 132, 116, 0.06); color: #ffc9c2; }
+
+  .alert {
+    margin-top: 8px;
+    padding: 8px 9px;
+    border: 1px solid rgba(255, 200, 107, 0.4);
+    border-radius: 8px;
+    background: rgba(255, 200, 107, 0.07);
+    font-size: 10.5px;
+    line-height: 1.5;
+    color: #ffe6b8;
+  }
+  .alert[hidden] { display: none; }
+
+  .actionbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 2px; }
+  .actionbar .note-line { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint); }
+  .actionbar .row { display: flex; gap: 7px; }
+  .actionbar .btn { margin: 0; }
+  .btn.small { min-height: 34px; padding: 8px 16px; font-size: 10.5px; }
+
+  @media (max-width: 900px) {
+    .workspace { grid-template-columns: minmax(0, 1fr); }
+    #app { height: auto; }
+    #stage.stage-fluid { height: auto; }
+    .pane-body { overflow: visible; }
+  }
+</style>
+</head>
+<body>
+<h1 class="sr-only">Exit Route Architect: keep evacuation routes clear</h1>
+<div id="stage" class="stage-fluid">
+  <div id="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">EX</span>
+        <span>
+          <b>Exit Route Architect</b>
+          <small>Drill preparation</small>
+        </span>
+      </div>
+      <div class="hud">
+        <div class="stat"><span>Store</span><strong id="hudStore">1/2</strong></div>
+        <div class="stat"><span>Score</span><strong id="hudScore">0000</strong></div>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <section class="pane" aria-label="Floor plan">
+        <div class="pane-head">
+          <span id="storeName">Corner store</span>
+          <b id="blockedNote">0 blockers</b>
+        </div>
+        <div class="pane-body">
+          <div class="plan-wrap">
+            <div id="plan" class="plan"></div>
+            <div class="legend">
+              <span><i class="f"></i>route</span>
+              <span><i class="b"></i>blocked</span>
+              <span><i class="e"></i>exit</span>
+              <span><i class="r"></i>drill path</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <aside class="pane" aria-label="Approved changes">
+        <div class="pane-head">
+          <span>Approved changes</span>
+          <b id="panelState">select a blocker</b>
+        </div>
+        <div class="pane-body">
+          <div id="changes" class="change-list"></div>
+          <p id="changeNote" class="note">Click a red blocker on the plan. Only changes in the emergency plan are acceptable.</p>
+          <div id="status" class="status" hidden></div>
+          <div id="alert" class="alert" hidden></div>
+        </div>
+      </aside>
+    </main>
+
+    <footer class="actionbar">
+      <span class="note-line" id="noteLine">Clear the route, then run the drill</span>
+      <div class="row">
+        <button id="drill" class="btn small" type="button">Run drill</button>
+      </div>
+    </footer>
+  </div>
+
+  <div id="overlay" class="overlay" role="dialog" aria-modal="true" aria-labelledby="ovTitle" hidden>
+    <div class="panel panel-card">
+      <p id="ovKicker" class="eyebrow"></p>
+      <h2 id="ovTitle" class="title"></h2>
+      <p id="ovLead" class="lead"></p>
+      <ul id="ovRules" class="rules"></ul>
+      <div id="ovScore" class="final-score" hidden>
+        <span>Drill score</span>
+        <strong id="ovScoreValue">0</strong>
+        <p id="ovRank" class="rank"></p>
+        <p id="ovBest" class="best"></p>
+      </div>
+      <button id="ovBtn" class="btn" type="button">Start the inspection</button>
+    </div>
+  </div>
+</div>
+<p class="hint">click a blocker &middot; pick an approved change &middot; drill the route</p>
+
+<script>
+(() => {
+  'use strict';
+
+  const $ = (s) => document.querySelector(s);
+  const BEST_KEY = 'exitRoute.best.v1';
+
+  function pathFrom(points) {
+    const cells = [];
+    for (let i = 0; i < points.length - 1; i += 1) {
+      let x = points[i][0];
+      let y = points[i][1];
+      const x2 = points[i + 1][0];
+      const y2 = points[i + 1][1];
+      const dx = Math.sign(x2 - x);
+      const dy = Math.sign(y2 - y);
+      while (x !== x2 || y !== y2) {
+        cells.push(x + ',' + y);
+        x += dx;
+        y += dy;
+      }
+    }
+    cells.push(points[points.length - 1].join(','));
+    return cells;
+  }
+
+  const STORES = [
+    {
+      name: 'Corner store',
+      cols: 10,
+      rows: 6,
+      start: [1, 1],
+      exit: [1, 4],
+      cells: pathFrom([[1, 1], [8, 1], [8, 4], [1, 4]]),
+      target: 18,
+      blockers: [
+        {
+          cell: '5,1', label: 'Pallet of stock',
+          options: [
+            { id: 'move', t: 'Move the pallet to the marked storage bay', ok: true, why: 'The pallet moves out of the route and into a designated bay.' },
+            { id: 'leave', t: 'Leave it \u2014 the drill is not until Thursday', ok: false, why: 'A drill is exactly when a blocked route must be found.' },
+            { id: 'stack', t: 'Stack it higher so it takes less floor space', ok: false, why: 'It is still in the route, and now it can topple.' }
+          ]
+        },
+        {
+          cell: '8,3', label: 'Roll cage',
+          options: [
+            { id: 'move', t: 'Return the roll cage to the back dock', ok: true, why: 'The cage leaves the route entirely.' },
+            { id: 'tuck', t: 'Push it tight against the wall and hope', ok: false, why: 'A snug blocker is still a blocker in a smoke-filled aisle.' },
+            { id: 'cone', t: 'Put a cone beside it', ok: false, why: 'A cone warns people about a route that still does not work.' }
+          ]
+        },
+        {
+          cell: '4,4', label: 'Cardboard bales',
+          options: [
+            { id: 'bale', t: 'Move the bales to the loading bay for collection', ok: true, why: 'Bales go to the collection point, not the evacuation route.' },
+            { id: 'flatten', t: 'Flatten them and leave them by the exit', ok: false, why: 'Flattened bales still narrow the exit route.' },
+            { id: 'sign', t: 'Add a sign asking people to climb over carefully', ok: false, why: 'Nobody should be climbing over stock to evacuate.' }
+          ]
+        }
+      ],
+      delivery: null
+    },
+    {
+      name: 'Supermarket',
+      cols: 12,
+      rows: 6,
+      start: [1, 1],
+      exit: [2, 5],
+      cells: pathFrom([[1, 1], [1, 3], [10, 3], [10, 5], [2, 5]]),
+      target: 26,
+      blockers: [
+        {
+          cell: '3,3', label: 'Promo display',
+          options: [
+            { id: 'move', t: 'Relocate the display to the front-of-store zone', ok: true, why: 'The promo unit leaves the marked route.' },
+            { id: 'narrow', t: 'Turn it sideways to free a few centimetres', ok: false, why: 'A squeeze point slows a crowd and fails the drill.' },
+            { id: 'staff', t: 'Ask staff to guide people around it', ok: false, why: 'Guides do not remove the obstruction.' }
+          ]
+        },
+        {
+          cell: '7,3', label: 'Cage of returns',
+          options: [
+            { id: 'move', t: 'Take the cage back to the returns room', ok: true, why: 'Returns belong off the evacuation route.' },
+            { id: 'lock', t: 'Lock the cage wheels so it cannot roll', ok: false, why: 'Immobile stock in a route is still stock in a route.' },
+            { id: 'tape', t: 'Tape off the aisle around the cage', ok: false, why: 'Tape marks the problem; it does not clear it.' }
+          ]
+        },
+        {
+          cell: '10,4', label: 'Trolley park',
+          options: [
+            { id: 'move', t: 'Return trolleys to the bay outside the exit', ok: true, why: 'The trolley bay sits clear of the exit route.' },
+            { id: 'chain', t: 'Chain the trolleys together', ok: false, why: 'Chaining makes a wider obstacle, not a smaller one.' },
+            { id: 'bell', t: 'Fit a bell so people announce themselves', ok: false, why: 'A bell does not create a passable route.' }
+          ]
+        },
+        {
+          cell: '6,5', label: 'Seasonal stock',
+          options: [
+            { id: 'move', t: 'Move seasonal stock to the top-floor overflow', ok: true, why: 'Overflow storage is designed for this.' },
+            { id: 'cover', t: 'Throw a sheet over it', ok: false, why: 'Hiding an obstruction is worse: people trip on what they cannot see.' },
+            { id: 'later', t: 'Deal with it after the drill', ok: false, why: 'The drill is the test, not a rehearsal for a later clean-up.' }
+          ]
+        }
+      ],
+      delivery: {
+        cell: '5,3',
+        label: 'Delivery cages',
+        text: 'A delivery has arrived and its cages are now sitting in the middle of the cleared route. The route you just proved no longer works.',
+        options: [
+          { id: 'move', t: 'Move the delivery cages to the goods-in bay', ok: true, why: 'Goods-in is off the route, so the path is clear again.' },
+          { id: 'wait', t: 'Leave them and drill again anyway', ok: false, why: 'The route is still blocked; the drill will fail.' },
+          { id: 'split', t: 'Split the cages either side of the aisle', ok: false, why: 'Two obstacles still narrow the route and it will not pass.' }
+        ]
+      }
+    }
+  ];
+
+  const state = {
+    store: 0,
+    score: 0,
+    best: 0,
+    cleared: {},
+    selected: null,
+    delivered: false,
+    route: [],
+    inspected: false
+  };
+
+  const els = {
+    plan: $('#plan'),
+    changes: $('#changes'),
+    changeNote: $('#changeNote'),
+    status: $('#status'),
+    alert: $('#alert'),
+    storeName: $('#storeName'),
+    blockedNote: $('#blockedNote'),
+    panelState: $('#panelState'),
+    noteLine: $('#noteLine'),
+    hudStore: $('#hudStore'),
+    hudScore: $('#hudScore'),
+    drill: $('#drill'),
+    overlay: $('#overlay'),
+    ovKicker: $('#ovKicker'),
+    ovTitle: $('#ovTitle'),
+    ovLead: $('#ovLead'),
+    ovRules: $('#ovRules'),
+    ovScore: $('#ovScore'),
+    ovScoreValue: $('#ovScoreValue'),
+    ovRank: $('#ovRank'),
+    ovBest: $('#ovBest'),
+    ovBtn: $('#ovBtn')
+  };
+
+  const store = () => STORES[state.store];
+  const pad = (n) => String(n).padStart(4, '0');
+
+  function activeBlockers() {
+    const list = store().blockers.filter((b) => !state.cleared[b.cell]);
+    if (state.delivered && store().delivery) {
+      const d = store().delivery;
+      if (!state.cleared['delivery']) list.push({ cell: d.cell, label: d.label, delivery: true });
+    }
+    return list;
+  }
+
+  function blockedSet() {
+    const set = new Set();
+    store().blockers.forEach((b) => { if (!state.cleared[b.cell]) set.add(b.cell); });
+    if (state.delivered && store().delivery && !state.cleared['delivery']) set.add(store().delivery.cell);
+    return set;
+  }
+
+  function bfs() {
+    const cells = new Set(store().cells);
+    const blocked = blockedSet();
+    const start = store().start.join(',');
+    const goal = store().exit.join(',');
+    const queue = [[store().start[0], store().start[1], 0]];
+    const seen = new Set([start]);
+    while (queue.length) {
+      const [x, y, d] = queue.shift();
+      if (x + ',' + y === goal) return { distance: d, seen: seen };
+      [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dx, dy]) => {
+        const key = (x + dx) + ',' + (y + dy);
+        if (!cells.has(key) || seen.has(key) || blocked.has(key)) return;
+        seen.add(key);
+        queue.push([x + dx, y + dy, d + 1]);
+      });
+    }
+    return { distance: -1, seen: new Set() };
+  }
+
+  function renderPlan() {
+    const s = store();
+    els.plan.style.gridTemplateColumns = 'repeat(' + s.cols + ', minmax(0, 1fr))';
+    els.plan.innerHTML = '';
+    const cells = new Set(s.cells);
+    const blocked = blockedSet();
+    const onRoute = new Set(state.route);
+    const startKey = s.start.join(',');
+    const exitKey = s.exit.join(',');
+
+    for (let y = 0; y < s.rows; y += 1) {
+      for (let x = 0; x < s.cols; x += 1) {
+        const key = x + ',' + y;
+        const isCell = cells.has(key);
+        const isBlocked = blocked.has(key);
+        const el = document.createElement(isBlocked ? 'button' : 'div');
+        if (isBlocked) el.type = 'button';
+        el.className = 'cell';
+        if (!isCell) el.classList.add('wall');
+        else if (key === startKey) el.classList.add('start');
+        else if (key === exitKey) el.classList.add('exit');
+        else el.classList.add(isBlocked ? 'blocked' : 'floor');
+        if (isBlocked) {
+          el.textContent = '\u2715';
+          el.setAttribute('aria-label', 'Blocked: ' + (activeBlockers().find((b) => b.cell === key) || {}).label);
+          if (state.selected === key) el.classList.add('selected');
+          el.addEventListener('click', () => selectBlocker(key));
+        }
+        if (!isBlocked && isCell && onRoute.has(key)) el.classList.add('route');
+        els.plan.appendChild(el);
+      }
+    }
+
+    els.storeName.textContent = s.name;
+    els.blockedNote.textContent = activeBlockers().length + ' blocker' + (activeBlockers().length === 1 ? '' : 's');
+    els.hudStore.textContent = (state.store + 1) + '/' + STORES.length;
+    els.hudScore.textContent = pad(state.score);
+  }
+
+  function selectBlocker(key) {
+    state.selected = key;
+    const blocker = activeBlockers().find((b) => b.cell === key);
+    if (!blocker) return;
+    const options = blocker.delivery ? store().delivery.options : blocker.options;
+    els.panelState.textContent = blocker.label;
+    els.changes.innerHTML = '';
+    options.forEach((o) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'change';
+      b.textContent = o.t;
+      b.addEventListener('click', () => applyChange(blocker, o, b));
+      els.changes.appendChild(b);
+    });
+    els.changeNote.textContent = blocker.delivery
+      ? 'This is the delivery that just arrived. Use only the approved change.'
+      : 'Only changes in the emergency plan are acceptable.';
+    renderPlan();
+  }
+
+  function applyChange(blocker, option, btn) {
+    if (option.ok) {
+      if (blocker.delivery) state.cleared.delivery = true;
+      else state.cleared[blocker.cell] = true;
+      state.route = [];
+      state.inspected = false;
+      els.status.hidden = false;
+      els.status.className = 'status good';
+      els.status.textContent = option.why;
+      els.changes.innerHTML = '';
+      els.panelState.textContent = 'cleared';
+      state.selected = null;
+      renderPlan();
+      els.noteLine.textContent = 'Route change recorded. Clear the rest, then drill.';
+    } else {
+      state.score = Math.max(0, state.score - 10);
+      els.status.hidden = false;
+      els.status.className = 'status bad';
+      els.status.textContent = option.why + ' -10';
+      btn.disabled = true;
+      els.hudScore.textContent = pad(state.score);
+    }
+  }
+
+  function runDrill() {
+    const result = bfs();
+    const s = store();
+    if (result.distance === -1) {
+      state.route = [];
+      renderPlan();
+      els.status.hidden = false;
+      els.status.className = 'status bad';
+      els.status.textContent = 'Drill failed: no route reaches the exit. Something is still blocking the way.';
+      els.noteLine.textContent = 'No route found. Clear the remaining blockers.';
+      return;
+    }
+
+    state.route = [...result.seen];
+    state.inspected = true;
+    renderPlan();
+
+    const clearedCount = Object.keys(state.cleared).filter((k) => k !== 'delivery').length;
+    const earned = 100 + clearedCount * 40 + (state.cleared.delivery ? 60 : 0);
+    els.status.hidden = false;
+    els.status.className = 'status good';
+
+    if (s.delivery && !state.delivered) {
+      state.delivered = true;
+      state.route = [];
+      els.status.textContent = 'Drill passed: ' + result.distance + ' cells from start to exit. Then the delivery arrived.';
+      els.alert.hidden = false;
+      els.alert.textContent = s.delivery.text;
+      els.drill.textContent = 'Drill again';
+      els.drill.dataset.mode = 'drill';
+      renderPlan();
+      els.noteLine.textContent = 'A delivery just blocked the route. Clear it and drill again.';
+      return;
+    }
+
+    state.score += earned;
+    els.hudScore.textContent = pad(state.score);
+    els.status.textContent = 'Drill passed: ' + result.distance + ' cells from start to exit (target ' + s.target + '). +' + earned;
+
+    els.drill.textContent = state.store === STORES.length - 1 ? 'Finish the inspection' : 'Next store';
+    els.drill.dataset.mode = 'next';
+    els.noteLine.textContent = 'Route clear, drill passed. Move on.';
+  }
+
+  function nextStore() {
+    if (state.store === STORES.length - 1) {
+      finish();
+      return;
+    }
+    state.store += 1;
+    loadStore();
+  }
+
+  function loadStore() {
+    state.cleared = {};
+    state.selected = null;
+    state.delivered = false;
+    state.route = [];
+    state.inspected = false;
+    els.changes.innerHTML = '';
+    els.panelState.textContent = 'select a blocker';
+    els.status.hidden = true;
+    els.alert.hidden = true;
+    els.drill.textContent = 'Run drill';
+    els.drill.dataset.mode = 'drill';
+    els.noteLine.textContent = 'Clear the route, then run the drill';
+    renderPlan();
+  }
+
+  function finish() {
+    if (state.score > state.best) {
+      state.best = state.score;
+      try { localStorage.setItem(BEST_KEY, String(state.score)); } catch (e) { /* ignore */ }
+    }
+    const rank = state.score >= 520 ? 'Fire safety lead'
+      : state.score >= 400 ? 'Evacuation planner'
+      : state.score >= 280 ? 'Shift supervisor'
+      : 'Trainee';
+    els.ovKicker.textContent = 'Inspection complete';
+    els.ovTitle.innerHTML = 'Routes <span class="accent">clear.</span>';
+    els.ovLead.textContent = 'Two stores drilled, including the delivery that blocked a route you had just proved. Exits only work when the way to them stays clear.';
+    els.ovRules.innerHTML = '';
+    els.ovScore.hidden = false;
+    els.ovScoreValue.textContent = String(state.score);
+    els.ovRank.textContent = rank;
+    els.ovBest.textContent = 'Best ' + pad(state.best);
+    els.overlay.hidden = false;
+    els.ovBtn.focus();
+  }
+
+  function start() {
+    state.store = 0;
+    state.score = 0;
+    els.overlay.hidden = true;
+    loadStore();
+  }
+
+  els.drill.addEventListener('click', () => {
+    if (els.drill.dataset.mode === 'next') nextStore();
+    else runDrill();
+  });
+  els.ovBtn.addEventListener('click', start);
+
+  try { state.best = parseInt(localStorage.getItem(BEST_KEY) || '0', 10) || 0; } catch (e) { state.best = 0; }
+
+  loadStore();
+
+  els.ovKicker.textContent = 'Drill preparation';
+  els.ovTitle.innerHTML = 'Exit Route <span class="accent">Architect</span>';
+  els.ovLead.textContent = 'Two stores, a drill on Thursday, and stock parked exactly where people need to run. Clear the routes with approved changes, then prove it with a drill.';
+  els.ovRules.innerHTML = [
+    'Click a red blocker to see the approved changes.',
+    'Only changes from the emergency plan count.',
+    'Run the drill to test the route; blocked routes fail loudly.',
+    'On the second store, a delivery will block a route you already cleared.'
+  ].map((t) => '<li class="rule">' + t + '</li>').join('');
+  els.ovBtn.textContent = 'Start the inspection';
+  els.overlay.hidden = false;
+})();
+</script>
+</body>
+</html>

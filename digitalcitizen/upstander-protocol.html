@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d1220">
+<title>The Upstander Protocol</title>
+<link rel="stylesheet" href="../common.css">
+<style>
+  :root {
+    --bg-top: #1f2a44;
+    --bg-mid: #090c14;
+    --bg-bottom: #04060a;
+    --stage-bg: #070b12;
+    --ink: #eef2fb;
+    --line: rgba(140, 180, 255, 0.18);
+    --teal: #6ef0c8;
+    --amber: #ffc86b;
+    --red: #ff7d86;
+    --blue: #8cc6ff;
+    --violet: #c1a6ff;
+  }
+  body { overflow-y: auto; }
+
+  #app {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: 8px;
+    padding: 8px;
+    height: 100%;
+    min-height: 0;
+  }
+  .topbar { margin: 0; }
+  .meters { display: flex; align-items: center; gap: 14px; }
+  .meter-box { display: grid; gap: 3px; min-width: 124px; }
+  .meter-box .lab {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 8.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .meter-box .lab b { color: #fff; font-weight: 700; }
+  .bar { height: 8px; border-radius: 999px; background: rgba(255, 255, 255, 0.09); overflow: hidden; }
+  .bar span { display: block; height: 100%; border-radius: 999px; transition: width 260ms ease; }
+  .bar.tox span { background: linear-gradient(90deg, #ff5f6d, var(--amber)); }
+  .bar.res span { background: linear-gradient(90deg, #2f9ecf, var(--teal)); }
+  .bar.low span { background: linear-gradient(90deg, #d63b4c, var(--red)); }
+  .evidence {
+    display: grid;
+    gap: 1px;
+    padding: 4px 9px;
+    border: 1px solid rgba(140, 198, 255, 0.3);
+    border-radius: 7px;
+    background: rgba(140, 198, 255, 0.06);
+    font-family: var(--font-mono);
+    font-size: 8.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .evidence b { color: var(--blue); font-size: 12px; letter-spacing: 0; }
+
+  .board {
+    display: grid;
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.95fr);
+    gap: 8px;
+    min-height: 0;
+  }
+  .pane {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: rgba(6, 9, 15, 0.84);
+    overflow: hidden;
+  }
+  .pane.active { border-color: rgba(140, 198, 255, 0.5); box-shadow: 0 0 0 1px rgba(140, 198, 255, 0.15); }
+  .pane-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--line);
+    background: rgba(255, 255, 255, 0.02);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .pane-head b { color: var(--blue); font-weight: 700; }
+  .pane.dm .pane-head b { color: var(--amber); }
+  .pane-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    scrollbar-width: thin;
+  }
+
+  .chat { display: grid; gap: 5px; }
+  .line {
+    display: grid;
+    grid-template-columns: 74px 1fr;
+    gap: 8px;
+    padding: 5px 8px;
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.025);
+    font-size: 11.5px;
+    line-height: 1.45;
+    color: rgba(238, 242, 251, 0.86);
+  }
+  .line .who {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.04em;
+    color: rgba(238, 242, 251, 0.45);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .line.bully { background: rgba(255, 125, 134, 0.07); }
+  .line.bully .who { color: #ffb0b6; }
+  .line.me { background: rgba(110, 240, 200, 0.07); }
+  .line.me .who { color: var(--teal); }
+  .line.rookie { background: rgba(255, 200, 107, 0.06); }
+  .line.rookie .who { color: var(--amber); }
+  .line.system {
+    display: block;
+    background: none;
+    padding: 1px 8px;
+    font-family: var(--font-mono);
+    font-size: 8.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgba(238, 242, 251, 0.35);
+  }
+
+  .prompt {
+    margin: 2px 0 0;
+    padding: 7px 9px;
+    border-left: 2px solid rgba(140, 198, 255, 0.45);
+    background: rgba(140, 198, 255, 0.05);
+    font-size: 11px;
+    line-height: 1.5;
+    color: rgba(238, 242, 251, 0.7);
+  }
+  .opts { display: grid; gap: 5px; margin-top: 2px; }
+  .opt {
+    display: grid;
+    grid-template-columns: 20px 1fr;
+    gap: 8px;
+    align-items: start;
+    padding: 8px 9px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.03);
+    color: rgba(238, 242, 251, 0.9);
+    text-align: left;
+    font: inherit;
+    font-size: 11px;
+    line-height: 1.45;
+    cursor: pointer;
+  }
+  .opt:hover:not(:disabled) { border-color: rgba(140, 198, 255, 0.5); background: rgba(140, 198, 255, 0.07); }
+  .opt:disabled { opacity: 0.4; cursor: default; }
+  .opt .k {
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: rgba(238, 242, 251, 0.6);
+  }
+  .opt .tactic {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 8px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--violet);
+    margin-bottom: 2px;
+  }
+  .opt.escalate .tactic { color: var(--red); }
+  .opt.delay .tactic { color: var(--amber); }
+
+  .dm .chat .line { background: rgba(255, 200, 107, 0.05); }
+  .hintline {
+    font-family: var(--font-mono);
+    font-size: 8.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: rgba(238, 242, 251, 0.32);
+    text-align: center;
+    padding: 4px 0 2px;
+  }
+
+  .actionbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 2px; flex-wrap: wrap; }
+  .footerbtns { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; margin-left: auto; }
+  .actionbar .note-line { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint); }
+  .actionbar .btn { margin: 0; }
+  .btn.small { min-height: 32px; padding: 7px 14px; font-size: 10px; }
+  .btn[disabled] { opacity: 0.4; cursor: default; }
+
+  .report { display: grid; gap: 6px; margin-top: 4px; }
+  .report button {
+    display: grid;
+    gap: 2px;
+    padding: 9px 11px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.03);
+    color: #fff;
+    text-align: left;
+    font: inherit;
+    cursor: pointer;
+  }
+  .report button:hover { border-color: rgba(140, 198, 255, 0.5); background: rgba(140, 198, 255, 0.07); }
+  .report button b { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--blue); }
+  .report button span { font-size: 10.5px; line-height: 1.4; color: rgba(238, 242, 251, 0.6); }
+
+  @media (max-width: 900px) {
+    .board { grid-template-columns: minmax(0, 1fr); min-width: 0; }
+    #app { height: auto; }
+    #stage.stage-fluid { height: auto; }
+    .pane-body { overflow: visible; }
+    .pane.inactive { display: none; }
+    .topbar { flex-wrap: wrap; row-gap: 7px; min-width: 0; }
+    .meters { width: 100%; flex-wrap: wrap; gap: 8px 12px; }
+    .meter-box { flex: 1 1 128px; min-width: 0; }
+    .evidence { flex: 0 0 auto; }
+    .line { grid-template-columns: 62px 1fr; }
+  }
+</style>
+</head>
+<body>
+<h1 class="sr-only">The Upstander Protocol: intervene in an online pile-on using direct, distract, delegate and delay tactics</h1>
+<div id="stage" class="stage-fluid">
+  <div id="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">UP</span>
+        <span>
+          <b>The Upstander Protocol</b>
+          <small>Lobby 4 &middot; ranked</small>
+        </span>
+      </div>
+      <div class="meters">
+        <div class="meter-box">
+          <span class="lab">Toxicity <b id="toxVal">42%</b></span>
+          <div class="bar tox" id="toxBar"><span style="width:42%"></span></div>
+        </div>
+        <div class="meter-box">
+          <span class="lab">Resilience <b id="resVal">38%</b></span>
+          <div class="bar res" id="resBar"><span style="width:38%"></span></div>
+        </div>
+        <div class="evidence"><span>Captured logs</span><b id="evVal">0</b></div>
+      </div>
+    </header>
+
+    <main class="board">
+      <section class="pane active" id="publicPane" aria-label="Public lobby chat">
+        <div class="pane-head"><span>Lobby 4 &middot; public chat</span><b id="publicTab">Tab to DM</b></div>
+        <div class="pane-body" id="publicBody"></div>
+      </section>
+
+      <section class="pane dm inactive" id="dmPane" aria-label="Private message with Rookie_99">
+        <div class="pane-head"><span>DM &middot; Rookie_99</span><b id="dmTab">Tab to public</b></div>
+        <div class="pane-body" id="dmBody"></div>
+      </section>
+    </main>
+
+    <footer class="actionbar">
+      <span class="note-line" id="noteLine">1&ndash;4 respond &middot; Tab switch window &middot; Space capture log</span>
+      <span class="footerbtns">
+        <button id="switchBtn" class="btn small" type="button">Open private DM</button>
+        <button id="capture" class="btn small" type="button">Capture log</button>
+      </span>
+    </footer>
+  </div>
+
+  <div id="overlay" class="overlay" role="dialog" aria-modal="true" aria-labelledby="ovTitle" hidden>
+    <div class="panel panel-card">
+      <p class="eyebrow" id="ovKicker">Lobby closed</p>
+      <h2 id="ovTitle" class="title"></h2>
+      <p id="ovLead" class="lead"></p>
+      <ul id="ovRules" class="rules"></ul>
+      <div id="ovScore" class="final-score" hidden>
+        <span id="ovScoreLabel">Final meters</span>
+        <strong id="ovScoreValue">0</strong>
+        <p id="ovRank" class="rank"></p>
+        <p id="ovBest" class="best"></p>
+      </div>
+      <button id="ovBtn" class="btn" type="button">Queue again</button>
+    </div>
+  </div>
+</div>
+<p class="hint">public flame &middot; private support &middot; evidence &middot; report</p>
+
+<script>
+(() => {
+  'use strict';
+
+  const $ = (s) => document.querySelector(s);
+  const BEST_KEY = 'upstander.best.v1';
+
+  const BEATS = [
+    {
+      id: 'b1',
+      push: [
+        { who: 'BlazeKing', text: 'uninstall immediately', kind: 'bully' },
+        { who: 'NovaFury', text: 'you are absolute garbage. nobody wants you here', kind: 'bully' },
+        { who: 'Rookie_99', text: 'sorry, that was my fault', kind: 'rookie' }
+      ],
+      prompt: 'Two teammates are flooding the lobby after one boss wipe. Rookie_99 has gone quiet.',
+      options: [
+        {
+          key: '1', tactic: 'Direct', text: 'Cut it out \u2014 everyone wipes on that boss the first time.',
+          tox: -6, res: 6,
+          reply: [{ who: 'BlazeKing', text: 'white knight lmao', kind: 'bully' }],
+          note: 'Naming the behaviour in one calm line draws a line. It also paints a target, so it works best with something else behind it.'
+        },
+        {
+          key: '2', tactic: 'Distract', text: 'Anyway \u2014 anyone know if the patch fixed the loot table? Still chasing the helmet.',
+          tox: -10, res: 4,
+          reply: [{ who: 'NovaFury', text: 'yeah it drops at the end now', kind: '' }],
+          note: 'Changing the subject gives the pile-on nowhere to stand. It is the cheapest de-escalation there is.'
+        },
+        {
+          key: '3', tactic: 'Escalate', text: 'BlazeKing you are trash at your own main. Uninstall yourself.',
+          tox: 18, res: -10,
+          reply: [
+            { who: 'PixelPete', text: 'OHHHHH', kind: '' },
+            { who: 'Rookie_99', text: 'please stop', kind: 'rookie' },
+            { who: 'BlazeKing', text: '1v1 me then', kind: 'bully' }
+          ],
+          note: 'Public counter-aggression rarely defends anyone. It makes the room louder and gives the target a second reason to leave.'
+        },
+        {
+          key: '4', tactic: 'Delay', text: 'Rookie, take the left flank with me on the next pull.',
+          tox: -4, res: 10,
+          reply: [{ who: 'Rookie_99', text: 'ok, trying', kind: 'rookie' }],
+          note: 'Giving the target a role in the next attempt answers the claim that they do not belong, without a fight.'
+        }
+      ]
+    },
+    {
+      id: 'b2',
+      push: [
+        { who: 'PixelPete', text: 'yeah rookie you are throwing', kind: 'bully' },
+        { who: 'NovaFury', text: 'just uninstall, save us the queue', kind: 'bully' }
+      ],
+      prompt: 'The pile-on is growing. Three people are now repeating the same two sentences.',
+      options: [
+        {
+          key: '1', tactic: 'Direct', text: 'That is enough. I am logging this lobby.',
+          tox: -4, res: 4,
+          reply: [{ who: 'PixelPete', text: 'lol reported', kind: 'bully' }],
+          note: 'A stated consequence without a speech. Short is stronger here; the log does the rest.'
+        },
+        {
+          key: '2', tactic: 'Distract', text: 'Map vote is open. Voting snow \u2014 come get your free win.',
+          tox: -12, res: 6,
+          reply: [{ who: 'NovaFury', text: 'voted', kind: '' }, { who: 'PixelPete', text: 'fine, snow', kind: '' }],
+          note: 'A shared next action usually beats a shared grievance. The chat moves on because there is somewhere to move.'
+        },
+        {
+          key: '3', tactic: 'Escalate', text: 'PixelPete you are the worst player in this lobby.',
+          tox: 16, res: -8,
+          reply: [
+            { who: 'PixelPete', text: 'look who is talking', kind: 'bully' },
+            { who: 'Rookie_99', text: 'i might just go', kind: 'rookie' }
+          ],
+          note: 'Now there are two fights and the target is still the subject of both.'
+        },
+        {
+          key: '4', tactic: 'Delegate', text: 'Anyone have a mod on their friends list? Lobby 4 needs one.',
+          tox: -6, res: 8,
+          reply: [{ who: 'NovaFury', text: 'mods never come', kind: '' }],
+          note: 'Delegation hands it to someone with authority, but it is slow \u2014 keep the room calm while you wait.'
+        }
+      ]
+    },
+    {
+      id: 'b3',
+      push: [
+        { who: 'BlazeKing', text: 'white knight alert', kind: 'bully' },
+        { who: 'BlazeKing', text: 'you are next', kind: 'bully' }
+      ],
+      prompt: 'The abuse has turned to you. Rookie_99 is still silent in public.',
+      dm: {
+        push: [
+          { who: 'Rookie_99', text: 'honestly maybe i should just quit, i am ruining it for everyone' }
+        ],
+        options: [
+          {
+            key: '1', tactic: 'Delay', text: 'That boss mechanic is brutal on a first run. Want to run drills after this match?',
+            tox: 0, res: 14,
+            note: 'Private, specific, and about the game rather than the person. This is the intervention that actually lands.'
+          },
+          {
+            key: '2', tactic: 'Delay', text: 'Ignore them, they are idiots.',
+            tox: 0, res: 4,
+            note: 'Supportive, but it still leaves the target alone with the feeling. Naming the mechanic does more than naming the bullies.'
+          },
+          {
+            key: '3', tactic: 'Delay', text: 'Maybe take a break from ranked for a bit?',
+            tox: 4, res: -12,
+            note: 'Sounding like the bullies, in a kinder voice. The room was the problem, not the player.'
+          }
+        ]
+      },
+      options: [
+        {
+          key: '1', tactic: 'Direct', text: 'I am not a white knight. I just do not need to insult a stranger to enjoy a game.',
+          tox: 2, res: 2,
+          reply: [{ who: 'BlazeKing', text: 'whatever', kind: 'bully' }],
+          note: 'Refusing the frame without escalating. Slightly warming, because it is still a public exchange about you.'
+        },
+        {
+          key: '2', tactic: 'Distract', text: 'Round starts in 30. We are 2-1, focus.',
+          tox: -8, res: 2,
+          reply: [{ who: 'NovaFury', text: 'ready', kind: '' }],
+          note: 'Back to the game. The bully loses the audience without anyone having to win an argument.'
+        },
+        {
+          key: '3', tactic: 'Escalate', text: 'Say it again and I will tank your rating.',
+          tox: 20, res: -12,
+          reply: [
+            { who: 'BlazeKing', text: 'try it', kind: 'bully' },
+            { who: 'Rookie_99', text: 'can we just play', kind: 'rookie' }
+          ],
+          note: 'A threat in public is a show. It raises toxicity, and the target now has to watch two people fight over them.'
+        },
+        {
+          key: '4', tactic: 'Delay', text: '(say nothing publicly, and open a private message)',
+          tox: -2, res: 6,
+          reply: [{ who: 'BlazeKing', text: 'silent now?', kind: 'bully' }],
+          note: 'Public silence starves the troll; the private window is where the actual support happens.'
+        }
+      ]
+    },
+    {
+      id: 'b4',
+      push: [
+        { who: 'NovaFury', text: 'gg', kind: '' },
+        { who: 'Rookie_99', text: 'gg', kind: 'rookie' },
+        { who: 'BlazeKing', text: 'requeue?', kind: 'bully' }
+      ],
+      prompt: 'The match is over. The squad is deciding whether to queue again, and Rookie_99 is waiting to see what you do.',
+      options: [
+        {
+          key: '1', tactic: 'Direct', text: 'GG all \u2014 Rookie, party invite sent, let us run it back.',
+          tox: -6, res: 10,
+          reply: [{ who: 'Rookie_99', text: 'joining', kind: 'rookie' }],
+          note: 'A visible invitation repairs the public story: the target is wanted, and everyone can see it.'
+        },
+        {
+          key: '2', tactic: 'Direct', text: 'Not queueing with those two again.',
+          tox: 4, res: 2,
+          reply: [{ who: 'NovaFury', text: 'wow', kind: '' }],
+          note: 'A boundary, but a public one that splits the room rather than fixing it.'
+        },
+        {
+          key: '3', tactic: 'Delay', text: 'I am out, this lobby is a mess.',
+          tox: 2, res: -6,
+          reply: [{ who: 'Rookie_99', text: 'yeah me too', kind: 'rookie' }],
+          note: 'Leaving returns the target to the room without you. If you go, take them with you or hand the room over.'
+        },
+        {
+          key: '4', tactic: 'Delegate', text: 'I have reported and muted the two of them. Rookie, want to duo?',
+          tox: -8, res: 10,
+          reply: [{ who: 'Rookie_99', text: 'yes please', kind: 'rookie' }],
+          note: 'Report plus an alternative. The conduct goes to moderation, and the target still has somewhere to play.'
+        }
+      ]
+    }
+  ];
+
+  const state = {
+    beat: 0,
+    tox: 42,
+    res: 38,
+    evidence: 0,
+    pane: 'public',
+    usedDm: false,
+    publicLog: [],
+    dmLog: [],
+    answered: false,
+    over: false,
+    best: 0,
+    ending: ''
+  };
+
+  const els = {
+    publicPane: $('#publicPane'),
+    dmPane: $('#dmPane'),
+    publicBody: $('#publicBody'),
+    dmBody: $('#dmBody'),
+    toxVal: $('#toxVal'),
+    resVal: $('#resVal'),
+    toxBar: $('#toxBar'),
+    resBar: $('#resBar'),
+    evVal: $('#evVal'),
+    noteLine: $('#noteLine'),
+    capture: $('#capture'),
+    switchBtn: $('#switchBtn'),
+    overlay: $('#overlay'),
+    ovKicker: $('#ovKicker'),
+    ovTitle: $('#ovTitle'),
+    ovLead: $('#ovLead'),
+    ovRules: $('#ovRules'),
+    ovScore: $('#ovScore'),
+    ovScoreLabel: $('#ovScoreLabel'),
+    ovScoreValue: $('#ovScoreValue'),
+    ovRank: $('#ovRank'),
+    ovBest: $('#ovBest'),
+    ovBtn: $('#ovBtn')
+  };
+
+  const clamp = (n) => Math.max(0, Math.min(100, n));
+  const beat = () => BEATS[state.beat];
+
+  function renderMeters() {
+    els.toxVal.textContent = state.tox + '%';
+    els.resVal.textContent = state.res + '%';
+    els.toxBar.querySelector('span').style.width = state.tox + '%';
+    els.resBar.querySelector('span').style.width = state.res + '%';
+    els.evVal.textContent = state.evidence;
+    els.capture.disabled = state.over;
+  }
+
+  function lineHtml(l) {
+    if (l.kind === 'system') return '<div class="line system">' + l.text + '</div>';
+    return '<div class="line ' + (l.kind || '') + '"><span class="who">' + l.who + '</span><span>' + l.text + '</span></div>';
+  }
+
+  function renderPublic() {
+    const b = beat();
+    let html = '<div class="chat">' + state.publicLog.map(lineHtml).join('') + '</div>';
+    if (!b) {
+      html += renderReport();
+    } else {
+      html += '<p class="prompt">' + b.prompt + '</p><div class="opts">' + b.options.map((o) =>
+        '<button class="opt ' + o.tactic.toLowerCase() + '" type="button" data-key="' + o.key + '">' +
+          '<span class="k">' + o.key + '</span>' +
+          '<span><span class="tactic">' + o.tactic + '</span>' + o.text + '</span>' +
+        '</button>').join('') + '</div>';
+      els.publicBody.innerHTML = html;
+      els.publicBody.querySelectorAll('.opt').forEach((btn) => {
+        btn.addEventListener('click', () => choosePublic(btn.dataset.key));
+      });
+    }
+    els.publicBody.innerHTML = html;
+    const opts = els.publicBody.querySelectorAll('.opt');
+    opts.forEach((btn) => btn.addEventListener('click', () => choosePublic(btn.dataset.key)));
+  }
+
+  function renderDm() {
+    const b = beat();
+    let html = '<div class="chat">' + state.dmLog.map(lineHtml).join('') + '</div>';
+    if (b && b.dm) {
+      if (state.usedDm) {
+        html += '<p class="prompt">You have said your piece privately. Back to the lobby.</p>';
+      } else {
+        html += '<div class="opts">' + b.dm.options.map((o) =>
+          '<button class="opt ' + o.tactic.toLowerCase() + '" type="button" data-dm="' + o.key + '">' +
+            '<span class="k">' + o.key + '</span>' +
+            '<span><span class="tactic">' + o.tactic + '</span>' + o.text + '</span>' +
+          '</button>').join('') + '</div>';
+        html += '<p class="hintline">Tab back to answer in public</p>';
+      }
+    } else {
+      html += '<p class="prompt">No private message open for this beat. Rookie_99 is not responding yet.</p>';
+    }
+    els.dmBody.innerHTML = html;
+    els.dmBody.querySelectorAll('.opt').forEach((btn) => {
+      btn.addEventListener('click', () => chooseDm(btn.dataset.dm));
+    });
+  }
+
+  function renderReport() {
+    return '<p class="prompt">The lobby has gone quiet. Time to file the conduct report before you leave.</p>' +
+      '<div class="report">' +
+        '<button type="button" data-report="harassment"><b>Report harassment &middot; attach log</b><span>' +
+          (state.evidence ? state.evidence + ' captured log(s) attached. Targeted, timestamped, hard to dismiss.' : 'No log captured. The report will be thin and may bounce.') +
+        '</span></button>' +
+        '<button type="button" data-report="spam"><b>Report spam</b><span>Lighter category. It hides the messages but records no pattern of harassment.</span></button>' +
+        '<button type="button" data-report="skip"><b>Leave without reporting</b><span>Nothing goes to moderation. The next lobby gets the same two players.</span></button>' +
+      '</div>';
+  }
+
+  function bindReport() {
+    els.publicBody.querySelectorAll('[data-report]').forEach((b) => {
+      b.addEventListener('click', () => report(b.dataset.report));
+    });
+  }
+
+  function renderAll() {
+    renderMeters();
+    renderPublic();
+    renderDm();
+    bindReport();
+    els.switchBtn.textContent = state.pane === 'public' ? 'Open private DM' : 'Back to lobby';
+    els.publicPane.classList.toggle('active', state.pane === 'public');
+    els.dmPane.classList.toggle('active', state.pane === 'dm');
+    els.publicPane.classList.toggle('inactive', state.pane !== 'public');
+    els.dmPane.classList.toggle('inactive', state.pane !== 'dm');
+  }
+
+  function apply(o, who) {
+    state.tox = clamp(state.tox + o.tox);
+    state.res = clamp(state.res + o.res);
+    if (o.reply) o.reply.forEach((r) => state.publicLog.push(r));
+    return who;
+  }
+
+  function choosePublic(key) {
+    const b = beat();
+    if (!b || state.over) return;
+    const o = b.options.find((x) => x.key === key);
+    if (!o) return;
+    state.publicLog.push({ who: 'You', text: o.text, kind: 'me' });
+    apply(o);
+    state.publicLog.push({ who: 'system', text: 'Tactic: ' + o.tactic + ' \u00b7 toxicity ' + (o.tox > 0 ? '+' : '') + o.tox + ' \u00b7 resilience ' + (o.res > 0 ? '+' : '') + o.res, kind: 'system' });
+    state.note = o.note;
+    els.noteLine.textContent = o.note.slice(0, 92);
+    state.beat += 1;
+    state.usedDm = false;
+    const next = BEATS[state.beat];
+    if (next) {
+      next.push.forEach((l) => state.publicLog.push(l));
+      if (next.dm) next.dm.push.forEach((l) => state.dmLog.push(l));
+      if (next.dm) {
+        state.pane = 'dm';
+        els.noteLine.textContent = 'A private message just arrived. Tab switches windows.';
+      }
+    } else {
+      state.publicLog.push({ who: 'system', text: 'Match over. File your report.', kind: 'system' });
+    }
+    renderAll();
+  }
+
+  function chooseDm(key) {
+    const b = beat();
+    if (!b || !b.dm || state.usedDm || state.over) return;
+    const o = b.dm.options.find((x) => x.key === key);
+    if (!o) return;
+    state.dmLog.push({ who: 'You', text: o.text, kind: 'me' });
+    apply(o);
+    state.usedDm = true;
+    els.noteLine.textContent = o.note.slice(0, 92);
+    state.pane = 'public';
+    renderAll();
+  }
+
+  function capture() {
+    if (state.over) return;
+    state.evidence += 1;
+    const stamp = new Date();
+    const t = String(stamp.getHours()).padStart(2, '0') + ':' + String(stamp.getMinutes()).padStart(2, '0') + ':' + String(stamp.getSeconds()).padStart(2, '0');
+    state.publicLog.push({ who: 'system', text: 'Log captured ' + t + ' \u2014 ' + state.publicLog.length + ' entries saved to report ticket', kind: 'system' });
+    renderMeters();
+    renderPublic();
+    els.noteLine.textContent = 'Log captured. Evidence is what turns a complaint into a case.';
+  }
+
+  function report(kind) {
+    if (state.over) return;
+    state.over = true;
+    let dTox = 0, dRes = 0, text = '';
+    if (kind === 'harassment') {
+      if (state.evidence > 0) {
+        dTox = -10; dRes = 12;
+        text = 'Filed with ' + state.evidence + ' timestamped log(s). The pattern is on record, which is what gets a conduct case opened rather than a shrugged-off complaint.';
+      } else {
+        dTox = -2; dRes = -4;
+        text = 'Filed without evidence. Moderation has a description and no log, so nothing sticks.';
+      }
+    } else if (kind === 'spam') {
+      dTox = -3; dRes = 0;
+      text = 'Spam reports hide messages but record no harassment pattern, so the same players are back tomorrow.';
+    } else {
+      dTox = 4; dRes = -8;
+      text = 'You left. Nothing was recorded, so the next lobby starts from exactly the same place.';
+    }
+    state.tox = clamp(state.tox + dTox);
+    state.res = clamp(state.res + dRes);
+    renderMeters();
+    finish(text);
+  }
+
+  function finish(reportText) {
+    const tox = state.tox, res = state.res;
+    let title, lead, rank;
+    if (tox <= 20 && res >= 80) {
+      title = 'The lobby <span class="accent">turned around.</span>';
+      lead = 'The room cooled, the target stayed, and the report went in with evidence attached. Nothing dramatic happened, which is what a good intervention looks like.';
+      rank = 'Upstander';
+    } else if (tox <= 20) {
+      title = 'A quiet room, <span class="accent">a thin one.</span>';
+      lead = 'You stopped the noise, but Rookie_99 never quite believed they were wanted here. De-escalation without private support leaves the target alone in a silent room.';
+      rank = 'Peacekeeper';
+    } else if (res >= 80) {
+      title = 'Rookie stayed. <span class="accent">The room stayed sour.</span>';
+      lead = 'The private support worked: they are still playing. But the public channel is still a place where this happens, and the two of them will do it again.';
+      rank = 'Ally';
+    } else {
+      title = 'Rookie <span class="accent">logged off.</span>';
+      lead = 'Two people made the lobby unbearable and the rest of the room, including you, did not change the conditions. That is how a player leaves a game for good.';
+      rank = 'Bystander';
+    }
+
+    if (res > state.best) {
+      state.best = res;
+      try { localStorage.setItem(BEST_KEY, String(res)); } catch (e) { /* ignore */ }
+    }
+
+    els.ovKicker.textContent = 'Match over';
+    els.ovTitle.innerHTML = title;
+    els.ovLead.textContent = reportText + ' ' + lead;
+    els.ovRules.innerHTML = [
+      'Public counter-aggression raises toxicity and gives the target a second front to survive.',
+      'Distract and Delegate cool the room; neither requires winning an argument.',
+      'Delay is the private one: a specific, game-related message beats "ignore them".',
+      'Evidence turns a complaint into a case. Capture the log before you report.'
+    ].map((t) => '<li class="rule">' + t + '</li>').join('');
+    els.ovScore.hidden = false;
+    els.ovScoreLabel.textContent = 'Toxicity / Resilience';
+    els.ovScoreValue.textContent = tox + '% / ' + res + '%';
+    els.ovRank.textContent = rank;
+    els.ovBest.textContent = 'Best resilience ' + state.best + '%';
+    els.overlay.hidden = false;
+    els.ovBtn.textContent = 'Queue again';
+    els.ovBtn.focus();
+  }
+
+  function start() {
+    state.beat = 0;
+    state.tox = 42;
+    state.res = 38;
+    state.evidence = 0;
+    state.pane = 'public';
+    state.usedDm = false;
+    state.publicLog = [];
+    state.dmLog = [];
+    state.over = false;
+    state.publicLog.push({ who: 'system', text: 'Match started \u00b7 ranked \u00b7 lobby 4', kind: 'system' });
+    BEATS[0].push.forEach((l) => state.publicLog.push(l));
+    state.dmLog.push({ who: 'system', text: 'No messages yet', kind: 'system' });
+    els.overlay.hidden = true;
+    els.noteLine.textContent = '1\u20134 respond \u00b7 Tab switch window \u00b7 Space capture log';
+    renderAll();
+  }
+
+  function togglePane() {
+    state.pane = state.pane === 'public' ? 'dm' : 'public';
+    renderAll();
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (state.over || !els.overlay.hidden) return;
+    if (e.key === 'Tab') { e.preventDefault(); togglePane(); return; }
+    if (e.key === ' ' || e.code === 'Space') { e.preventDefault(); capture(); return; }
+    const n = e.key;
+    if (n >= '1' && n <= '4') {
+      if (state.pane === 'dm') {
+        const b = beat();
+        if (b && b.dm && !state.usedDm) { e.preventDefault(); chooseDm(n); }
+      } else {
+        e.preventDefault(); choosePublic(n);
+      }
+    }
+  });
+
+  els.capture.addEventListener('click', capture);
+  els.switchBtn.addEventListener('click', togglePane);
+  els.ovBtn.addEventListener('click', start);
+
+  try { state.best = parseInt(localStorage.getItem(BEST_KEY) || '0', 10) || 0; } catch (e) { state.best = 0; }
+
+  state.publicLog.push({ who: 'system', text: 'Match started \u00b7 ranked \u00b7 lobby 4', kind: 'system' });
+  BEATS[0].push.forEach((l) => state.publicLog.push(l));
+  state.dmLog.push({ who: 'system', text: 'No messages yet', kind: 'system' });
+  renderAll();
+
+  els.ovTitle.innerHTML = 'The Upstander <span class="accent">Protocol</span>';
+  els.ovLead.textContent = 'Two players are destroying a teammate in public chat. You have four moves: Direct, Distract, Delegate, Delay \u2014 and a private window that opens with Tab.';
+  els.ovRules.innerHTML = [
+    'Press 1\u20134 to answer in the active window.',
+    'Tab switches between the lobby and Rookie_99\u2019s private messages.',
+    'Space captures a timestamped log for the report ticket.',
+    'Public counter-aggression raises toxicity. The target pays for it.'
+  ].map((t) => '<li class="rule">' + t + '</li>').join('');
+  els.ovBtn.textContent = 'Enter the lobby';
+  els.overlay.hidden = false;
+})();
+</script>
+</body>
+</html>

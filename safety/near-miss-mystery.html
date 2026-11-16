@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d0f16">
+<title>Near-Miss Mystery</title>
+<link rel="stylesheet" href="../common.css">
+<style>
+  :root {
+    --bg-top: #2a2f42;
+    --bg-mid: #0b0d14;
+    --bg-bottom: #05060a;
+    --stage-bg: #080b12;
+    --ink: #f2f4fb;
+    --line: rgba(193, 166, 255, 0.18);
+    --teal: #70e7c8;
+    --amber: #ffc86b;
+    --red: #ff8474;
+    --violet: #c1a6ff;
+  }
+  body { overflow-y: auto; }
+
+  #app {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: 8px;
+    padding: 8px;
+    height: 100%;
+    min-height: 0;
+  }
+  .topbar { margin: 0; }
+
+  .workspace {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+    gap: 9px;
+    min-height: 0;
+  }
+
+  .pane {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: rgba(7, 9, 15, 0.78);
+    overflow: hidden;
+  }
+  .pane-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--line);
+    background: rgba(255, 255, 255, 0.02);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .pane-head b { color: var(--violet); font-weight: 700; }
+
+  .pane-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 10px;
+    scrollbar-width: thin;
+  }
+
+  /* ---------- evidence ---------- */
+  .tray {
+    display: grid;
+    gap: 5px;
+    padding: 8px;
+    border: 1px dashed rgba(255, 255, 255, 0.14);
+    border-radius: 9px;
+    min-height: 54px;
+  }
+  .tray > span {
+    font-family: var(--font-mono);
+    font-size: 8.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+  .card {
+    display: grid;
+    gap: 2px;
+    padding: 7px 9px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.03);
+    color: rgba(242, 244, 251, 0.86);
+    text-align: left;
+    font: inherit;
+    cursor: pointer;
+  }
+  .card:hover { border-color: rgba(193, 166, 255, 0.5); }
+  .card[aria-pressed="true"] { border-color: rgba(255, 200, 107, 0.7); background: rgba(255, 200, 107, 0.09); }
+  .card time {
+    font-family: var(--font-mono);
+    font-size: 8.5px;
+    letter-spacing: 0.1em;
+    color: var(--amber);
+  }
+  .card span { font-size: 10.5px; line-height: 1.45; }
+
+  .timeline { display: grid; gap: 6px; margin-top: 9px; }
+  .phase {
+    display: grid;
+    gap: 5px;
+    padding: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 9px;
+    background: rgba(255, 255, 255, 0.02);
+    min-height: 54px;
+  }
+  .phase.hover { border-color: rgba(255, 200, 107, 0.6); background: rgba(255, 200, 107, 0.06); }
+  .phase h3 {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .phase .placed { display: grid; gap: 4px; }
+  .phase .empty {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--faint);
+  }
+  .placed .card { cursor: pointer; }
+  .placed .card.correct { border-color: rgba(112, 231, 200, 0.55); background: rgba(112, 231, 200, 0.07); }
+  .placed .card.incorrect { border-color: rgba(255, 132, 116, 0.55); background: rgba(255, 132, 116, 0.07); }
+
+  /* ---------- factors ---------- */
+  .group { display: grid; gap: 5px; }
+  .group + .group { margin-top: 12px; }
+  .group h3 {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--violet);
+  }
+  .group p {
+    margin: 0;
+    font-size: 10.5px;
+    line-height: 1.5;
+    color: rgba(242, 244, 251, 0.6);
+  }
+  .check {
+    display: grid;
+    grid-template-columns: 15px 1fr;
+    gap: 7px;
+    align-items: start;
+    padding: 7px 9px;
+    border: 1px solid rgba(255, 255, 255, 0.11);
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.03);
+    color: rgba(242, 244, 251, 0.86);
+    text-align: left;
+    font: inherit;
+    font-size: 10.5px;
+    line-height: 1.45;
+    cursor: pointer;
+  }
+  .check:hover { border-color: rgba(193, 166, 255, 0.5); }
+  .check[aria-pressed="true"] { border-color: rgba(112, 231, 200, 0.6); background: rgba(112, 231, 200, 0.1); }
+  .check i {
+    display: grid;
+    place-items: center;
+    width: 15px;
+    height: 15px;
+    margin-top: 1px;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 3px;
+    font-style: normal;
+    font-size: 9px;
+    color: transparent;
+  }
+  .check[aria-pressed="true"] i { border-color: rgba(112, 231, 200, 0.7); background: rgba(112, 231, 200, 0.25); color: #06211c; }
+  .check.correct { border-color: rgba(112, 231, 200, 0.55); }
+  .check.trap { border-color: rgba(255, 132, 116, 0.55); }
+
+  .reveal {
+    margin-top: 10px;
+    padding: 9px 10px;
+    border: 1px solid rgba(112, 231, 200, 0.32);
+    border-radius: 9px;
+    background: rgba(112, 231, 200, 0.06);
+    font-size: 10.5px;
+    line-height: 1.55;
+    color: #c9fdec;
+  }
+  .reveal[hidden] { display: none; }
+  .reveal b { display: block; margin-bottom: 3px; font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; }
+
+  .actionbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 2px; }
+  .actionbar .note-line { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint); }
+  .actionbar .btn { margin: 0; }
+  .btn.small { min-height: 34px; padding: 8px 16px; font-size: 10.5px; }
+
+  @media (max-width: 900px) {
+    .workspace { grid-template-columns: minmax(0, 1fr); }
+    #app { height: auto; }
+    #stage.stage-fluid { height: auto; }
+    .pane-body { overflow: visible; }
+  }
+</style>
+</head>
+<body>
+<h1 class="sr-only">Near-Miss Mystery: reconstruct a workplace near miss</h1>
+<div id="stage" class="stage-fluid">
+  <div id="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">NM</span>
+        <span>
+          <b>Near-Miss Mystery</b>
+          <small>Aisle 4, 14:18</small>
+        </span>
+      </div>
+      <div class="hud">
+        <div class="stat"><span>Placed</span><strong id="hudPlaced">0/6</strong></div>
+        <div class="stat"><span>Score</span><strong id="hudScore">0000</strong></div>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <section class="pane" aria-label="Timeline">
+        <div class="pane-head">
+          <span>Timeline</span>
+          <b id="stageState">reconstructing</b>
+        </div>
+        <div class="pane-body">
+          <div id="tray" class="tray"></div>
+          <div class="timeline" id="timeline"></div>
+        </div>
+      </section>
+
+      <section class="pane" aria-label="Causes">
+        <div class="pane-head">
+          <span>Investigation</span>
+          <b id="pickState">2 picks left</b>
+        </div>
+        <div class="pane-body">
+          <div class="group">
+            <h3>Contributing factors</h3>
+            <p>Select every condition the evidence supports.</p>
+            <div id="factors" class="group" style="margin-top:6px"></div>
+          </div>
+          <div class="group">
+            <h3>Preventive changes</h3>
+            <p>Pick two that would stop this happening again.</p>
+            <div id="fixes" class="group" style="margin-top:6px"></div>
+          </div>
+          <div id="reveal" class="reveal" hidden></div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="actionbar">
+      <span class="note-line" id="noteLine">Place each evidence card, then name the causes</span>
+      <button id="submit" class="btn small" type="button">File the investigation</button>
+    </footer>
+  </div>
+
+  <div id="overlay" class="overlay" role="dialog" aria-modal="true" aria-labelledby="ovTitle" hidden>
+    <div class="panel panel-card">
+      <p id="ovKicker" class="eyebrow"></p>
+      <h2 id="ovTitle" class="title"></h2>
+      <p id="ovLead" class="lead"></p>
+      <ul id="ovRules" class="rules"></ul>
+      <div id="ovScore" class="final-score" hidden>
+        <span>Case score</span>
+        <strong id="ovScoreValue">0</strong>
+        <p id="ovRank" class="rank"></p>
+        <p id="ovBest" class="best"></p>
+      </div>
+      <button id="ovBtn" class="btn" type="button">Open the case</button>
+    </div>
+  </div>
+</div>
+<p class="hint">a pallet truck stopped 30 cm from a picker &middot; nobody was hurt &middot; what made it possible?</p>
+
+<script>
+(() => {
+  'use strict';
+
+  const $ = (s) => document.querySelector(s);
+  const BEST_KEY = 'nearMiss.best.v1';
+
+  const PHASES = [
+    'Before the shift',
+    'During the shift',
+    '14:18 \u00b7 The moment',
+    'After \u00b7 14:19 onward'
+  ];
+
+  const EVIDENCE = [
+    { id: 'light', slot: 0, time: 'Three weeks earlier', text: 'The aisle 4 light failed. The repair work order is still open.' },
+    { id: 'pallets', slot: 1, time: '14:05', text: 'A delivery leaves six shrink-wrapped pallets at the aisle 4 corner.' },
+    { id: 'spotter', slot: 1, time: '14:12', text: 'The spotter is called to the loading bay. The pallet truck carries on alone.' },
+    { id: 'stop', slot: 2, time: '14:18', text: 'The truck rounds the corner and stops 30 cm from a picker.' },
+    { id: 'unhurt', slot: 3, time: '14:19', text: 'Both workers are unhurt. The truck is parked and the aisle is left as it was.' },
+    { id: 'book', slot: 3, time: '14:30', text: 'The supervisor writes the near miss in the book but opens no investigation.' }
+  ];
+
+  const FACTORS = [
+    { id: 'light', t: 'Aisle lighting had been out for weeks', correct: true, why: 'The work order was still open, so the dark corner was a known, unfixed condition.' },
+    { id: 'sight', t: 'Stored pallets blocked the sightline at the corner', correct: true, why: 'The delivery left pallets exactly where neither worker could see round the corner.' },
+    { id: 'alone', t: 'The pallet truck was operating without a spotter', correct: true, why: 'The spotter was pulled away, so the one control in place quietly disappeared.' },
+    { id: 'careless', t: 'The picker should have been paying more attention', correct: false, trap: true, why: 'Nothing in the evidence says the picker was distracted; blaming them hides three fixable conditions.' },
+    { id: 'speed', t: 'The driver was speeding', correct: false, trap: true, why: 'No evidence records speed. The truck stopped in time, which tells us little either way.' },
+    { id: 'staffing', t: 'The site is short-staffed in December', correct: false, why: 'Plausible context, but nothing in this evidence links it to the event.' }
+  ];
+
+  const FIXES = [
+    { id: 'repair', t: 'Repair the aisle lighting and close the work order', correct: true, why: 'Fixes the condition that made the corner blind.' },
+    { id: 'nostore', t: 'Mark no-storage zones at corners and enforce them', correct: true, why: 'Keeps the sightline open between deliveries.' },
+    { id: 'retrain', t: 'Retrain the picker on situational awareness', correct: false, why: 'Training does not repair a light or clear a corner.' },
+    { id: 'sign', t: 'Add another speed limit sign', correct: false, why: 'Signs do not change layout, lighting or staffing.' },
+    { id: 'email', t: 'Email everyone a reminder to be careful', correct: false, why: 'A reminder leaves every underlying condition exactly as it was.' }
+  ];
+
+  const state = {
+    placed: {},
+    selected: null,
+    factors: [],
+    fixes: [],
+    score: 0,
+    best: 0,
+    filed: false
+  };
+
+  const els = {
+    tray: $('#tray'),
+    timeline: $('#timeline'),
+    factors: $('#factors'),
+    fixes: $('#fixes'),
+    reveal: $('#reveal'),
+    hudPlaced: $('#hudPlaced'),
+    hudScore: $('#hudScore'),
+    stageState: $('#stageState'),
+    pickState: $('#pickState'),
+    noteLine: $('#noteLine'),
+    submit: $('#submit'),
+    overlay: $('#overlay'),
+    ovKicker: $('#ovKicker'),
+    ovTitle: $('#ovTitle'),
+    ovLead: $('#ovLead'),
+    ovRules: $('#ovRules'),
+    ovScore: $('#ovScore'),
+    ovScoreValue: $('#ovScoreValue'),
+    ovRank: $('#ovRank'),
+    ovBest: $('#ovBest'),
+    ovBtn: $('#ovBtn')
+  };
+
+  const pad = (n) => String(n).padStart(4, '0');
+  const cardById = (id) => EVIDENCE.find((c) => c.id === id);
+  const placedIds = () => Object.keys(state.placed);
+
+  function cardMarkup(card, extra) {
+    return '<button type="button" class="card ' + (extra || '') + '" data-card="' + card.id + '" aria-pressed="' +
+      (state.selected === card.id) + '"><time>' + card.time + '</time><span>' + card.text + '</span></button>';
+  }
+
+  function renderTray() {
+    const loose = EVIDENCE.filter((c) => !state.placed[c.id]);
+    els.tray.innerHTML = '<span>Evidence cards \u00b7 ' + loose.length + ' left</span>' +
+      (loose.length ? loose.map((c) => cardMarkup(c)).join('') : '<span style="color:#a9efd9;font-size:10px">All cards placed.</span>');
+    els.tray.querySelectorAll('[data-card]').forEach((b) => {
+      b.addEventListener('click', () => {
+        if (state.filed) return;
+        state.selected = state.selected === b.dataset.card ? null : b.dataset.card;
+        renderTray();
+      });
+    });
+    els.hudPlaced.textContent = placedIds().length + '/' + EVIDENCE.length;
+  }
+
+  function renderTimeline() {
+    els.timeline.innerHTML = '';
+    PHASES.forEach((name, i) => {
+      const box = document.createElement('div');
+      box.className = 'phase';
+      box.dataset.slot = String(i);
+      box.innerHTML = '<h3>' + name + '</h3><div class="placed"></div>';
+      const placed = box.querySelector('.placed');
+      const cards = placedIds().filter((id) => state.placed[id] === i);
+      if (!cards.length) placed.innerHTML = '<span class="empty">drop or click a card here</span>';
+      cards.forEach((id) => {
+        const c = cardById(id);
+        placed.insertAdjacentHTML('beforeend', cardMarkup(c, 'placed-card'));
+      });
+      placed.querySelectorAll('[data-card]').forEach((b) => {
+        b.addEventListener('click', () => {
+          if (state.filed) return;
+          delete state.placed[b.dataset.card];
+          renderTray();
+          renderTimeline();
+        });
+      });
+      box.addEventListener('click', (e) => {
+        if (state.filed || e.target.closest('[data-card]')) return;
+        if (!state.selected) return;
+        state.placed[state.selected] = i;
+        state.selected = null;
+        renderTray();
+        renderTimeline();
+      });
+      els.timeline.appendChild(box);
+    });
+  }
+
+  function renderChecklist(container, list, chosen, limit) {
+    container.innerHTML = '';
+    list.forEach((item) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'check';
+      b.setAttribute('aria-pressed', String(chosen.indexOf(item.id) !== -1));
+      b.innerHTML = '<i aria-hidden="true">\u2713</i><span>' + item.t + '</span>';
+      b.addEventListener('click', () => {
+        if (state.filed) return;
+        const i = chosen.indexOf(item.id);
+        if (i === -1) {
+          if (limit && chosen.length >= limit) {
+            els.noteLine.textContent = 'Only ' + limit + ' preventive changes fit the budget.';
+            return;
+          }
+          chosen.push(item.id);
+        } else {
+          chosen.splice(i, 1);
+        }
+        renderAll();
+      });
+      container.appendChild(b);
+    });
+  }
+
+  function renderAll() {
+    renderTray();
+    renderTimeline();
+    renderChecklist(els.factors, FACTORS, state.factors, 0);
+    renderChecklist(els.fixes, FIXES, state.fixes, 2);
+    els.pickState.textContent = (2 - state.fixes.length) + ' pick' + (2 - state.fixes.length === 1 ? '' : 's') + ' left';
+    els.hudScore.textContent = pad(state.score);
+    els.stageState.textContent = state.filed ? 'filed' : 'reconstructing';
+  }
+
+  function submit() {
+    if (state.filed) return;
+    if (placedIds().length < EVIDENCE.length) {
+      els.noteLine.textContent = 'Place all six evidence cards on the timeline first.';
+      return;
+    }
+    if (state.fixes.length !== 2) {
+      els.noteLine.textContent = 'Choose exactly two preventive changes.';
+      return;
+    }
+    state.filed = true;
+
+    let earned = 0;
+    EVIDENCE.forEach((card) => {
+      const placedSlot = state.placed[card.id];
+      const ok = placedSlot === card.slot;
+      if (ok) earned += 40;
+      const el = els.timeline.querySelector('[data-slot="' + placedSlot + '"] [data-card="' + card.id + '"]');
+      if (el) el.classList.add(ok ? 'correct' : 'incorrect');
+    });
+
+    const factorEls = [...els.factors.querySelectorAll('.check')];
+    FACTORS.forEach((f, i) => {
+      const chosen = state.factors.indexOf(f.id) !== -1;
+      if (chosen && f.correct) earned += 60;
+      if (chosen && f.trap) earned = Math.max(0, earned - 25);
+      if (f.correct) factorEls[i].classList.add('correct');
+      if (f.trap && chosen) factorEls[i].classList.add('trap');
+    });
+
+    FIXES.forEach((f, i) => {
+      const chosen = state.fixes.indexOf(f.id) !== -1;
+      if (chosen && f.correct) earned += 60;
+    });
+
+    state.score += earned;
+    els.hudScore.textContent = pad(state.score);
+    els.stageState.textContent = 'filed';
+    els.pickState.textContent = '+' + earned;
+    els.noteLine.textContent = 'Investigation filed +' + earned + '.';
+    els.submit.textContent = 'Close the case';
+    els.submit.dataset.mode = 'finish';
+
+    els.reveal.hidden = false;
+    els.reveal.innerHTML = '<b>What the evidence shows</b>' +
+      'Three conditions lined up: a light that stayed broken for weeks, a corner stacked with pallets, and a spotter pulled away mid-task. ' +
+      'Any one of them alone would probably have been survivable. Together they made the near miss almost certain. ' +
+      'Naming the picker or the driver would close the file without changing any of it.';
+    els.factors.querySelectorAll('.check').forEach((el) => { el.setAttribute('aria-disabled', 'true'); });
+    els.hudPlaced.textContent = placedIds().length + '/' + EVIDENCE.length;
+  }
+
+  function finish() {
+    if (state.score > state.best) {
+      state.best = state.score;
+      try { localStorage.setItem(BEST_KEY, String(state.score)); } catch (e) { /* ignore */ }
+    }
+    const rank = state.score >= 480 ? 'Lead investigator'
+      : state.score >= 380 ? 'Safety investigator'
+      : state.score >= 260 ? 'Trainee investigator'
+      : 'Observer';
+    els.ovKicker.textContent = 'Case closed';
+    els.ovTitle.innerHTML = 'Conditions, not <span class="accent">culprits.</span>';
+    els.ovLead.textContent = 'A near miss is a free lesson. This one had three contributing conditions, and every one of them was fixable without blaming the people in the aisle.';
+    els.ovRules.innerHTML = '';
+    els.ovScore.hidden = false;
+    els.ovScoreValue.textContent = String(state.score);
+    els.ovRank.textContent = rank;
+    els.ovBest.textContent = 'Best ' + pad(state.best);
+    els.overlay.hidden = false;
+    els.ovBtn.focus();
+  }
+
+  function start() {
+    state.placed = {};
+    state.selected = null;
+    state.factors = [];
+    state.fixes = [];
+    state.score = 0;
+    state.filed = false;
+    els.reveal.hidden = true;
+    els.overlay.hidden = true;
+    els.submit.textContent = 'File the investigation';
+    els.submit.dataset.mode = 'submit';
+    els.noteLine.textContent = 'Place each evidence card, then name the causes';
+    renderAll();
+  }
+
+  els.submit.addEventListener('click', () => {
+    if (els.submit.dataset.mode === 'finish') finish();
+    else submit();
+  });
+  els.ovBtn.addEventListener('click', start);
+
+  try { state.best = parseInt(localStorage.getItem(BEST_KEY) || '0', 10) || 0; } catch (e) { state.best = 0; }
+
+  renderAll();
+
+  els.ovKicker.textContent = 'Aisle 4 \u00b7 14:18';
+  els.ovTitle.innerHTML = 'Near-Miss <span class="accent">Mystery</span>';
+  els.ovLead.textContent = 'A pallet truck stopped 30 cm short of a picker. Nobody was hurt, so nothing was investigated. Reconstruct the timeline from six evidence cards and decide what actually caused it.';
+  els.ovRules.innerHTML = [
+    'Click a card, then click a phase to place it on the timeline.',
+    'Click a placed card to send it back to the tray.',
+    'Choose every contributing factor the evidence supports.',
+    'Pick two preventive changes. Blaming a person will cost you points.'
+  ].map((t) => '<li class="rule">' + t + '</li>').join('');
+  els.ovBtn.textContent = 'Open the case';
+  els.overlay.hidden = false;
+})();
+</script>
+</body>
+</html>

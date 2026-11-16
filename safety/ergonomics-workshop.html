@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b1116">
+<title>Ergonomics Workshop</title>
+<link rel="stylesheet" href="../common.css">
+<style>
+  :root {
+    --bg-top: #26313f;
+    --bg-mid: #0a1015;
+    --bg-bottom: #05080b;
+    --stage-bg: #071014;
+    --ink: #eef6fb;
+    --line: rgba(136, 202, 255, 0.18);
+    --teal: #70e7c8;
+    --amber: #ffc86b;
+    --red: #ff8474;
+    --blue: #88caff;
+  }
+  body { overflow-y: auto; }
+
+  #app {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: 8px;
+    padding: 8px;
+    height: 100%;
+    min-height: 0;
+  }
+  .topbar { margin: 0; }
+
+  .workspace {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+    gap: 9px;
+    min-height: 0;
+  }
+
+  .pane {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: rgba(5, 12, 16, 0.76);
+    overflow: hidden;
+  }
+  .pane-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--line);
+    background: rgba(255, 255, 255, 0.02);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .pane-head b { color: var(--blue); font-weight: 700; }
+
+  .pane-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 10px;
+    scrollbar-width: thin;
+  }
+
+  /* ---------- scene ---------- */
+  .scene {
+    position: relative;
+    display: grid;
+    gap: 6px;
+    padding: 12px;
+    margin-bottom: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    background:
+      linear-gradient(180deg, rgba(136, 202, 255, 0.07), transparent 70%),
+      #08121a;
+  }
+  .scene.shipping { background: linear-gradient(180deg, rgba(255, 200, 107, 0.07), transparent 70%), #0b1219; }
+  .scene .floor {
+    height: 34px;
+    border-radius: 6px;
+    background: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.06) 0 2px, transparent 2px 18px), #0d1820;
+  }
+  .scene .figure {
+    position: relative;
+    height: 62px;
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+  }
+  .scene .person {
+    width: 26px;
+    border-radius: 6px 6px 2px 2px;
+    background: linear-gradient(180deg, #6fd8e8, #2b6a80);
+    position: relative;
+  }
+  .scene .person::before {
+    content: "";
+    position: absolute;
+    top: -12px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #9fe3f0;
+  }
+  .scene .bench {
+    flex: 1;
+    height: 10px;
+    border-radius: 3px;
+    background: linear-gradient(90deg, #3e5768, #5d7f92);
+    align-self: flex-end;
+    margin-bottom: 22px;
+  }
+  .scene .strain {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(238, 246, 251, 0.5);
+  }
+  .meter {
+    height: 7px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+  }
+  .meter span {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--teal), var(--amber));
+    transition: width 200ms ease;
+  }
+  .meter.high span { background: linear-gradient(90deg, var(--amber), var(--red)); }
+
+  .worker {
+    display: grid;
+    gap: 3px;
+    padding: 9px 10px;
+    border: 1px solid rgba(255, 200, 107, 0.25);
+    border-radius: 9px;
+    background: rgba(255, 200, 107, 0.05);
+  }
+  .worker b {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--amber);
+  }
+  .worker p { margin: 0; font-size: 11.5px; line-height: 1.5; color: #ffe6b8; }
+
+  /* ---------- slots ---------- */
+  .slot {
+    display: grid;
+    gap: 6px;
+    padding: 9px 10px;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 9px;
+    background: rgba(255, 255, 255, 0.025);
+  }
+  .slot + .slot { margin-top: 7px; }
+  .slot.good { border-color: rgba(112, 231, 200, 0.45); }
+  .slot.bad { border-color: rgba(255, 132, 116, 0.5); }
+  .slot-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .slot-head h3 {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: rgba(238, 246, 251, 0.75);
+  }
+  .slot-head span {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+  .opts { display: flex; flex-wrap: wrap; gap: 4px; }
+  .opt {
+    padding: 5px 9px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.03);
+    color: rgba(238, 246, 251, 0.82);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    cursor: pointer;
+  }
+  .opt:hover { border-color: rgba(136, 202, 255, 0.5); }
+  .opt[aria-checked="true"] { border-color: rgba(112, 231, 200, 0.65); background: rgba(112, 231, 200, 0.13); color: #d7fff4; }
+
+  .verdict {
+    margin: 0;
+    font-size: 10.5px;
+    line-height: 1.5;
+    color: var(--muted);
+  }
+  .verdict.ok { color: #a9efd9; }
+  .verdict.no { color: #ffc3bb; }
+
+  .actionbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 2px; }
+  .actionbar .note-line { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint); }
+  .actionbar .btn { margin: 0; }
+  .btn.small { min-height: 34px; padding: 8px 16px; font-size: 10.5px; }
+
+  @media (max-width: 900px) {
+    .workspace { grid-template-columns: minmax(0, 1fr); }
+    #app { height: auto; }
+    #stage.stage-fluid { height: auto; }
+    .pane-body { overflow: visible; }
+  }
+</style>
+</head>
+<body>
+<h1 class="sr-only">Ergonomics Workshop: adjust workstations for the person and the task</h1>
+<div id="stage" class="stage-fluid">
+  <div id="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">ER</span>
+        <span>
+          <b>Ergonomics Workshop</b>
+          <small>Shipping &amp; office</small>
+        </span>
+      </div>
+      <div class="hud">
+        <div class="stat"><span>Set-up</span><strong id="hudRound">1/4</strong></div>
+        <div class="stat"><span>Score</span><strong id="hudScore">0000</strong></div>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <section class="pane" aria-label="Workstation">
+        <div class="pane-head">
+          <span id="sceneName">Shipping department</span>
+          <b id="strainNote">strain high</b>
+        </div>
+        <div class="pane-body">
+          <div id="scene" class="scene"></div>
+          <div id="slots"></div>
+        </div>
+      </section>
+
+      <aside class="pane" aria-label="Worker brief">
+        <div class="pane-head">
+          <span>Worker brief</span>
+          <b id="roundState">adjusting</b>
+        </div>
+        <div class="pane-body">
+          <div id="worker" class="worker"></div>
+          <div id="feedback"></div>
+        </div>
+      </aside>
+    </main>
+
+    <footer class="actionbar">
+      <span class="note-line" id="noteLine">Adjust every component, then evaluate</span>
+      <button id="evaluate" class="btn small" type="button">Evaluate set-up</button>
+    </footer>
+  </div>
+
+  <div id="overlay" class="overlay" role="dialog" aria-modal="true" aria-labelledby="ovTitle" hidden>
+    <div class="panel panel-card">
+      <p id="ovKicker" class="eyebrow"></p>
+      <h2 id="ovTitle" class="title"></h2>
+      <p id="ovLead" class="lead"></p>
+      <ul id="ovRules" class="rules"></ul>
+      <div id="ovScore" class="final-score" hidden>
+        <span>Workshop score</span>
+        <strong id="ovScoreValue">0</strong>
+        <p id="ovRank" class="rank"></p>
+        <p id="ovBest" class="best"></p>
+      </div>
+      <button id="ovBtn" class="btn" type="button">Open the workshop</button>
+    </div>
+  </div>
+</div>
+<p class="hint">same components, different people &middot; one set-up will not fit everyone</p>
+
+<script>
+(() => {
+  'use strict';
+
+  const $ = (s) => document.querySelector(s);
+  const BEST_KEY = 'ergonomics.best.v1';
+
+  const ROUNDS = [
+    {
+      scene: 'Shipping department',
+      kind: 'shipping',
+      worker: { name: 'Ada', detail: '1.92 m tall. Lifts 20 kg boxes from the pallet to the bench all shift.' },
+      slots: [
+        {
+          id: 'bench', label: 'Bench height',
+          opts: [
+            { v: '850', t: '850 mm' }, { v: '950', t: '950 mm' }, { v: '1100', t: '1100 mm' }
+          ],
+          answer: '1100',
+          why: 'Ada is tall, so a low bench forces her to stoop. The bench should sit just below elbow height for her.'
+        },
+        {
+          id: 'lift', label: 'Lifting method',
+          opts: [
+            { v: 'manual', t: 'Lift by hand' }, { v: 'trolley', t: 'Pallet trolley' }, { v: 'vacuum', t: 'Vacuum lifter' }
+          ],
+          answer: 'vacuum',
+          why: 'A vacuum lifter removes the 20 kg lift entirely instead of asking her to lift well.'
+        },
+        {
+          id: 'floor', label: 'Standing surface',
+          opts: [
+            { v: 'concrete', t: 'Bare concrete' }, { v: 'mat', t: 'Anti-fatigue mat' }
+          ],
+          answer: 'mat',
+          why: 'A mat spreads the pressure of standing all shift; concrete concentrates it in the feet and lower back.'
+        },
+        {
+          id: 'rotation', label: 'Task pattern',
+          opts: [
+            { v: 'same', t: 'Packing only' }, { v: 'rotate', t: 'Rotate packing and labelling every 30 min' }
+          ],
+          answer: 'rotate',
+          why: 'Rotation changes the posture and muscle group in use, cutting the repetitive load.'
+        }
+      ]
+    },
+    {
+      scene: 'Shipping department',
+      kind: 'shipping',
+      worker: { name: 'Marcus', detail: '1.62 m tall. Packs small parts and rarely lifts anything over 8 kg.' },
+      slots: [
+        {
+          id: 'bench', label: 'Bench height',
+          opts: [
+            { v: '850', t: '850 mm' }, { v: '950', t: '950 mm' }, { v: '1100', t: '1100 mm' }
+          ],
+          answer: '850',
+          why: 'What suited Ada leaves Marcus reaching up all shift. The bench follows the worker, not the room.'
+        },
+        {
+          id: 'lift', label: 'Lifting method',
+          opts: [
+            { v: 'manual', t: 'Lift by hand' },
+            { v: 'trolley', t: 'Pallet trolley' },
+            { v: 'vacuum', t: 'Vacuum lifter' }
+          ],
+          answer: 'trolley',
+          why: 'The loads are lighter and mostly moved as containers, so a trolley is the proportionate aid.'
+        },
+        {
+          id: 'floor', label: 'Standing surface',
+          opts: [
+            { v: 'concrete', t: 'Bare concrete' }, { v: 'mat', t: 'Anti-fatigue mat' }
+          ],
+          answer: 'mat',
+          why: 'The surface matters whatever the height: standing still is the exposure.'
+        },
+        {
+          id: 'rotation', label: 'Task pattern',
+          opts: [
+            { v: 'same', t: 'Packing only' }, { v: 'rotate', t: 'Rotate packing and labelling every 30 min' }
+          ],
+          answer: 'rotate',
+          why: 'Repetition is the hazard here, not weight, so rotation still earns its place.'
+        }
+      ]
+    },
+    {
+      scene: 'Computer office',
+      kind: 'office',
+      worker: { name: 'Priya', detail: 'Works at a fixed desk for eight hours, mostly on a laptop on a riser.' },
+      slots: [
+        {
+          id: 'monitor', label: 'Screen height',
+          opts: [
+            { v: 'low', t: 'Below eye level' }, { v: 'eye', t: 'Top of screen at eye level' }, { v: 'high', t: 'Above eye level' }
+          ],
+          answer: 'eye',
+          why: 'The top of the screen at eye level keeps the neck neutral instead of flexed or extended.'
+        },
+        {
+          id: 'chair', label: 'Chair support',
+          opts: [
+            { v: 'none', t: 'Plain chair' }, { v: 'lumbar', t: 'Adjustable lumbar support' }
+          ],
+          answer: 'lumbar',
+          why: 'Adjustable lumbar support follows the curve of the lower back across a long day.'
+        },
+        {
+          id: 'keyboard', label: 'Keyboard position',
+          opts: [
+            { v: 'far', t: 'Pushed to the back of the desk' }, { v: 'close', t: 'Close to the edge, wrists neutral' }
+          ],
+          answer: 'close',
+          why: 'Keyboard close and wrists flat avoids the long reach and the bent wrist.'
+        },
+        {
+          id: 'mouse', label: 'Mouse position',
+          opts: [
+            { v: 'side', t: 'Far out to the side' }, { v: 'near', t: 'Beside the keyboard, supported' }
+          ],
+          answer: 'near',
+          why: 'A mouse at arm\u2019s length load the shoulder; beside the keyboard it stays within reach.'
+        }
+      ]
+    },
+    {
+      scene: 'Computer office',
+      kind: 'office',
+      worker: { name: 'Sam', detail: '1.85 m tall, uses a sit-stand desk and alternates between sitting and standing through the day.' },
+      slots: [
+        {
+          id: 'monitor', label: 'Screen height',
+          opts: [
+            { v: 'low', t: 'Below eye level' }, { v: 'eye', t: 'Top of screen at eye level' }, { v: 'high', t: 'Above eye level' }
+          ],
+          answer: 'eye',
+          why: 'Raising the desk does not raise the screen: the monitor arm has to move with the working posture.'
+        },
+        {
+          id: 'chair', label: 'Chair support',
+          opts: [
+            { v: 'none', t: 'Plain chair' }, { v: 'lumbar', t: 'Adjustable lumbar support' }
+          ],
+          answer: 'lumbar',
+          why: 'The seated half of the day still needs support, even with a standing option.'
+        },
+        {
+          id: 'keyboard', label: 'Keyboard position',
+          opts: [
+            { v: 'far', t: 'Pushed to the back of the desk' }, { v: 'close', t: 'Close to the edge, wrists neutral' }
+          ],
+          answer: 'close',
+          why: 'Short reach matters more when standing, because the shoulder is already working to hold the arms up.'
+        },
+        {
+          id: 'mouse', label: 'Mouse position',
+          opts: [
+            { v: 'side', t: 'Far out to the side' }, { v: 'near', t: 'Beside the keyboard, supported' }
+          ],
+          answer: 'near',
+          why: 'Reaching sideways while standing loads the shoulder further than the same reach while seated.'
+        }
+      ]
+    }
+  ];
+
+  const state = { round: 0, score: 0, best: 0, choices: {}, evaluated: false };
+
+  const els = {
+    scene: $('#scene'),
+    slots: $('#slots'),
+    worker: $('#worker'),
+    feedback: $('#feedback'),
+    sceneName: $('#sceneName'),
+    strainNote: $('#strainNote'),
+    roundState: $('#roundState'),
+    noteLine: $('#noteLine'),
+    hudRound: $('#hudRound'),
+    hudScore: $('#hudScore'),
+    evaluate: $('#evaluate'),
+    overlay: $('#overlay'),
+    ovKicker: $('#ovKicker'),
+    ovTitle: $('#ovTitle'),
+    ovLead: $('#ovLead'),
+    ovRules: $('#ovRules'),
+    ovScore: $('#ovScore'),
+    ovScoreValue: $('#ovScoreValue'),
+    ovRank: $('#ovRank'),
+    ovBest: $('#ovBest'),
+    ovBtn: $('#ovBtn')
+  };
+
+  const round = () => ROUNDS[state.round];
+  const pad = (n) => String(n).padStart(4, '0');
+
+  function strain() {
+    const r = round();
+    const wrong = r.slots.filter((s) => state.choices[s.id] && state.choices[s.id] !== s.answer).length;
+    const unanswered = r.slots.filter((s) => !state.choices[s.id]).length;
+    return Math.round(((wrong + unanswered * 0.5) / r.slots.length) * 100);
+  }
+
+  function renderScene() {
+    const r = round();
+    els.scene.className = 'scene ' + r.kind;
+    const pct = strain();
+    els.scene.innerHTML = '<div class="figure">' +
+      '<div class="person" style="height:' + (r.kind === 'shipping' ? 46 : 40) + 'px"></div>' +
+      '<div class="bench"></div></div>' +
+      '<div class="floor"></div>' +
+      '<div class="strain">strain exposure ' + pct + '%</div>' +
+      '<div class="meter ' + (pct > 40 ? 'high' : '') + '"><span style="width:' + Math.max(4, 100 - pct) + '%"></span></div>';
+    els.strainNote.textContent = pct > 40 ? 'strain high' : pct > 0 ? 'strain reduced' : 'strain cleared';
+    els.hudRound.textContent = (state.round + 1) + '/' + ROUNDS.length;
+    els.hudScore.textContent = pad(state.score);
+    els.sceneName.textContent = r.scene;
+  }
+
+  function renderWorker() {
+    const r = round();
+    els.worker.innerHTML = '<b>Worker ' + (state.round + 1) + ' of ' + ROUNDS.length + '</b><p><b style="color:#fff">' + r.worker.name + '</b> \u2014 ' + r.worker.detail + '</p>';
+  }
+
+  function renderSlots() {
+    const r = round();
+    els.slots.innerHTML = '';
+    r.slots.forEach((slot) => {
+      const box = document.createElement('div');
+      box.className = 'slot';
+      box.dataset.slot = slot.id;
+      box.innerHTML = '<div class="slot-head"><h3>' + slot.label + '</h3><span>' + (state.choices[slot.id] ? 'set' : 'unset') + '</span></div>';
+      const opts = document.createElement('div');
+      opts.className = 'opts';
+      slot.opts.forEach((o) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'opt';
+        b.textContent = o.t;
+        b.setAttribute('role', 'radio');
+        b.setAttribute('aria-checked', String(state.choices[slot.id] === o.v));
+        b.addEventListener('click', () => {
+          state.choices[slot.id] = o.v;
+          state.evaluated = false;
+          renderScene();
+          renderSlots();
+        });
+        opts.appendChild(b);
+      });
+      box.appendChild(opts);
+      const verdict = document.createElement('p');
+      verdict.className = 'verdict';
+      verdict.hidden = true;
+      box.appendChild(verdict);
+      els.slots.appendChild(box);
+    });
+  }
+
+  function evaluate() {
+    const r = round();
+    const unset = r.slots.filter((s) => !state.choices[s.id]);
+    if (unset.length) {
+      els.noteLine.textContent = 'Set all ' + r.slots.length + ' components first.';
+      return;
+    }
+    let correct = 0;
+    r.slots.forEach((slot) => {
+      const ok = state.choices[slot.id] === slot.answer;
+      if (ok) correct += 1;
+      const box = els.slots.querySelector('[data-slot="' + slot.id + '"]');
+      box.classList.add(ok ? 'good' : 'bad');
+      const verdict = box.querySelector('.verdict');
+      verdict.hidden = false;
+      verdict.className = 'verdict ' + (ok ? 'ok' : 'no');
+      verdict.textContent = (ok ? 'Right. ' : 'Not for this worker. ') + slot.why;
+    });
+
+    const earned = correct * 60 + (correct === r.slots.length ? 80 : 0);
+    state.score += earned;
+    state.evaluated = true;
+    els.hudScore.textContent = pad(state.score);
+    els.roundState.textContent = correct === r.slots.length ? 'passed' : 'review';
+    els.feedback.innerHTML = '<p class="note" style="margin-top:10px;font-size:10.5px;line-height:1.5;color:rgba(238,246,251,0.6)">' +
+      correct + ' of ' + r.slots.length + ' components fit this worker. +' + earned + '.</p>';
+    els.evaluate.textContent = state.round === ROUNDS.length - 1 ? 'Finish the workshop' : 'Next worker';
+    els.evaluate.dataset.mode = 'next';
+    els.noteLine.textContent = correct === r.slots.length
+      ? 'Set-up passed +' + earned + '.'
+      : 'Partial: ' + correct + ' of ' + r.slots.length + ' correct. Next worker has different needs.';
+  }
+
+  function nextRound() {
+    if (state.round === ROUNDS.length - 1) {
+      finish();
+      return;
+    }
+    state.round += 1;
+    loadRound();
+  }
+
+  function loadRound() {
+    state.choices = {};
+    state.evaluated = false;
+    els.feedback.innerHTML = '';
+    els.evaluate.textContent = 'Evaluate set-up';
+    els.evaluate.dataset.mode = 'evaluate';
+    els.roundState.textContent = 'adjusting';
+    els.noteLine.textContent = 'Adjust every component, then evaluate';
+    renderScene();
+    renderWorker();
+    renderSlots();
+  }
+
+  function finish() {
+    if (state.score > state.best) {
+      state.best = state.score;
+      try { localStorage.setItem(BEST_KEY, String(state.score)); } catch (e) { /* ignore */ }
+    }
+    const rank = state.score >= 1100 ? 'Ergonomics specialist'
+      : state.score >= 880 ? 'Workplace assessor'
+      : state.score >= 620 ? 'Team leader'
+      : 'Trainee';
+    els.ovKicker.textContent = 'Workshop closed';
+    els.ovTitle.innerHTML = 'Workstations <span class="accent">adapted.</span>';
+    els.ovLead.textContent = 'Four set-ups, two different workers per space. The lesson is that no single arrangement is right: height, reach and support follow the person and the task.';
+    els.ovRules.innerHTML = '';
+    els.ovScore.hidden = false;
+    els.ovScoreValue.textContent = String(state.score);
+    els.ovRank.textContent = rank;
+    els.ovBest.textContent = 'Best ' + pad(state.best);
+    els.overlay.hidden = false;
+    els.ovBtn.focus();
+  }
+
+  function start() {
+    state.round = 0;
+    state.score = 0;
+    els.overlay.hidden = true;
+    loadRound();
+  }
+
+  els.evaluate.addEventListener('click', () => {
+    if (els.evaluate.dataset.mode === 'next') nextRound();
+    else evaluate();
+  });
+  els.ovBtn.addEventListener('click', start);
+
+  try { state.best = parseInt(localStorage.getItem(BEST_KEY) || '0', 10) || 0; } catch (e) { state.best = 0; }
+
+  loadRound();
+
+  els.ovKicker.textContent = 'Shipping & office';
+  els.ovTitle.innerHTML = 'Ergonomics <span class="accent">Workshop</span>';
+  els.ovLead.textContent = 'Adjust bench height, lifting aids, screens and chairs for four workers. Then notice how quickly a set-up that fitted one person stops fitting the next.';
+  els.ovRules.innerHTML = [
+    'Set every component before evaluating.',
+    'Match the workstation to the worker\u2019s height and task.',
+    'Repetition, reach and standing all count as exposure.',
+    'The same room has to serve different bodies; nothing here is universal.'
+  ].map((t) => '<li class="rule">' + t + '</li>').join('');
+  els.ovBtn.textContent = 'Open the workshop';
+  els.overlay.hidden = false;
+})();
+</script>
+</body>
+</html>

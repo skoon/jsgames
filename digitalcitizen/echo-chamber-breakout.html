@@ -1,0 +1,1243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#101018">
+<title>Echo Chamber Breakout</title>
+<link rel="stylesheet" href="../common.css">
+<style>
+  :root {
+    --bg-top: #2b2340;
+    --bg-mid: #0b0a12;
+    --bg-bottom: #05050a;
+    --stage-bg: #0a0913;
+    --ink: #f3f0fb;
+    --line: rgba(190, 170, 255, 0.18);
+    --teal: #6ef0c8;
+    --amber: #ffc86b;
+    --red: #ff7d86;
+    --violet: #c1a6ff;
+    --blue: #88caff;
+  }
+  body { overflow-y: auto; }
+
+  #app {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: 8px;
+    padding: 8px;
+    height: 100%;
+    min-height: 0;
+  }
+  .topbar { margin: 0; align-items: center; }
+
+  .meters { display: flex; align-items: center; gap: 14px; }
+  .meter-box { display: grid; gap: 3px; min-width: 118px; }
+  .meter-box .lab {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 8.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .meter-box .lab b { color: #fff; font-weight: 700; }
+  .bar { height: 8px; border-radius: 999px; background: rgba(255, 255, 255, 0.09); overflow: hidden; }
+  .bar span { display: block; height: 100%; border-radius: 999px; transition: width 260ms ease; }
+  .bar.cred span { background: linear-gradient(90deg, #2fd6a8, var(--teal)); }
+  .bar.eng span { background: linear-gradient(90deg, #f0a53c, var(--amber)); }
+  .bar.low span { background: linear-gradient(90deg, #d63b4c, var(--red)); }
+  .tokens {
+    display: grid;
+    gap: 1px;
+    padding: 4px 10px;
+    border: 1px solid rgba(110, 240, 200, 0.32);
+    border-radius: 7px;
+    background: rgba(110, 240, 200, 0.06);
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .tokens b { color: var(--teal); font-size: 13px; letter-spacing: 0; }
+
+  .board {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+    gap: 9px;
+    min-height: 0;
+  }
+  .pane {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: rgba(8, 7, 14, 0.82);
+    overflow: hidden;
+  }
+  .pane-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--line);
+    background: rgba(255, 255, 255, 0.02);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .pane-head b { color: var(--violet); font-weight: 700; }
+  .pane-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 12px;
+    scrollbar-width: thin;
+  }
+
+  /* ---------- feed card ---------- */
+  .feed { display: grid; gap: 10px; place-items: stretch; }
+  .cardwrap { position: relative; user-select: none; touch-action: pan-y; }
+  .card {
+    position: relative;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 14px;
+    background: #0d0b16;
+    overflow: hidden;
+    cursor: grab;
+    transition: transform 120ms ease, box-shadow 160ms ease;
+    will-change: transform;
+  }
+  .card.dragging { transition: none; cursor: grabbing; }
+  .card.fly-left { transform: translateX(-130%) rotate(-9deg); opacity: 0; transition: transform 260ms ease, opacity 260ms ease; }
+  .card.fly-right { transform: translateX(130%) rotate(9deg); opacity: 0; transition: transform 260ms ease, opacity 260ms ease; }
+
+  .art { position: relative; height: 132px; overflow: hidden; }
+  .art::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, transparent 45%, rgba(8, 7, 14, 0.85));
+  }
+  .art .tagshot {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    z-index: 2;
+    padding: 3px 7px;
+    border-radius: 4px;
+    background: rgba(5, 4, 9, 0.7);
+    font-family: var(--font-mono);
+    font-size: 8.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(243, 240, 251, 0.7);
+  }
+  .art[data-art="tiger"] { background: linear-gradient(180deg, #c9b08a, #7c6647 62%, #3d3323); }
+  .art[data-art="tiger"]::before {
+    content: "";
+    position: absolute;
+    left: 22%;
+    top: 26%;
+    width: 46%;
+    height: 60%;
+    border-radius: 46% 46% 38% 38%;
+    background:
+      repeating-linear-gradient(96deg, rgba(24, 18, 10, 0.8) 0 6px, transparent 6px 20px),
+      linear-gradient(180deg, #f6f2e8, #d9d2c2);
+    filter: blur(0.4px);
+  }
+  .art[data-art="flood"] { background: linear-gradient(180deg, #6c8ca6, #37607d 48%, #234a63); }
+  .art[data-art="flood"]::before {
+    content: "";
+    position: absolute;
+    inset: 52% 0 0;
+    background: repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.16) 0 2px, transparent 2px 9px);
+  }
+  .art[data-art="council"] { background: linear-gradient(180deg, #3b3a52, #232235); }
+  .art[data-art="council"]::before {
+    content: "";
+    position: absolute;
+    inset: 44% 8% 0;
+    background: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.12) 0 26px, transparent 26px 34px);
+    border-radius: 4px;
+  }
+  .art[data-art="road"] { background: linear-gradient(180deg, #4a5160, #2b3140 60%, #1d222c); }
+  .art[data-art="road"]::before {
+    content: "";
+    position: absolute;
+    inset: 54% 0 0;
+    background: repeating-linear-gradient(90deg, rgba(255, 214, 120, 0.55) 0 16px, transparent 16px 42px);
+    height: 3px;
+  }
+  .art[data-art="sky"] { background: linear-gradient(180deg, #7fb7d8, #3d6f92 70%, #274b66); }
+  .art[data-art="sky"]::before {
+    content: "";
+    position: absolute;
+    inset: 18% 0 auto;
+    height: 60px;
+    background:
+      linear-gradient(96deg, transparent 6%, rgba(255, 255, 255, 0.55) 7%, rgba(255, 255, 255, 0.55) 24%, transparent 25%),
+      linear-gradient(94deg, transparent 42%, rgba(255, 255, 255, 0.4) 43%, rgba(255, 255, 255, 0.4) 66%, transparent 67%);
+    filter: blur(1px);
+  }
+  .art[data-art="water"] { background: radial-gradient(circle at 50% 30%, #2f6f7a, #123c46 70%); }
+  .art[data-art="water"]::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 34%;
+    width: 46px;
+    height: 60px;
+    transform: translateX(-50%) rotate(45deg);
+    border-radius: 0 50% 50% 50%;
+    background: linear-gradient(180deg, #b8f4ff, #3aa8c4);
+    opacity: 0.75;
+  }
+  .art[data-art="hospital"] { background: linear-gradient(180deg, #4a5a68, #2a3742); }
+  .art[data-art="hospital"]::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 48px;
+    height: 16px;
+    transform: translate(-50%, -50%);
+    background: #eef7fb;
+    box-shadow: 0 0 0 0 #eef7fb;
+  }
+  .art[data-art="hospital"] .cross-v {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 16px;
+    height: 48px;
+    transform: translate(-50%, -50%);
+    background: #eef7fb;
+  }
+  .art[data-art="library"] { background: linear-gradient(180deg, #6b5a44, #3b3125); }
+  .art[data-art="library"]::before {
+    content: "";
+    position: absolute;
+    inset: 22% 10% 18%;
+    background: repeating-linear-gradient(90deg,
+      rgba(255, 255, 255, 0.16) 0 7px, transparent 7px 9px,
+      rgba(255, 214, 150, 0.3) 9px 15px, transparent 15px 18px);
+  }
+  .art[data-art="bus"] { background: linear-gradient(180deg, #5d6b78, #33414d); }
+  .art[data-art="bus"]::before {
+    content: "";
+    position: absolute;
+    left: 12%;
+    right: 12%;
+    top: 42%;
+    height: 46px;
+    border-radius: 6px;
+    background: linear-gradient(180deg, #cfd8de, #8fa0ad);
+  }
+
+  .cardbody { display: grid; gap: 6px; padding: 10px 12px 12px; }
+  .src {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    letter-spacing: 0.06em;
+    color: rgba(243, 240, 251, 0.55);
+  }
+  .src b { color: var(--violet); font-weight: 600; }
+  .headline {
+    margin: 0;
+    font-size: clamp(14px, 1.9vw, 17px);
+    line-height: 1.35;
+    font-weight: 650;
+    color: #fff;
+  }
+  .hype {
+    font-family: var(--font-mono);
+    font-size: 8.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--amber);
+  }
+
+  .swipehint {
+    position: absolute;
+    top: 12px;
+    padding: 5px 9px;
+    border-radius: 6px;
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .swipehint.left { left: 10px; border: 1px solid rgba(255, 125, 134, 0.8); color: #ffc3c8; background: rgba(255, 60, 80, 0.16); }
+  .swipehint.right { right: 10px; border: 1px solid rgba(255, 200, 107, 0.8); color: #ffe2b3; background: rgba(255, 180, 60, 0.16); }
+
+  .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+  .act {
+    display: grid;
+    gap: 2px;
+    padding: 9px 10px;
+    border-radius: 9px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.03);
+    color: #fff;
+    text-align: left;
+    font: inherit;
+    cursor: pointer;
+  }
+  .act b { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; }
+  .act span { font-size: 9.5px; line-height: 1.35; color: rgba(243, 240, 251, 0.5); }
+  .act:hover:not(:disabled) { border-color: rgba(255, 255, 255, 0.35); }
+  .act.flag b { color: var(--red); }
+  .act.amp b { color: var(--amber); }
+  .act:disabled { opacity: 0.4; cursor: default; }
+  .act.net { grid-column: 1 / -1; }
+  .act.net b { color: var(--teal); }
+
+  /* ---------- research ---------- */
+  .tools { display: grid; gap: 6px; }
+  .tool {
+    display: grid;
+    grid-template-columns: 20px 1fr;
+    gap: 8px;
+    align-items: start;
+    padding: 8px 10px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.03);
+    color: rgba(243, 240, 251, 0.88);
+    text-align: left;
+    font: inherit;
+    font-size: 11px;
+    line-height: 1.4;
+    cursor: pointer;
+  }
+  .tool:hover:not(:disabled) { border-color: rgba(193, 166, 255, 0.55); background: rgba(193, 166, 255, 0.07); }
+  .tool i { font-style: normal; font-size: 13px; }
+  .tool em { display: block; font-style: normal; font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.06em; color: rgba(243, 240, 251, 0.42); margin-top: 2px; }
+  .tool:disabled { opacity: 0.42; cursor: default; }
+  .tool.done { border-color: rgba(110, 240, 200, 0.4); opacity: 1; background: rgba(110, 240, 200, 0.05); }
+
+  .log { display: grid; gap: 6px; margin-top: 10px; }
+  .entry {
+    padding: 8px 10px;
+    border-left: 2px solid rgba(193, 166, 255, 0.5);
+    background: rgba(193, 166, 255, 0.05);
+    border-radius: 0 7px 7px 0;
+    font-size: 11px;
+    line-height: 1.5;
+    color: rgba(243, 240, 251, 0.82);
+  }
+  .entry b {
+    display: block;
+    margin-bottom: 2px;
+    font-family: var(--font-mono);
+    font-size: 8.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--violet);
+  }
+  .entry.good { border-left-color: rgba(110, 240, 200, 0.7); background: rgba(110, 240, 200, 0.05); }
+  .entry.good b { color: var(--teal); }
+  .entry.bad { border-left-color: rgba(255, 125, 134, 0.7); background: rgba(255, 125, 134, 0.05); }
+  .entry.bad b { color: var(--red); }
+
+  .verdict {
+    margin-top: 10px;
+    padding: 10px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 9px;
+    background: rgba(255, 255, 255, 0.03);
+  }
+  .verdict[hidden] { display: none; }
+  .verdict.ok { border-color: rgba(110, 240, 200, 0.45); background: rgba(110, 240, 200, 0.06); }
+  .verdict.no { border-color: rgba(255, 125, 134, 0.45); background: rgba(255, 125, 134, 0.06); }
+  .verdict .vh {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    color: #fff;
+  }
+  .verdict.ok .vh { color: var(--teal); }
+  .verdict.no .vh { color: var(--red); }
+  .verdict p { margin: 5px 0 0; font-size: 11px; line-height: 1.5; color: rgba(243, 240, 251, 0.78); }
+  .verdict p.truth { color: #d9d2f2; }
+
+  .actionbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 2px; }
+  .actionbar .note-line { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint); }
+  .actionbar .btn { margin: 0; }
+  .btn.small { min-height: 34px; padding: 8px 16px; font-size: 10.5px; }
+  .btn[disabled] { opacity: 0.4; cursor: default; }
+
+  .debrief-panel { width: min(780px, 94vw); max-height: 88vh; overflow-y: auto; }
+  .dbstats { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 10px; }
+  .dbstat {
+    padding: 5px 9px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.03);
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .dbstat b { color: #fff; }
+  .dbtable { display: grid; gap: 3px; margin-bottom: 13px; }
+  .dbrow {
+    display: grid;
+    grid-template-columns: 18px minmax(0, 1fr) 66px 58px 104px 14px;
+    gap: 7px;
+    align-items: center;
+    padding: 6px 8px;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.02);
+    font-size: 10px;
+  }
+  .dbrow.head {
+    padding: 0 8px 2px;
+    border: 0;
+    background: none;
+    font-family: var(--font-mono);
+    font-size: 8px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(243, 240, 251, 0.4);
+  }
+  .dbrow.ok { border-color: rgba(110, 240, 200, 0.32); }
+  .dbrow.no { border-color: rgba(255, 125, 134, 0.32); }
+  .dbrow .n { font-family: var(--font-mono); color: rgba(243, 240, 251, 0.45); }
+  .dbrow .h { color: #fff; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dbrow .v, .dbrow .d { font-family: var(--font-mono); font-size: 8.5px; letter-spacing: 0.06em; text-transform: uppercase; }
+  .dbrow .v { color: var(--violet); }
+  .dbrow .d { color: rgba(243, 240, 251, 0.7); }
+  .dbrow .r { font-family: var(--font-mono); font-size: 8.5px; color: rgba(243, 240, 251, 0.5); }
+  .dbrow .m { font-family: var(--font-mono); text-align: right; }
+  .dbrow .tip {
+    grid-column: 1 / -1;
+    padding-top: 3px;
+    font-size: 9.5px;
+    line-height: 1.4;
+    color: rgba(243, 240, 251, 0.52);
+  }
+  .dbrow.ok .m { color: var(--teal); }
+  .dbrow.no .m { color: var(--red); }
+
+  @media (max-width: 620px) {
+    .dbrow { grid-template-columns: 16px minmax(0, 1fr) 74px 14px; }
+    .dbrow .v, .dbrow .d { display: none; }
+  }
+
+  .picklist { display: grid; gap: 7px; margin-top: 10px; }
+  .pick {
+    display: grid;
+    gap: 3px;
+    padding: 10px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 9px;
+    background: rgba(255, 255, 255, 0.03);
+    color: #fff;
+    text-align: left;
+    font: inherit;
+    cursor: pointer;
+  }
+  .pick:hover { border-color: rgba(193, 166, 255, 0.6); background: rgba(193, 166, 255, 0.08); }
+  .pick b { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--violet); }
+  .pick span { font-size: 11px; line-height: 1.45; color: rgba(243, 240, 251, 0.72); }
+
+  .chiprow { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+  .chip {
+    padding: 3px 7px;
+    border: 1px solid rgba(110, 240, 200, 0.35);
+    border-radius: 999px;
+    background: rgba(110, 240, 200, 0.07);
+    font-family: var(--font-mono);
+    font-size: 8.5px;
+    letter-spacing: 0.06em;
+    color: #b9ffe6;
+  }
+
+  @media (max-width: 950px) {
+    .board { grid-template-columns: minmax(0, 1fr); }
+    #app { height: auto; }
+    #stage.stage-fluid { height: auto; }
+    .pane-body { overflow: visible; }
+    .topbar { flex-wrap: wrap; }
+    .meters { width: 100%; }
+  }
+</style>
+</head>
+<body>
+<h1 class="sr-only">Echo Chamber Breakout: moderate a viral feed while keeping credibility and engagement alive</h1>
+<div id="stage" class="stage-fluid">
+  <div id="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">EC</span>
+        <span>
+          <b>Echo Chamber Breakout</b>
+          <small>Northgate desk</small>
+        </span>
+      </div>
+      <div class="meters">
+        <div class="meter-box">
+          <span class="lab">Credibility <b id="credVal">60%</b></span>
+          <div class="bar cred" id="credBar"><span style="width:60%"></span></div>
+        </div>
+        <div class="meter-box">
+          <span class="lab">Engagement <b id="engVal">60%</b></span>
+          <div class="bar eng" id="engBar"><span style="width:60%"></span></div>
+        </div>
+        <div class="tokens"><span>Fact-check tokens</span><b id="tokVal">0</b></div>
+      </div>
+    </header>
+
+    <main class="board">
+      <section class="pane" aria-label="Feed">
+        <div class="pane-head"><span>Trending</span><b id="cardCount">Card 1 / 10</b></div>
+        <div class="pane-body">
+          <div class="feed">
+            <div class="cardwrap" id="cardwrap"></div>
+            <div class="actions">
+              <button class="act flag" id="btnFlag" type="button">
+                <b>&larr; Debunk / Flag</b>
+                <span>Attach context and stop the spread.</span>
+              </button>
+              <button class="act amp" id="btnAmp" type="button">
+                <b>Amplify / Publish &rarr;</b>
+                <span>Push it to the feed. Traffic now.</span>
+              </button>
+              <button class="act net" id="btnTrace" type="button">
+                <b>Trace the network &middot; <span id="tokCost">1 token</span></b>
+                <span>Spend a token to expose coordinated accounts behind this card.</span>
+              </button>
+            </div>
+            <div class="verdict" id="verdict" hidden></div>
+          </div>
+        </div>
+      </section>
+
+      <aside class="pane" aria-label="Research">
+        <div class="pane-head"><span>Research tabs</span><b id="clockNote">0 lookups</b></div>
+        <div class="pane-body">
+          <div class="tools">
+            <button class="tool" type="button" data-tool="image">
+              <i aria-hidden="true">&#128269;</i>
+              <span>Reverse image search<em>Where did this picture first appear?</em></span>
+            </button>
+            <button class="tool" type="button" data-tool="source">
+              <i aria-hidden="true">&#127968;</i>
+              <span>Evaluate the source<em>Who publishes this, and who funds them?</em></span>
+            </button>
+            <button class="tool" type="button" data-tool="lateral">
+              <i aria-hidden="true">&#128279;</i>
+              <span>Lateral reading<em>What do independent outlets say?</em></span>
+            </button>
+          </div>
+          <p class="chiprow" id="upgradeChips"></p>
+          <div class="log" id="log"></div>
+        </div>
+      </aside>
+    </main>
+
+    <footer class="actionbar">
+      <span class="note-line" id="noteLine">Swipe the card, or use the buttons &middot; double-click the image to research</span>
+      <button id="nextBtn" class="btn small" type="button" disabled>Decide first</button>
+    </footer>
+  </div>
+
+  <div id="pickOverlay" class="overlay" role="dialog" aria-modal="true" aria-labelledby="pickTitle" hidden>
+    <div class="panel panel-card">
+      <p class="eyebrow">Build your desk</p>
+      <h2 id="pickTitle" class="title">Add one tool.</h2>
+      <p class="lead">Every few cards you get to add a capability. Choose one.</p>
+      <div id="pickList" class="picklist"></div>
+    </div>
+  </div>
+
+  <div id="debrief" class="overlay" role="dialog" aria-modal="true" aria-labelledby="dbTitle" hidden>
+    <div class="panel panel-card debrief-panel">
+      <p class="eyebrow">Shift debrief</p>
+      <h2 id="dbTitle" class="title">What you checked, and when.</h2>
+      <div id="dbStats" class="dbstats"></div>
+      <div id="dbTable" class="dbtable"></div>
+      <button id="dbBtn" class="btn" type="button">See the results</button>
+    </div>
+  </div>
+
+  <div id="overlay" class="overlay" role="dialog" aria-modal="true" aria-labelledby="ovTitle" hidden>
+    <div class="panel panel-card">
+      <p class="eyebrow" id="ovKicker">Desk closed</p>
+      <h2 id="ovTitle" class="title"></h2>
+      <p id="ovLead" class="lead"></p>
+      <ul id="ovRules" class="rules"></ul>
+      <div id="ovScore" class="final-score" hidden>
+        <span id="ovScoreLabel">Final credibility</span>
+        <strong id="ovScoreValue">0</strong>
+        <p id="ovRank" class="rank"></p>
+        <p id="ovBest" class="best"></p>
+      </div>
+      <button id="ovBtn" class="btn" type="button">Start again</button>
+    </div>
+  </div>
+</div>
+<p class="hint">credibility vs. engagement &middot; one of them is always trying to kill the other</p>
+
+<script>
+(() => {
+  'use strict';
+
+  const $ = (s) => document.querySelector(s);
+  const BEST_KEY = 'echoChamber.best.v1';
+
+  const CARDS = [
+    {
+      id: 'c1', art: 'tiger', shot: 'photo · resident',
+      coach: 'Fastest check: reverse image search \u2014 it is a 2018 film still, so no escape can be happening this week.',
+      source: 'Metro Beat Now', hype: '12.4k shares',
+      headline: 'BREAKING: Rare albino tiger escapes metropolitan zoo, roaming residential district',
+      truth: 'false', network: false,
+      tools: {
+        image: 'The photo is a press still from the 2018 film "Nightfall County", shot on a set in Romania. The bus stop is a prop.',
+        source: 'Registered 19 days ago. 41 posts, every one labelled BREAKING. No named editor, no corrections page.',
+        lateral: 'The zoo\u2019s own account says all animals are accounted for. No other outlet has the story.'
+      },
+      lesson: 'The photo is real; the headline is not. Reverse image search answers "where has this been before", which is almost never the page you are on.'
+    },
+    {
+      id: 'c2', art: 'road', shot: 'photo · street',
+      coach: 'Fastest check: lateral reading \u2014 the council agenda has no such vote on it.',
+      source: 'Patriot Wire Daily', hype: '31.2k shares',
+      headline: 'Council votes to ban all cars from the town centre by Friday',
+      truth: 'false', network: true,
+      tools: {
+        image: 'A stock photo of an empty street, licensed on three stock sites since 2019.',
+        source: 'Mixes opinion and news. Two stories retracted this year after legal threats.',
+        lateral: 'The council\u2019s published agenda has no such vote. Three local reporters say the claim is invented.'
+      },
+      lesson: 'A real 31k-share spike is not a signal of truth; it is often a signal of a network. Trace it before you give it more oxygen.'
+    },
+    {
+      id: 'c3', art: 'water', shot: 'official bulletin',
+      coach: 'Fastest check: source record \u2014 a statutory body publishing its own monthly figures.',
+      source: 'Regional Water Authority', hype: '3.1k shares',
+      headline: 'Reservoir at 8% capacity after driest summer since 1976',
+      truth: 'true', network: false,
+      tools: {
+        image: 'Taken by the authority this week; timestamps match the bulletin.',
+        source: 'A statutory body that publishes monthly figures with methodology.',
+        lateral: 'Two independent outlets quote the same figure from the same bulletin.'
+      },
+      lesson: 'Dry, sourced, checkable. This is what the engagement meter punishes you for amplifying \u2014 and the credibility meter rewards.'
+    },
+    {
+      id: 'c4', art: 'council', shot: 'video still',
+      coach: 'Fastest check: reverse image search \u2014 the clip is from a 2019 meeting 300 km away.',
+      source: 'Civic Watch', hype: '18.7k shares',
+      headline: 'Video shows mayor asleep during budget meeting',
+      truth: 'misleading', network: false,
+      tools: {
+        image: 'The frame matches a 2019 meeting of a different council, 300 km away.',
+        source: 'Aggregator. Credits no original footage and names no reporter.',
+        lateral: 'The mayor\u2019s office says the clip predates her term by six years.'
+      },
+      lesson: 'The footage is genuine, the caption is not. Out-of-context media is the hardest kind to catch, because nothing in the file is fake.'
+    },
+    {
+      id: 'c5', art: 'bus', shot: 'press image',
+      coach: 'Fastest check: source record \u2014 the operator\u2019s own timetable announcement with a start date.',
+      source: 'Transit Authority', hype: '2.4k shares',
+      headline: 'New bus route cuts cross-town journey by 20 minutes',
+      truth: 'true', network: false,
+      tools: {
+        image: 'Route map published with the timetable, same day.',
+        source: 'The operator\u2019s own announcement, with a start date.',
+        lateral: 'Two local papers confirm the new timetable.'
+      },
+      lesson: 'Boring, verifiable, useful. Local service news rarely trends, which is exactly why the feed buries it.'
+    },
+    {
+      id: 'c6', art: 'sky', shot: 'photo · sky',
+      coach: 'Fastest check: reverse image search \u2014 the same photo has carried hoaxes since 2016.',
+      source: 'SkyWatch Truth', hype: '44.8k shares',
+      headline: 'Pilot confirms chemtrails are being sprayed over primary schools',
+      truth: 'false', network: true,
+      tools: {
+        image: 'Ordinary contrails. The same photo has been used in hoaxes since 2016.',
+        source: 'Run by a conspiracy channel with no aviation credentials.',
+        lateral: 'No aviation authority or meteorologist supports the claim; public flight data shows normal traffic.'
+      },
+      lesson: '"A pilot confirms" is not a source. A name, a licence and a record are a source \u2014 and this card has none of the three.'
+    },
+    {
+      id: 'c7', art: 'hospital', shot: 'dataset',
+      coach: 'Fastest check: source record \u2014 named data lead, methodology, dated publication.',
+      source: 'Northgate General Hospital', hype: '5.6k shares',
+      headline: 'Hospital publishes monthly waiting times after pressure',
+      truth: 'true', network: false,
+      tools: {
+        image: 'Screenshot of the published dataset, dated this month.',
+        source: 'Trust publication with methodology and a named data lead.',
+        lateral: 'Health reporters quote the same dataset; waiting lists fell 4%.'
+      },
+      lesson: 'An institution publishing its own bad numbers is the least viral and most trustworthy thing on the feed.'
+    },
+    {
+      id: 'c8', art: 'flood', shot: 'photo · street',
+      coach: 'Fastest check: reverse image search \u2014 the photo already appeared in 2015 flood coverage.',
+      source: 'Weather Watchers UK', hype: '26.5k shares',
+      headline: 'Photo: high street underwater \u2014 "happening now"',
+      truth: 'misleading', network: false,
+      tools: {
+        image: 'Reverse search finds the identical photo in 2015 flood coverage of a different town.',
+        source: 'A community weather page with no editorial oversight.',
+        lateral: 'The Environment Agency has no flood warning for the area today.'
+      },
+      lesson: 'A dramatic, true photograph can carry a false present tense. Check the date before the street name.'
+    },
+    {
+      id: 'c9', art: 'water', shot: 'no image',
+      coach: 'Fastest check: lateral reading \u2014 no lab result exists and both authorities deny it.',
+      source: 'Truth Drop', hype: '38.9k shares',
+      headline: 'Anonymous insider: water supply contaminated \u2014 do not drink tap water',
+      truth: 'false', network: true,
+      tools: {
+        image: 'No image. The card is a claim with a screenshot of text.',
+        source: 'Anonymous submission account created last week. No editor, no contact.',
+        lateral: 'The water company and council both deny it. No lab result exists anywhere public.'
+      },
+      lesson: 'An unverifiable claim with a health instruction is the most dangerous shape of misinformation: the cost of believing it is panic, and the cost of ignoring it is fear.'
+    },
+    {
+      id: 'c10', art: 'library', shot: 'photo · sign',
+      coach: 'Fastest check: lateral reading \u2014 the council website lists the same hours from Monday.',
+      source: 'Northgate Libraries', hype: '1.8k shares',
+      headline: 'Library extends opening hours to 9pm from Monday',
+      truth: 'true', network: false,
+      tools: {
+        image: 'Photo of the new sign, timestamped today.',
+        source: 'Council library service, official account, named contact.',
+        lateral: 'The council website lists the same hours from Monday.'
+      },
+      lesson: 'Small true things are the bulk of a healthy feed, and the hardest to make anyone care about.'
+    }
+  ];
+
+  const UPGRADES = {
+    notes: { name: 'Community notes', text: 'Correct flags add +4 extra credibility.' },
+    tip: { name: 'Tip line', text: 'Correct flags earn 2 tokens instead of 1.' },
+    alumni: { name: 'Loyal readers', text: 'Amplifying true stories adds +4 extra engagement.' },
+    legal: { name: 'Legal review', text: 'Amplifying false content costs 6 less credibility.' },
+    desk: { name: 'Fact-check desk', text: 'The first lookup on each card is free.' },
+    subs: { name: 'Source subscriptions', text: 'Source evaluation costs no engagement.' }
+  };
+
+  const PICK_ORDER = ['notes', 'tip', 'alumni', 'legal', 'desk', 'subs'];
+
+  const state = {
+    idx: 0,
+    cred: 60,
+    eng: 60,
+    tokens: 0,
+    cost: 2,
+    lookups: 0,
+    anyLookup: {},
+    used: {},
+    neutralized: {},
+    upgrades: [],
+    picked: 0,
+    resolved: false,
+    over: false,
+    correct: 0,
+    wrong: 0,
+    journal: [],
+    pendingEnd: null,
+    best: 0
+  };
+
+  const els = {
+    wrap: $('#cardwrap'),
+    verdict: $('#verdict'),
+    log: $('#log'),
+    cardCount: $('#cardCount'),
+    clockNote: $('#clockNote'),
+    noteLine: $('#noteLine'),
+    nextBtn: $('#nextBtn'),
+    credVal: $('#credVal'),
+    engVal: $('#engVal'),
+    credBar: $('#credBar'),
+    engBar: $('#engBar'),
+    tokVal: $('#tokVal'),
+    btnFlag: $('#btnFlag'),
+    btnAmp: $('#btnAmp'),
+    btnTrace: $('#btnTrace'),
+    upgradeChips: $('#upgradeChips'),
+    pickOverlay: $('#pickOverlay'),
+    pickList: $('#pickList'),
+    debrief: $('#debrief'),
+    dbStats: $('#dbStats'),
+    dbTable: $('#dbTable'),
+    dbBtn: $('#dbBtn'),
+    overlay: $('#overlay'),
+    ovKicker: $('#ovKicker'),
+    ovTitle: $('#ovTitle'),
+    ovLead: $('#ovLead'),
+    ovRules: $('#ovRules'),
+    ovScore: $('#ovScore'),
+    ovScoreLabel: $('#ovScoreLabel'),
+    ovScoreValue: $('#ovScoreValue'),
+    ovRank: $('#ovRank'),
+    ovBest: $('#ovBest'),
+    ovBtn: $('#ovBtn')
+  };
+
+  const card = () => CARDS[state.idx];
+  const has = (u) => state.upgrades.indexOf(u) !== -1;
+  const clamp = (n) => Math.max(0, Math.min(100, n));
+  const used = (id) => state.used[id] || (state.used[id] = {});
+
+  function renderMeters() {
+    els.credVal.textContent = state.cred + '%';
+    els.engVal.textContent = state.eng + '%';
+    els.credBar.querySelector('span').style.width = state.cred + '%';
+    els.engBar.querySelector('span').style.width = state.eng + '%';
+    els.credBar.className = 'bar cred' + (state.cred <= 25 ? ' low' : '');
+    els.engBar.className = 'bar eng' + (state.eng <= 25 ? ' low' : '');
+    els.tokVal.textContent = state.tokens;
+    els.btnTrace.disabled = state.tokens < 1 || state.resolved;
+  }
+
+  function renderChips() {
+    els.upgradeChips.innerHTML = state.upgrades.map((u) => '<span class="chip">' + UPGRADES[u].name + '</span>').join('');
+  }
+
+  function renderCard() {
+    const c = card();
+    els.cardCount.textContent = 'Card ' + (state.idx + 1) + ' / ' + CARDS.length;
+    els.clockNote.textContent = state.lookups + ' lookup' + (state.lookups === 1 ? '' : 's');
+    els.wrap.innerHTML =
+      '<div class="swipehint left">Debunk</div>' +
+      '<div class="swipehint right">Amplify</div>' +
+      '<article class="card" id="card" tabindex="0">' +
+        '<div class="art" data-art="' + c.art + '">' +
+          (c.art === 'hospital' ? '<span class="cross-v"></span>' : '') +
+          '<span class="tagshot">' + c.shot + '</span>' +
+        '</div>' +
+        '<div class="cardbody">' +
+          '<div class="src"><b>' + c.source + '</b><span class="hype">' + c.hype + '</span></div>' +
+          '<h2 class="headline">' + c.headline + '</h2>' +
+        '</div>' +
+      '</article>';
+    els.verdict.hidden = true;
+    els.verdict.className = 'verdict';
+    els.log.innerHTML = '';
+    els.btnFlag.disabled = false;
+    els.btnAmp.disabled = false;
+    els.nextBtn.disabled = true;
+    els.nextBtn.textContent = 'Decide first';
+    renderMeters();
+    bindCard();
+  }
+
+  function bindCard() {
+    const c = card();
+    const el = $('#card');
+    const left = $('.swipehint.left');
+    const right = $('.swipehint.right');
+
+    let startX = 0, dx = 0, dragging = false;
+
+    el.addEventListener('pointerdown', (e) => {
+      if (state.resolved) return;
+      dragging = true;
+      startX = e.clientX;
+      el.classList.add('dragging');
+      try { el.setPointerCapture(e.pointerId); } catch (err) { /* synthetic pointer */ }
+    });
+    el.addEventListener('pointermove', (e) => {
+      if (!dragging) return;
+      dx = e.clientX - startX;
+      el.style.transform = 'translateX(' + dx + 'px) rotate(' + (dx / 26) + 'deg)';
+      left.style.opacity = String(Math.max(0, Math.min(1, -dx / 90)));
+      right.style.opacity = String(Math.max(0, Math.min(1, dx / 90)));
+    });
+    const end = () => {
+      if (!dragging) return;
+      dragging = false;
+      el.classList.remove('dragging');
+      el.style.transform = '';
+      left.style.opacity = '0';
+      right.style.opacity = '0';
+      if (dx <= -90) resolve('flag');
+      else if (dx >= 90) resolve('amplify');
+      dx = 0;
+    };
+    el.addEventListener('pointerup', end);
+    el.addEventListener('pointercancel', end);
+
+    el.addEventListener('dblclick', () => {
+      const first = document.querySelector('.tool');
+      if (first) { first.focus(); first.classList.add('done'); }
+      note('Research tab opened. Start with the image, then the source.');
+    });
+
+    el.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowLeft') { e.preventDefault(); resolve('flag'); }
+      if (e.key === 'ArrowRight') { e.preventDefault(); resolve('amplify'); }
+    });
+
+    els.btnFlag.onclick = () => resolve('flag');
+    els.btnAmp.onclick = () => resolve('amplify');
+    els.btnTrace.onclick = trace;
+
+    document.querySelectorAll('.tool').forEach((b) => {
+      const done = used(c.id)[b.dataset.tool];
+      b.disabled = !!done || state.resolved;
+      b.classList.toggle('done', !!done);
+      b.onclick = () => research(b.dataset.tool);
+    });
+  }
+
+  function note(text) { els.noteLine.textContent = text; }
+
+  function addEntry(kind, label, text) {
+    const d = document.createElement('div');
+    d.className = 'entry' + (kind ? ' ' + kind : '');
+    d.innerHTML = '<b>' + label + '</b>' + text;
+    els.log.appendChild(d);
+  }
+
+  function research(tool) {
+    const c = card();
+    if (state.resolved || used(c.id)[tool]) return;
+    const first = !state.anyLookup[c.id];
+    state.anyLookup[c.id] = true;
+    used(c.id)[tool] = true;
+
+    let cost = state.cost;
+    if (tool === 'source' && has('subs')) cost = 0;
+    if (has('desk') && first) cost = 0;
+    state.eng = clamp(state.eng - cost);
+    state.lookups += 1;
+    const jr = journalEntry();
+    jr.tools.push({ tool, cost });
+    jr.cost += cost;
+
+    addEntry(tool === 'image' ? 'good' : '', tool === 'image' ? 'Reverse image search' : tool === 'source' ? 'Source record' : 'Lateral reading', c.tools[tool]);
+    renderMeters();
+    els.clockNote.textContent = state.lookups + ' lookup' + (state.lookups === 1 ? '' : 's');
+    note(cost ? 'Lookup used. Hype falls while you dig (' + cost + ' engagement).' : 'Lookup used at no engagement cost.');
+    const b = document.querySelector('.tool[data-tool="' + tool + '"]');
+    if (b) { b.disabled = true; b.classList.add('done'); }
+    if (state.eng <= 0) gameOver('eng');
+  }
+
+  function trace() {
+    const c = card();
+    if (state.resolved || state.tokens < 1) return;
+    state.tokens -= 1;
+    if (c.network) {
+      state.neutralized[c.id] = true;
+      state.cred = clamp(state.cred + 8);
+      addEntry('good', 'Network traced', 'Dozens of accounts created the same week, posting the same link. The boost was purchased, not organic. Credibility +8, and the spike is dead.');
+      note('Coordinated network exposed. +8 credibility.');
+    } else {
+      state.cred = clamp(state.cred - 2);
+      addEntry('bad', 'No network found', 'This one is being shared by ordinary people. The token is spent and the answer is "no coordination".');
+      note('No coordination found. The token is spent.');
+    }
+    renderMeters();
+  }
+
+  function resolve(action) {
+    if (state.resolved) return;
+    const c = card();
+    state.resolved = true;
+    els.btnFlag.disabled = true;
+    els.btnAmp.disabled = true;
+    document.querySelectorAll('.tool').forEach((b) => { b.disabled = true; });
+
+    let dCred = 0, dEng = 0, gained = 0, ok = false, head = '', text = '';
+
+    if (action === 'flag') {
+      if (c.truth === 'true') {
+        dCred = -10; dEng = -7; state.wrong += 1;
+        head = 'False alarm \u221210 credibility, \u22127 engagement';
+        text = 'You debunked a true story. The correction is now part of the record, and so is the hit to trust.';
+      } else {
+        dCred = 9 + (has('notes') ? 4 : 0);
+        dEng = -5;
+        gained = 1 + (has('tip') ? 1 : 0);
+        state.tokens += gained;
+        state.correct += 1;
+        ok = true;
+        head = 'Flagged with context +' + dCred + ' credibility, ' + dEng + ' engagement, +' + gained + ' token';
+        text = 'Context attached and the post throttled. Flagging costs reach now and buys trust later.';
+      }
+    } else {
+      if (c.truth === 'true') {
+        dCred = 3; dEng = 9 + (has('alumni') ? 4 : 0); state.correct += 1; ok = true;
+        head = 'Amplified a true story +3 credibility, +' + dEng + ' engagement';
+        text = 'Checked and true, so it goes out. This is the only way the engagement meter and the credibility meter ever rise together.';
+      } else if (c.truth === 'misleading') {
+        dCred = -12; dEng = 16; state.wrong += 1;
+        head = 'Amplified misleading content \u221212 credibility, +16 engagement';
+        text = 'The footage was genuine and the caption was not. The spike is real; so is the correction you will have to publish.';
+      } else {
+        dCred = -20 + (has('legal') ? 6 : 0);
+        dEng = 24; state.wrong += 1;
+        head = 'Amplified a fabrication ' + dCred + ' credibility, +24 engagement';
+        text = 'Rage-bait pays immediately. The credibility bill arrives later, in corrections and lost trust.';
+        if (c.network && !state.neutralized[c.id]) {
+          dCred -= 6;
+          text += ' The accounts pushing it were coordinated, which you would have seen with one trace.';
+        }
+      }
+    }
+
+    const jr = journalEntry();
+    jr.action = action;
+    jr.ok = ok;
+    jr.truth = c.truth;
+    jr.dCred = dCred;
+    jr.dEng = dEng;
+
+    state.cred = clamp(state.cred + dCred);
+    state.eng = clamp(state.eng + dEng);
+    renderMeters();
+
+    const v = els.verdict;
+    v.hidden = false;
+    v.className = 'verdict ' + (ok ? 'ok' : 'no');
+    const label = c.truth === 'true' ? 'TRUE' : c.truth === 'misleading' ? 'MISLEADING' : 'FABRICATED';
+    v.innerHTML = '<span class="vh">' + head + '</span>' +
+      '<p class="truth"><b>Verdict: ' + label + '.</b> ' + c.lesson + '</p>' +
+      '<p>' + text + '</p>' +
+      '<p style="color:rgba(243,240,251,0.5)">Card ' + (state.idx + 1) + ' of ' + CARDS.length + '.</p>';
+
+    els.nextBtn.disabled = false;
+    els.nextBtn.textContent = state.idx === CARDS.length - 1 ? 'Close the shift' : 'Next card';
+    note(ok ? 'Correct call. ' + (gained ? '+' + gained + ' token.' : '') : 'That one will cost you.');
+
+    if (state.cred <= 0) gameOver('cred');
+    else if (state.eng <= 0) gameOver('eng');
+  }
+
+  function next() {
+    if (!state.resolved) return;
+    if (state.idx === CARDS.length - 1) { finish(); return; }
+    state.idx += 1;
+    state.resolved = false;
+    if ((state.idx === 3 || state.idx === 6 || state.idx === 9) && state.picked < 3) {
+      renderCard();
+      openPicks();
+      return;
+    }
+    renderCard();
+  }
+
+  function openPicks() {
+    const options = PICK_ORDER.filter((u) => !has(u)).slice(0, 2);
+    if (!options.length) return;
+    els.pickList.innerHTML = '';
+    options.forEach((u) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'pick';
+      b.innerHTML = '<b>' + UPGRADES[u].name + '</b><span>' + UPGRADES[u].text + '</span>';
+      b.addEventListener('click', () => {
+        state.upgrades.push(u);
+        state.picked += 1;
+        els.pickOverlay.hidden = true;
+        renderChips();
+        renderCard();
+        note(UPGRADES[u].name + ' added to the desk.');
+      });
+      els.pickList.appendChild(b);
+    });
+    els.pickOverlay.hidden = false;
+  }
+
+  function gameOver(which) {
+    if (state.over) return;
+    state.over = true;
+    state.resolved = true;
+    openDebrief(() => showGameOver(which));
+  }
+
+  function showGameOver(which) {
+    const hysteria = which === 'cred';
+    els.ovKicker.textContent = hysteria ? 'Feed lost' : 'Funding lost';
+    els.ovTitle.innerHTML = hysteria ? 'Credibility <span class="accent">collapsed.</span>' : 'Engagement <span class="accent">hit zero.</span>';
+    els.ovLead.textContent = hysteria
+      ? 'Nobody trusts the desk any more, so the rumours run without you. The corrections are still published; nobody reads them.'
+      : 'The outlet ran out of money. Every accurate flag cost reach, and reach is what pays the staff.';
+    els.ovRules.innerHTML = (hysteria ? [
+      'Rage-bait spikes engagement and spends credibility.',
+      'Every fabrication you amplify has to be corrected twice.',
+      'Trace networks before amplification, not after.'
+    ] : [
+      'Investigation costs engagement while it runs.',
+      'Tepid, sourced stories still bring readers back.',
+      'Correct calls earn tokens; tokens buy network traces.'
+    ]).map((t) => '<li class="rule">' + t + '</li>').join('');
+    els.ovScore.hidden = false;
+    els.ovScoreLabel.textContent = hysteria ? 'Reached card' : 'Reached card';
+    els.ovScoreValue.textContent = (state.idx + 1) + ' / ' + CARDS.length;
+    els.ovRank.textContent = state.correct + ' correct, ' + state.wrong + ' wrong';
+    els.ovBest.textContent = 'Credibility ' + state.cred + '% \u00b7 Engagement ' + state.eng + '%';
+    els.ovBtn.textContent = 'Start again';
+    els.overlay.hidden = false;
+    els.ovBtn.focus();
+  }
+
+  function journalEntry() {
+    if (!state.journal[state.idx]) {
+      state.journal[state.idx] = { idx: state.idx, tools: [], cost: 0, action: null, ok: null };
+    }
+    return state.journal[state.idx];
+  }
+
+  function openDebrief(onDone) {
+    const rows = state.journal.filter(Boolean).map((j) => {
+      const c = CARDS[j.idx];
+      const verdict = c.truth === 'true' ? 'True' : c.truth === 'misleading' ? 'Misleading' : 'Fake';
+      const action = j.action === 'flag' ? 'Flagged' : j.action === 'amplify' ? 'Amplified' : '—';
+      const cls = j.ok === null ? '' : (j.ok ? 'ok' : 'no');
+      const mark = j.ok === null ? '·' : (j.ok ? '✓' : '✗');
+      const research = j.tools.length
+        ? j.tools.length + ' lookup' + (j.tools.length === 1 ? '' : 's') + ' · −' + j.cost + ' eng'
+        : 'no research';
+      return '<div class="dbrow ' + cls + '">' +
+        '<span class="n">' + (j.idx + 1) + '</span>' +
+        '<span class="h" title="' + c.headline.replace(/"/g, '&quot;') + '">' + c.headline + '</span>' +
+        '<span class="v">' + verdict + '</span>' +
+        '<span class="d">' + action + '</span>' +
+        '<span class="r">' + research + '</span>' +
+        '<span class="m">' + mark + '</span>' +
+        '<span class="tip">' + c.coach + '</span>' +
+      '</div>';
+    }).join('');
+
+    const done = state.journal.filter(Boolean);
+    const researched = done.filter((j) => j.tools.length > 0).length;
+    const blind = done.filter((j) => j.tools.length === 0).length;
+    const blindCorrect = done.filter((j) => j.tools.length === 0 && j.ok).length;
+    const spent = done.reduce((n, j) => n + j.cost, 0);
+    const grounded = done.filter((j) => j.tools.length > 0 && j.ok).length;
+
+    els.dbStats.innerHTML =
+      '<span class="dbstat">Researched <b>' + researched + ' / ' + done.length + '</b></span>' +
+      '<span class="dbstat">Blind calls <b>' + blind + '</b> (' + blindCorrect + ' right)</span>' +
+      '<span class="dbstat">Lookup cost <b>−' + spent + ' eng</b></span>' +
+      '<span class="dbstat">Grounded calls <b>' + grounded + '</b></span>';
+
+    els.dbTable.innerHTML = '<div class="dbrow head"><span class="n">#</span><span class="h">Card</span>' +
+      '<span class="v">Truth</span><span class="d">You did</span><span class="r">Research</span><span class="m"></span></div>' + rows;
+
+    state.pendingEnd = onDone;
+    els.dbBtn.textContent = state.over ? 'See what happened' : 'See the results';
+    els.debrief.hidden = false;
+    els.dbBtn.focus();
+  }
+
+  function finish() {
+    openDebrief(() => showFinal());
+  }
+
+  function showFinal() {
+    if (state.cred > state.best) {
+      state.best = state.cred;
+      try { localStorage.setItem(BEST_KEY, String(state.cred)); } catch (e) { /* ignore */ }
+    }
+    const rank = state.cred >= 80 && state.eng >= 60 ? 'Editor who survived'
+      : state.cred >= 70 ? 'Trusted desk'
+      : state.cred >= 50 ? 'Holding the line'
+      : 'Barely solvent';
+    els.ovKicker.textContent = 'Shift complete';
+    els.ovTitle.innerHTML = 'Credibility <span class="accent">' + state.cred + '%</span> \u00b7 Engagement <span class="accent">' + state.eng + '%</span>';
+    els.ovLead.textContent = 'Ten cards, one feed. The credible move was rarely the loud one, and the loud one always paid \u2014 briefly.';
+    els.ovRules.innerHTML = [
+      'Lateral reading beats staring at the claim: open another tab.',
+      'A real photo can carry a false headline. Check the date and the place.',
+      'Virality is a distribution signal, not a truth signal.',
+      'Networks are traceable. Trace them before the spike, not after.'
+    ].map((t) => '<li class="rule">' + t + '</li>').join('');
+    els.ovScore.hidden = false;
+    els.ovScoreLabel.textContent = 'Correct calls';
+    els.ovScoreValue.textContent = state.correct + ' / ' + CARDS.length;
+    els.ovRank.textContent = rank;
+    els.ovBest.textContent = 'Credibility ' + state.cred + '% \u00b7 Best ' + state.best + '%';
+    els.overlay.hidden = false;
+    els.ovBtn.textContent = 'Run the feed again';
+    els.ovBtn.focus();
+  }
+
+  function start() {
+    state.idx = 0;
+    state.cred = 60;
+    state.eng = 60;
+    state.tokens = 0;
+    state.lookups = 0;
+    state.anyLookup = {};
+    state.used = {};
+    state.neutralized = {};
+    state.upgrades = [];
+    state.picked = 0;
+    state.resolved = false;
+    state.over = false;
+    state.correct = 0;
+    state.wrong = 0;
+    state.journal = [];
+    state.pendingEnd = null;
+    els.debrief.hidden = true;
+    els.overlay.hidden = true;
+    els.pickOverlay.hidden = true;
+    renderChips();
+    renderCard();
+    note('Swipe the card, or use the buttons \u00b7 double-click the image to research');
+  }
+
+  els.nextBtn.addEventListener('click', next);
+  els.ovBtn.addEventListener('click', start);
+  els.dbBtn.addEventListener('click', () => {
+    els.debrief.hidden = true;
+    const fn = state.pendingEnd;
+    state.pendingEnd = null;
+    if (fn) fn();
+  });
+
+  try { state.best = parseInt(localStorage.getItem(BEST_KEY) || '0', 10) || 0; } catch (e) { state.best = 0; }
+
+  renderChips();
+  renderCard();
+
+  els.ovTitle.innerHTML = 'Echo Chamber <span class="accent">Breakout</span>';
+  els.ovLead.textContent = 'You run the social desk for a local newsroom. Credibility and engagement both start at 60%. If either hits zero the desk is finished \u2014 and the cards that spike hardest are the ones you should not touch.';
+  els.ovRules.innerHTML = [
+    'Swipe left or click Debunk to flag; swipe right or click Amplify to publish.',
+    'Double-click the image to research: reverse image search, source record, lateral reading.',
+    'Every lookup burns engagement while the hype cools.',
+    'Correct flags earn fact-check tokens. Spend them to expose coordinated networks.'
+  ].map((t) => '<li class="rule">' + t + '</li>').join('');
+  els.ovBtn.textContent = 'Open the feed';
+  els.overlay.hidden = false;
+})();
+</script>
+</body>
+</html>

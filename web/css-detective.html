@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a1013">
+<title>CSS Detective</title>
+<link rel="stylesheet" href="../common.css">
+<style>
+  :root {
+    --bg-top: #26313f;
+    --bg-mid: #0b1116;
+    --bg-bottom: #05080a;
+    --stage-bg: #080f13;
+    --ink: #eef4f8;
+    --amber: #ffc86b;
+    --teal: #70e7c8;
+    --line: rgba(150, 226, 203, 0.16);
+  }
+  body { overflow-y: auto; }
+
+  #app {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: 8px;
+    padding: 8px;
+    height: 100%;
+    min-height: 0;
+  }
+
+  .topbar { margin: 0; }
+
+  .workspace {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+    gap: 10px;
+    min-height: 0;
+  }
+
+  .pane {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: rgba(7, 15, 19, 0.72);
+    overflow: hidden;
+  }
+
+  .pane-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 11px;
+    border-bottom: 1px solid var(--line);
+    background: rgba(255, 255, 255, 0.02);
+  }
+
+  .pane-head span {
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .pane-head strong {
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--amber);
+    font-weight: 700;
+  }
+
+  .pane-body {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    padding: 11px;
+    scrollbar-width: thin;
+  }
+
+  /* ---------- suspect site ---------- */
+  .preview {
+    display: grid;
+    gap: 10px;
+    padding: 16px;
+    min-height: 190px;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 10px;
+    background: #101a1f;
+    color: #d4dee4;
+    font-family: var(--font-sans);
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+  .preview * { box-sizing: border-box; }
+  .preview h1, .preview h2, .preview h3 { margin: 0; font-size: 20px; line-height: 1.25; }
+  .preview p { margin: 0; font-size: 14px; line-height: 1.55; }
+  .preview .meta { font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: #7d8d95; }
+  .preview .site-head { display: grid; gap: 6px; }
+  .preview .feed { min-width: 0; flex: 1 1 auto; }
+  .preview .rail { min-width: 0; }
+  .preview .cta {
+    border: 0;
+    border-radius: 8px;
+    padding: 11px 18px;
+    font: inherit;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    justify-self: start;
+  }
+  .preview .receipt { display: grid; gap: 8px; padding: 14px; border-radius: 10px; background: #0d1519; border: 1px solid rgba(255, 255, 255, 0.06); }
+  .preview .receipt .total { padding: 8px 10px; border-radius: 6px; font-weight: 700; }
+  .preview [data-hot] { cursor: help; }
+  .preview [data-hot].hot-hint { outline: 2px dashed rgba(255, 200, 107, 0.75); outline-offset: 3px; }
+
+  /* ---------- code panel ---------- */
+  .code-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 0;
+  }
+
+  textarea.code {
+    width: 100%;
+    min-height: 168px;
+    flex: 1;
+    resize: vertical;
+    padding: 10px 11px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 9px;
+    background: #060d10;
+    color: #c9f5e6;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 1.6;
+    tab-size: 2;
+    white-space: pre;
+    overflow: auto;
+  }
+  textarea.code:focus-visible { outline: 2px solid var(--teal); outline-offset: 1px; }
+
+  .row { display: flex; flex-wrap: wrap; gap: 8px; }
+  .row .btn { margin-top: 0; }
+  .btn.small { min-height: 34px; padding: 8px 16px; font-size: 11px; }
+
+  .clue {
+    display: flex;
+    gap: 8px;
+    padding: 9px 10px;
+    border: 1px solid rgba(255, 200, 107, 0.26);
+    border-radius: 8px;
+    background: rgba(255, 200, 107, 0.06);
+    font-size: 12px;
+    line-height: 1.5;
+    color: #ffe1ae;
+  }
+  .clue[hidden] { display: none; }
+  .clue b { color: var(--amber); }
+
+  .status {
+    margin: 0;
+    padding: 8px 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    font-size: 12px;
+    line-height: 1.45;
+    color: var(--muted);
+    min-height: 34px;
+  }
+  .status.good { color: var(--mint); border-color: rgba(134, 231, 197, 0.32); }
+  .status.bad { color: var(--red); border-color: rgba(255, 132, 116, 0.32); }
+
+  /* ---------- explanation ---------- */
+  .explain {
+    display: grid;
+    gap: 8px;
+    padding: 10px;
+    border: 1px solid rgba(112, 231, 200, 0.28);
+    border-radius: 10px;
+    background: rgba(112, 231, 200, 0.05);
+  }
+  .explain h3 {
+    margin: 0;
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--teal);
+  }
+  .explain .opts { display: grid; gap: 6px; }
+  .explain button {
+    text-align: left;
+    padding: 8px 10px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.03);
+    font-size: 12px;
+    line-height: 1.45;
+    cursor: pointer;
+  }
+  .explain button:hover { border-color: rgba(112, 231, 200, 0.45); }
+  .explain button.right { border-color: rgba(134, 231, 197, 0.7); background: rgba(134, 231, 197, 0.12); color: #d9fff2; }
+  .explain button.wrong { border-color: rgba(255, 132, 116, 0.6); background: rgba(255, 132, 116, 0.1); color: #ffd2cc; }
+  .explain button:disabled { cursor: default; }
+  .reveal { margin: 0; font-size: 12px; line-height: 1.55; color: rgba(241, 248, 243, 0.78); }
+
+  .case-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+    align-items: baseline;
+    margin-bottom: 8px;
+  }
+  .case-meta .client {
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--amber);
+  }
+  .case-meta .symptom {
+    font-size: 12px;
+    line-height: 1.5;
+    color: rgba(241, 248, 243, 0.72);
+  }
+
+  .dots { display: flex; gap: 5px; }
+  .dots i {
+    width: 16px;
+    height: 3px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.14);
+  }
+  .dots i.done { background: var(--teal); }
+  .dots i.now { background: var(--amber); }
+
+  .actionbar {
+    padding: 0 2px 2px;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+
+  .breakdown > div { display: flex; justify-content: space-between; gap: 12px; }
+  .breakdown b { color: var(--ink); }
+
+  @media (max-width: 860px) {
+    .workspace { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto; }
+    .pane-body { overflow: visible; }
+    #app { height: auto; }
+    #stage.stage-fluid { height: auto; }
+  }
+</style>
+</head>
+<body>
+<h1 class="sr-only">CSS Detective: a stylesheet debugging game</h1>
+<div id="stage" class="stage-fluid">
+  <div id="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">?</span>
+        <span>
+          <b>CSS Detective</b>
+          <small>Broken sites unit</small>
+        </span>
+      </div>
+      <div class="hud">
+        <div class="stat"><span>Case</span><strong id="hudCase">1/4</strong></div>
+        <div class="stat"><span>Score</span><strong id="hudScore">0000</strong></div>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <section class="pane" aria-label="Suspect website">
+        <div class="pane-head">
+          <span>Exhibit A &middot; live page</span>
+          <strong id="paneClient">Rosa's Ramen</strong>
+        </div>
+        <div class="pane-body">
+          <div class="case-meta">
+            <span class="client" id="caseClient">Rosa's Ramen</span>
+            <span class="symptom" id="caseSymptom">The headline should be coral.</span>
+          </div>
+          <div id="preview" class="preview"></div>
+          <p id="clue" class="clue" hidden></p>
+        </div>
+      </section>
+
+      <section class="pane" aria-label="Stylesheet editor">
+        <div class="pane-head">
+          <span>stylesheet.css</span>
+          <span id="dots" class="dots" aria-hidden="true"></span>
+        </div>
+        <div class="pane-body">
+          <div class="code-wrap">
+            <label class="sr-only" for="code">CSS rules for the preview</label>
+            <textarea id="code" class="code" spellcheck="false" aria-describedby="status"></textarea>
+            <div class="row">
+              <button id="verify" class="btn small" type="button">Apply fix</button>
+              <button id="resetCss" class="btn small btn-secondary" type="button">Restore broken CSS</button>
+            </div>
+            <p id="status" class="status" role="status" aria-live="polite">Click the broken element for a clue, then edit the rule and apply.</p>
+            <div id="explain" class="explain" hidden>
+              <h3 id="explainTitle">Why did that happen?</h3>
+              <div id="options" class="opts"></div>
+              <p id="reveal" class="reveal" hidden></p>
+              <button id="next" class="btn small" type="button" hidden>Next case</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="actionbar">
+      <span>Keep every selector prefixed with <b>.preview</b> &middot; click a suspect for a clue</span>
+    </footer>
+  </div>
+
+  <div id="overlay" class="overlay" role="dialog" aria-modal="true" aria-labelledby="ovTitle" hidden>
+    <div class="panel panel-card">
+      <p id="ovKicker" class="eyebrow"></p>
+      <h2 id="ovTitle" class="title"></h2>
+      <p id="ovLead" class="lead"></p>
+      <ul id="ovRules" class="rules"></ul>
+      <div id="ovScore" class="final-score" hidden>
+        <span>Case file closed</span>
+        <strong id="ovScoreValue">0</strong>
+        <p id="ovRank" class="rank"></p>
+        <p id="ovBest" class="best"></p>
+      </div>
+      <div id="ovBreak" class="breakdown" hidden></div>
+      <button id="ovBtn" class="btn" type="button">Open case one</button>
+    </div>
+  </div>
+</div>
+<p class="hint">click the suspect &middot; edit CSS &middot; apply fix &middot; explain the cause</p>
+
+<style id="caseStyle"></style>
+<script>
+(() => {
+  'use strict';
+
+  const $ = (sel) => document.querySelector(sel);
+  const BEST_KEY = 'cssdetective.best.v1';
+  const EXPECT_RED = 'rgb(255, 132, 116)';
+  const EXPECT_INK = 'rgb(27, 34, 36)';
+  const EXPECT_AMBER = 'rgb(255, 200, 107)';
+
+  const CASES = [
+    {
+      client: "Rosa's Ramen",
+      symptom: 'The headline should be coral. It renders lavender instead.',
+      html: `
+        <div class="site-head">
+          <p class="meta">Closed for the holiday</p>
+          <h2 class="headline" data-hot="The h2 has two color rules pointing at it. Which one wins?">Fresh bread daily</h2>
+        </div>`,
+      css: `.preview .headline {
+  color: #ff8474;   /* the coral we want */
+}
+
+.preview .site-head h2 {
+  color: #b8a4e6;   /* the lavender that wins */
+}`,
+      clue: 'Count the parts of each selector: classes, elements. The heavier selector wins, no matter which one you wrote first.',
+      prop: 'color',
+      target: '.preview .headline',
+      expect: EXPECT_RED,
+      question: 'Both rules are class-based. Why does lavender win?',
+      options: [
+        { text: 'The lavender selector is more specific: 0,2,1 beats 0,2,0.', ok: true },
+        { text: 'The rule that appears later in the file always wins.', ok: false },
+        { text: 'Color is inherited from the body, so neither rule applies.', ok: false }
+      ],
+      reveal: 'Specificity beats source order. Adding the element type (h2) gave the lavender rule one extra point, so it won even though the coral rule came first. Match or beat the specificity to fix it.'
+    },
+    {
+      client: 'Corner Market',
+      symptom: 'The total is barely visible on its paper receipt.',
+      html: `
+        <article class="receipt">
+          <h3>Corner Market</h3>
+          <p class="total" data-hot="No rule ever sets a text color on .total. Where does its color come from?">Total due <b>$24.00</b></p>
+        </article>`,
+      css: `.preview .receipt {
+  color: rgba(255, 255, 255, 0.22);
+}
+
+.preview .receipt .total {
+  background: #f6f1e4;
+}`,
+      clue: 'The receipt sets a pale color at the top. The total never declares its own color, so it inherits one.',
+      prop: 'color',
+      target: '.preview .receipt .total',
+      expect: EXPECT_INK,
+      question: 'Why is the total unreadable even though its own rule looks fine?',
+      options: [
+        { text: 'The total inherits the pale text color from .receipt; its rule only set a background.', ok: true },
+        { text: '.total is less specific than .receipt, so its background is ignored too.', ok: false },
+        { text: 'The <b> tag inside the paragraph resets the color.', ok: false }
+      ],
+      reveal: 'Inheritance fills in what a rule leaves out. .total declared a background but no color, so it inherited the near-transparent white from its parent and painted pale text on pale paper.'
+    },
+    {
+      client: 'Science Club Dashboard',
+      symptom: 'The whole dashboard scrolls sideways on a laptop.',
+      html: `
+        <div class="dash" data-hot="The sidebar has a fixed width that is wider than this exhibit.">
+          <main class="feed">
+            <h3>Club feed</h3>
+            <p>Three new posts about the science fair.</p>
+          </main>
+          <aside class="rail">
+            <h3>Upcoming</h3>
+            <p>Science fair &middot; Friday</p>
+          </aside>
+        </div>`,
+      css: `.preview .dash {
+  display: flex;
+  gap: 12px;
+}
+
+.preview .dash .rail {
+  flex: 0 0 420px;   /* refuses to shrink */
+}`,
+      clue: 'flex: 0 0 420px means "never shrink, never grow, always 420px". The exhibit is narrower than that.',
+      test: (root) => {
+        const pane = root;
+        return {
+          pass: pane.scrollWidth <= pane.clientWidth + 1,
+          detail: 'content ' + pane.scrollWidth + 'px in a ' + pane.clientWidth + 'px pane'
+        };
+      },
+      question: 'What made the layout overflow instead of squeezing?',
+      options: [
+        { text: 'A fixed flex-basis with flex-shrink 0; the rail could not give up any width.', ok: true },
+        { text: 'The gap property adds 420px between the columns.', ok: false },
+        { text: 'Flex containers always overflow when they hold an <aside>.', ok: false }
+      ],
+      reveal: 'flex: 0 0 420px is a hard size: grow 0, shrink 0, basis 420px. Letting the rail shrink (or capping it with max-width: 100%) keeps the row inside its parent.'
+    },
+    {
+      client: 'Harbor Bistro',
+      symptom: 'The reserve button should be amber with dark ink. It looks slate grey.',
+      html: `
+        <button class="cta primary" data-hot="Two selectors, identical specificity. Which one did the browser apply?">Reserve a table</button>`,
+      css: `.preview .cta {
+  background: #ffc86b;
+  color: #06211c;
+}
+
+.preview .primary {
+  background: #2a3f47;
+  color: #7d8d95;
+}`,
+      clue: 'Both selectors are one class. When weights tie, the rule lower in the file wins. Order matters.',
+      prop: 'backgroundColor',
+      target: '.preview .cta',
+      expect: EXPECT_AMBER,
+      question: 'Both rules are one class deep. Why did slate win?',
+      options: [
+        { text: 'Equal specificity, so the later rule in source order wins.', ok: true },
+        { text: 'The .primary class is always stronger because it is named last alphabetically.', ok: false },
+        { text: 'Background colors are inherited, so the button took its parent color.', ok: false }
+      ],
+      reveal: 'Cascade order is the tie-breaker. With identical specificity, whichever declaration comes later in the stylesheet wins. Reorder the rules, or raise the winning selector one class.'
+    }
+  ];
+
+  const state = { i: 0, score: 0, fails: 0, solved: false, answered: false, best: 0, perCase: [] };
+  let lastGoodCss = '';
+
+  const els = {
+    preview: $('#preview'),
+    style: $('#caseStyle'),
+    code: $('#code'),
+    client: $('#caseClient'),
+    paneClient: $('#paneClient'),
+    symptom: $('#caseSymptom'),
+    clue: $('#clue'),
+    verify: $('#verify'),
+    reset: $('#resetCss'),
+    status: $('#status'),
+    explain: $('#explain'),
+    options: $('#options'),
+    reveal: $('#reveal'),
+    next: $('#next'),
+    hudCase: $('#hudCase'),
+    hudScore: $('#hudScore'),
+    dots: $('#dots'),
+    overlay: $('#overlay'),
+    ovKicker: $('#ovKicker'),
+    ovTitle: $('#ovTitle'),
+    ovLead: $('#ovLead'),
+    ovRules: $('#ovRules'),
+    ovScore: $('#ovScore'),
+    ovScoreValue: $('#ovScoreValue'),
+    ovRank: $('#ovRank'),
+    ovBest: $('#ovBest'),
+    ovBreak: $('#ovBreak'),
+    ovBtn: $('#ovBtn')
+  };
+
+  const pad = (n) => String(n).padStart(4, '0');
+  const current = () => CASES[state.i];
+
+  function setStatus(text, tone) {
+    els.status.textContent = text;
+    els.status.className = 'status' + (tone ? ' ' + tone : '');
+  }
+
+  function renderDots() {
+    els.dots.innerHTML = '';
+    CASES.forEach((_, idx) => {
+      const i = document.createElement('i');
+      if (idx < state.perCase.length) i.className = 'done';
+      else if (idx === state.i) i.className = 'now';
+      els.dots.appendChild(i);
+    });
+  }
+
+  function applyCss(css) {
+    els.style.textContent = css;
+  }
+
+  function probe(c) {
+    if (typeof c.test === 'function') return c.test(els.preview);
+    const sel = c.target.replace(/^\.preview\s+/, '');
+    const el = els.preview.querySelector(sel);
+    if (!el) return { pass: false, detail: 'target missing' };
+    const actual = getComputedStyle(el)[c.prop];
+    return { pass: actual === c.expect, detail: c.prop + ': ' + actual };
+  }
+
+  function loadCase() {
+    const c = current();
+    state.solved = false;
+    state.answered = false;
+    state.fails = 0;
+    els.client.textContent = c.client;
+    els.paneClient.textContent = c.client;
+    els.symptom.textContent = c.symptom;
+    els.preview.innerHTML = c.html;
+    els.code.value = c.css;
+    lastGoodCss = c.css;
+    applyCss(c.css);
+    els.clue.hidden = true;
+    els.clue.textContent = '';
+    els.explain.hidden = true;
+    els.options.innerHTML = '';
+    els.reveal.hidden = true;
+    els.next.hidden = true;
+    els.verify.disabled = false;
+    els.reset.disabled = false;
+    els.hudCase.textContent = (state.i + 1) + '/' + CASES.length;
+    els.hudScore.textContent = pad(state.score);
+    setStatus('Suspicious element highlighted. Click it for a clue, then fix the rule.', '');
+    renderDots();
+
+    els.preview.querySelectorAll('[data-hot]').forEach((el) => {
+      el.classList.add('hot-hint');
+      el.addEventListener('click', () => {
+        els.clue.hidden = false;
+        els.clue.innerHTML = '<b>Clue.</b> ' + el.dataset.hot;
+        el.classList.remove('hot-hint');
+      });
+    });
+  }
+
+  function showExplanation() {
+    const c = current();
+    els.explain.hidden = false;
+    els.options.innerHTML = '';
+    els.reveal.hidden = true;
+    els.next.hidden = true;
+    c.options.forEach((opt, idx) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = opt.text;
+      b.addEventListener('click', () => answer(idx, b));
+      els.options.appendChild(b);
+    });
+  }
+
+  function answer(idx, btn) {
+    if (state.answered) return;
+    const c = current();
+    const chosen = c.options[idx];
+    state.answered = true;
+    [...els.options.children].forEach((b, i) => {
+      b.disabled = true;
+      if (c.options[i].ok) b.classList.add('right');
+      else if (i === idx) b.classList.add('wrong');
+    });
+    if (chosen.ok) {
+      state.score += 100;
+      setStatus('Clear explanation. +100. Read the full reasoning below.', 'good');
+    } else {
+      state.score += 25;
+      setStatus('Part of the way there. +25 — read why the real cause is different.', 'warn');
+    }
+    els.reveal.hidden = false;
+    els.reveal.textContent = c.reveal;
+    els.next.hidden = false;
+    els.hudScore.textContent = pad(state.score);
+    state.perCase[state.i] = true;
+    renderDots();
+    els.next.focus();
+  }
+
+  function verify() {
+    if (state.solved) return;
+    const c = current();
+    applyCss(els.code.value);
+    const result = probe(c);
+    if (result.pass) {
+      state.solved = true;
+      const fixPoints = Math.max(40, 100 - state.fails * 15);
+      state.score += fixPoints;
+      els.hudScore.textContent = pad(state.score);
+      els.verify.disabled = true;
+      els.reset.disabled = true;
+      setStatus('Fixed. ' + result.detail + '. +' + fixPoints + ' points. Now explain the cause.', 'good');
+      showExplanation();
+    } else {
+      state.fails += 1;
+      setStatus('Not yet — ' + result.detail + '. Check specificity, inheritance, and source order.', 'bad');
+      els.code.focus();
+    }
+  }
+
+  function nextCase() {
+    state.i += 1;
+    if (state.i >= CASES.length) finish();
+    else loadCase();
+  }
+
+  function finish() {
+    const total = state.score;
+    if (total > state.best) {
+      state.best = total;
+      try { localStorage.setItem(BEST_KEY, String(total)); } catch (e) { /* ignore */ }
+    }
+    const rank = total >= 850 ? 'Chief inspector'
+      : total >= 700 ? 'Detective'
+      : total >= 550 ? 'Junior sleuth'
+      : 'Cadet';
+
+    els.style.textContent = '';
+    els.ovKicker.textContent = 'All four cases closed';
+    els.ovTitle.innerHTML = 'Case file <span class="accent">closed.</span>';
+    els.ovLead.textContent = 'Every broken site is repaired and explained. The pattern to remember: the browser did not ignore your rule — another rule outweighed it.';
+    els.ovRules.innerHTML = '';
+    els.ovScore.hidden = false;
+    els.ovScoreValue.textContent = String(total);
+    els.ovRank.textContent = rank;
+    els.ovBest.textContent = 'Best ' + pad(state.best);
+    els.ovBreak.hidden = false;
+    els.ovBreak.innerHTML = CASES.map((c, i) =>
+      '<div><span>' + (i + 1) + '. ' + c.client + '</span><b>' + (state.perCase[i] ? 'closed' : 'open') + '</b></div>'
+    ).join('');
+    els.ovBtn.textContent = 'Work the cases again';
+    els.overlay.hidden = false;
+  }
+
+  function start() {
+    state.score = 0;
+    state.i = 0;
+    state.perCase = [];
+    els.overlay.hidden = true;
+    loadCase();
+  }
+
+  els.verify.addEventListener('click', verify);
+  els.reset.addEventListener('click', () => {
+    els.code.value = lastGoodCss;
+    applyCss(lastGoodCss);
+    setStatus('Broken rules restored. The symptom is back.', '');
+  });
+  els.next.addEventListener('click', nextCase);
+  els.ovBtn.addEventListener('click', start);
+
+  els.code.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      verify();
+    }
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const start = els.code.selectionStart;
+      const end = els.code.selectionEnd;
+      els.code.value = els.code.value.slice(0, start) + '  ' + els.code.value.slice(end);
+      els.code.selectionStart = els.code.selectionEnd = start + 2;
+    }
+  });
+
+  try { state.best = parseInt(localStorage.getItem(BEST_KEY) || '0', 10) || 0; } catch (e) { state.best = 0; }
+
+  els.ovKicker.textContent = 'Broken sites unit';
+  els.ovTitle.innerHTML = 'CSS <span class="accent">Detective</span>';
+  els.ovLead.textContent = 'Four sites, four visual bugs, one suspect each. Click the broken element, read the clue, then fix the rule in the editor. Some bugs are not in the rule you are staring at.';
+  els.ovRules.innerHTML = [
+    'Click the highlighted suspect to collect a clue.',
+    'Edit the CSS panel, then apply the fix.',
+    'Once it renders correctly, choose the cause that explains it.',
+    'Faster, cleaner fixes and sharp explanations score higher.'
+  ].map((t) => '<li class="rule">' + t + '</li>').join('');
+  els.ovBtn.textContent = 'Open case one';
+  els.overlay.hidden = false;
+  els.hudScore.textContent = pad(state.score);
+})();
+</script>
+</body>
+</html>

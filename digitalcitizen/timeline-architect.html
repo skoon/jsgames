@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d1418">
+<title>Timeline Architect</title>
+<link rel="stylesheet" href="../common.css">
+<style>
+  :root {
+    --bg-top: #24333a;
+    --bg-mid: #090f12;
+    --bg-bottom: #04070a;
+    --stage-bg: #070d10;
+    --ink: #eef7f6;
+    --line: rgba(120, 210, 200, 0.18);
+    --teal: #6ef0c8;
+    --amber: #ffc86b;
+    --red: #ff7d86;
+    --blue: #8cc6ff;
+    --violet: #c1a6ff;
+  }
+  body { overflow-y: auto; }
+
+  #app {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: 8px;
+    padding: 8px;
+    height: 100%;
+    min-height: 0;
+  }
+  .topbar { margin: 0; }
+
+  .meters { display: flex; align-items: center; gap: 14px; }
+  .meter-box { display: grid; gap: 3px; min-width: 130px; }
+  .meter-box .lab {
+    display: flex; justify-content: space-between; gap: 8px;
+    font-family: var(--font-mono); font-size: 8.5px; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .meter-box .lab b { color: #fff; font-weight: 700; }
+  .bar { height: 8px; border-radius: 999px; background: rgba(255, 255, 255, 0.09); overflow: hidden; }
+  .bar span { display: block; height: 100%; border-radius: 999px; transition: width 260ms ease; }
+  .bar.opp span { background: linear-gradient(90deg, #4a8dd8, var(--blue)); }
+  .bar.safe span { background: linear-gradient(90deg, #2fd6a8, var(--teal)); }
+  .bar.low span { background: linear-gradient(90deg, #d63b4c, var(--red)); }
+
+  .board {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+    gap: 9px;
+    min-height: 0;
+  }
+  .pane {
+    display: flex; flex-direction: column; min-height: 0;
+    border: 1px solid var(--line); border-radius: 12px;
+    background: rgba(6, 12, 14, 0.82); overflow: hidden;
+  }
+  .pane-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 7px 10px; border-bottom: 1px solid var(--line);
+    background: rgba(255, 255, 255, 0.02);
+    font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .pane-head b { color: var(--teal); font-weight: 700; }
+  .pane-body {
+    flex: 1; min-height: 0; overflow-y: auto; padding: 12px;
+    scrollbar-width: thin;
+  }
+
+  /* ---------- post ---------- */
+  .post {
+    max-width: 460px; margin: 0 auto;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 12px; overflow: hidden; background: #0a1216;
+  }
+  .posthead {
+    display: flex; align-items: center; gap: 9px; padding: 9px 11px;
+  }
+  .avatar {
+    display: grid; place-items: center; width: 30px; height: 30px;
+    border-radius: 50%; background: linear-gradient(180deg, #2f7d72, #17423d);
+    font-family: var(--font-mono); font-size: 10px; color: #d9fff5;
+  }
+  .who { display: grid; gap: 1px; }
+  .who b { font-size: 11.5px; color: #fff; }
+  .who span { font-family: var(--font-mono); font-size: 8.5px; color: rgba(238, 247, 246, 0.45); }
+  .aud {
+    margin-left: auto; padding: 3px 7px; border-radius: 999px;
+    border: 1px solid rgba(140, 198, 255, 0.35);
+    font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--blue);
+  }
+  .aud.close, .aud.private { border-color: rgba(110, 240, 200, 0.4); color: var(--teal); }
+  .aud.public { border-color: rgba(255, 125, 134, 0.45); color: var(--red); }
+
+  .photo {
+    position: relative; height: 190px;
+    background: linear-gradient(180deg, #4a5b62, #23323a 62%, #18242b);
+  }
+  .photo[data-art="porch"]::before {
+    content: ""; position: absolute; inset: 34% 16% 30%;
+    border-radius: 6px; background: linear-gradient(180deg, #d8c9a8, #a8946f);
+  }
+  .photo[data-art="porch"]::after {
+    content: ""; position: absolute; left: 50%; bottom: 26%; width: 34px; height: 62px;
+    transform: translateX(-50%); border-radius: 4px;
+    background: #46392c;
+  }
+  .photo[data-art="concert"] {
+    background: radial-gradient(circle at 30% 30%, #c85ac4, transparent 45%),
+      radial-gradient(circle at 72% 40%, #4aa6e8, transparent 42%),
+      linear-gradient(180deg, #1a1224, #0b0712);
+  }
+  .photo[data-art="concert"]::before {
+    content: ""; position: absolute; inset: 55% 0 0;
+    background: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.18) 0 2px, transparent 2px 22px);
+  }
+  .photo[data-art="office"] {
+    background: linear-gradient(180deg, #38434f, #1c242c 66%, #12181d);
+  }
+  .photo[data-art="office"]::before {
+    content: ""; position: absolute; inset: 30% 22% 34%;
+    background: repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.14) 0 3px, transparent 3px 16px);
+    border-radius: 3px;
+  }
+
+  .spot {
+    position: absolute; z-index: 2;
+    padding: 2px 5px; border: 1px dashed rgba(255, 200, 107, 0.85);
+    border-radius: 4px; background: rgba(20, 12, 4, 0.55);
+    font-family: var(--font-mono); font-size: 7.5px; letter-spacing: 0.06em;
+    color: #ffe2b3; cursor: crosshair;
+  }
+  .spot.red {
+    border-style: solid; border-color: rgba(255, 255, 255, 0.2);
+    background: #050908; color: transparent; text-shadow: none;
+  }
+  .spot.red::after {
+    content: "redacted"; position: absolute; inset: 0; display: grid; place-items: center;
+    font-size: 7px; color: rgba(238, 247, 246, 0.35);
+  }
+
+  .caption { padding: 10px 12px 4px; font-size: 12.5px; line-height: 1.55; color: rgba(238, 247, 246, 0.9); }
+  .seg { padding: 1px 2px; border-bottom: 1px dashed rgba(255, 200, 107, 0.7); cursor: crosshair; }
+  .seg.red {
+    background: #050908; color: transparent; border-bottom-color: transparent;
+    user-select: none;
+  }
+  .seg.red::after { content: "redacted"; color: rgba(238, 247, 246, 0.3); font-family: var(--font-mono); font-size: 8px; }
+  .meta {
+    display: flex; align-items: center; gap: 6px;
+    padding: 7px 12px 11px; font-family: var(--font-mono); font-size: 8.5px;
+    color: rgba(238, 247, 246, 0.42); word-break: break-all;
+  }
+  .meta.scrubbed { color: rgba(110, 240, 200, 0.6); text-decoration: line-through; }
+
+  /* ---------- controls ---------- */
+  .group { display: grid; gap: 5px; }
+  .group + .group { margin-top: 11px; }
+  .group h3 {
+    margin: 0; font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--teal);
+  }
+  .group p { margin: 0; font-size: 10.5px; line-height: 1.5; color: rgba(238, 247, 246, 0.55); }
+  .audrow { display: flex; flex-wrap: wrap; gap: 4px; }
+  .audbtn {
+    padding: 6px 9px; border: 1px solid rgba(255, 255, 255, 0.13); border-radius: 6px;
+    background: rgba(255, 255, 255, 0.03); color: rgba(238, 247, 246, 0.8);
+    font-family: var(--font-mono); font-size: 9px; cursor: pointer;
+  }
+  .audbtn[aria-pressed="true"] { border-color: rgba(110, 240, 200, 0.6); background: rgba(110, 240, 200, 0.12); color: #d7fff4; }
+  .audbtn:hover { border-color: rgba(140, 198, 255, 0.5); }
+
+  .checklist { display: grid; gap: 4px; }
+  .row {
+    display: flex; align-items: center; gap: 7px;
+    padding: 6px 8px; border: 1px solid rgba(255, 255, 255, 0.09); border-radius: 6px;
+    background: rgba(255, 255, 255, 0.02); font-size: 10.5px; color: rgba(238, 247, 246, 0.75);
+  }
+  .row i {
+    display: grid; place-items: center; width: 15px; height: 15px; border-radius: 3px;
+    border: 1px solid rgba(255, 125, 134, 0.6); font-size: 8px; font-style: normal; color: var(--red);
+  }
+  .row.ok i { border-color: rgba(110, 240, 200, 0.6); color: var(--teal); }
+  .row.ok { color: rgba(110, 240, 200, 0.75); }
+
+  .toolbtn {
+    padding: 7px 10px; border: 1px solid rgba(140, 198, 255, 0.35); border-radius: 7px;
+    background: rgba(140, 198, 255, 0.07); color: #d6ecff;
+    font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.06em; cursor: pointer;
+  }
+  .toolbtn:hover { background: rgba(140, 198, 255, 0.14); }
+  .toolbtn.on { border-color: rgba(110, 240, 200, 0.6); background: rgba(110, 240, 200, 0.1); color: #d7fff4; }
+
+  .conseq { display: grid; gap: 6px; }
+  .conseq .c {
+    padding: 8px 10px; border-left: 2px solid rgba(255, 125, 134, 0.6);
+    background: rgba(255, 125, 134, 0.05); border-radius: 0 7px 7px 0;
+    font-size: 11px; line-height: 1.5; color: rgba(238, 247, 246, 0.8);
+  }
+  .conseq .c.good { border-left-color: rgba(110, 240, 200, 0.7); background: rgba(110, 240, 200, 0.05); }
+  .conseq .c b { display: block; margin-bottom: 2px; font-family: var(--font-mono); font-size: 8.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--amber); }
+  .conseq .c.good b { color: var(--teal); }
+  .delta { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.06em; color: var(--muted); }
+  .delta b { color: #fff; }
+
+  .actionbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 2px; flex-wrap: wrap; }
+  .actionbar .note-line { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint); }
+  .actionbar .btn { margin: 0; }
+  .btn.small { min-height: 32px; padding: 7px 14px; font-size: 10px; }
+  .btn[disabled] { opacity: 0.4; cursor: default; }
+
+  @media (max-width: 900px) {
+    .board { grid-template-columns: minmax(0, 1fr); min-width: 0; }
+    #app { height: auto; }
+    #stage.stage-fluid { height: auto; }
+    .pane-body { overflow: visible; }
+    .topbar { flex-wrap: wrap; row-gap: 7px; min-width: 0; }
+    .meters { width: 100%; flex-wrap: wrap; gap: 8px 12px; }
+    .meter-box { flex: 1 1 130px; min-width: 0; }
+    .photo { height: 168px; }
+    .spot { font-size: 7px; }
+  }
+</style>
+</head>
+<body>
+<h1 class="sr-only">Timeline Architect: audit what you post now against what it becomes in ten years</h1>
+<div id="stage" class="stage-fluid">
+  <div id="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">TA</span>
+        <span>
+          <b>Timeline Architect</b>
+          <small>Season 1 &middot; three posts</small>
+        </span>
+      </div>
+      <div class="meters">
+        <div class="meter-box">
+          <span class="lab">Opportunity <b id="oppVal">72%</b></span>
+          <div class="bar opp" id="oppBar"><span style="width:72%"></span></div>
+        </div>
+        <div class="meter-box">
+          <span class="lab">Privacy <b id="safeVal">58%</b></span>
+          <div class="bar safe" id="safeBar"><span style="width:58%"></span></div>
+        </div>
+      </div>
+    </header>
+
+    <main class="board">
+      <section class="pane" aria-label="Post">
+        <div class="pane-head"><span id="epName">Episode 1</span><b id="epYear">2026</b></div>
+        <div class="pane-body" id="postBody"></div>
+      </section>
+
+      <section class="pane" aria-label="Controls">
+        <div class="pane-head"><span>Before you publish</span><b id="ctrlState">editing</b></div>
+        <div class="pane-body" id="ctrlBody"></div>
+      </section>
+    </main>
+
+    <footer class="actionbar">
+      <span class="note-line" id="noteLine">Click a label in the photo or caption to redact it</span>
+      <button id="publish" class="btn small" type="button">Publish post</button>
+    </footer>
+  </div>
+
+  <div id="overlay" class="overlay" role="dialog" aria-modal="true" aria-labelledby="ovTitle" hidden>
+    <div class="panel panel-card">
+      <p class="eyebrow" id="ovKicker">Ten years later</p>
+      <h2 id="ovTitle" class="title"></h2>
+      <p id="ovLead" class="lead"></p>
+      <ul id="ovRules" class="rules"></ul>
+      <div id="ovScore" class="final-score" hidden>
+        <span>Footprint</span>
+        <strong id="ovScoreValue">0</strong>
+        <p id="ovRank" class="rank"></p>
+        <p id="ovBest" class="best"></p>
+      </div>
+      <button id="ovBtn" class="btn" type="button">Rewind to 2026</button>
+    </div>
+  </div>
+</div>
+<p class="hint">everything you post is a decision with a ten-year tail</p>
+
+<script>
+(() => {
+  'use strict';
+
+  const $ = (s) => document.querySelector(s);
+  const BEST_KEY = 'timelineArchitect.best.v1';
+
+  const AUDIENCES = [
+    { id: 'public', label: 'Public', safety: -9, opp: -5 },
+    { id: 'friends', label: 'Friends', safety: -3, opp: -1 },
+    { id: 'close', label: 'Close Friends', safety: 0, opp: 0 },
+    { id: 'private', label: 'Private', safety: 2, opp: 1 }
+  ];
+
+  const EPISODES = [
+    {
+      id: 'e1', year: '2026', name: 'Episode 1 \u00b7 Eighteen',
+      title: 'Your 18th birthday',
+      art: 'porch',
+      audience: 'public',
+      meta: 'EXIF: 51.5074 N, 0.1278 W \u00b7 iPhone \u00b7 2026-04-12 18:22',
+      metaRisk: { safety: -8, opp: -2, note: 'GPS and timestamp: the photo carries its own address.' },
+      spots: [
+        { key: 'licence', label: 'licence no.', style: 'left:8%;top:58%;', risk: { safety: -12, opp: -10, note: 'Identity theft: a licence number plus a date of birth opens accounts in your name.' } },
+        { key: 'dob', label: 'date of birth', style: 'left:44%;top:58%;', risk: { safety: -9, opp: -8, note: 'Synthetic identity: a real name and birthdate is the seed of a fake credit file.' } },
+        { key: 'address', label: 'home address', style: 'left:8%;top:76%;', risk: { safety: -11, opp: -6, note: 'Your address, searchable by anyone, forever.' } },
+        { key: 'door', label: 'no. 42', style: 'right:16%;top:44%;', risk: { safety: -8, opp: -2, note: 'A house number plus a street sign is a front door on a map.' } }
+      ],
+      caption: [
+        { text: 'Home alone for the entire week! ', risk: { safety: -14, opp: 0, note: 'An empty house announced to the public, with the address in the frame.' } },
+        { text: 'Freedom!', risk: null }
+      ],
+      fixed: null
+    },
+    {
+      id: 'e2', year: '2027', name: 'Episode 2 \u00b7 Nineteen',
+      title: 'Front row, ticket in hand',
+      art: 'concert',
+      audience: 'public',
+      meta: 'EXIF: 53.4808 N, 2.2426 W \u00b7 2027-08-03 20:41',
+      metaRisk: { safety: -7, opp: -2, note: 'Live location plus time: anyone can work out where you are standing.' },
+      spots: [
+        { key: 'barcode', label: 'ticket barcode', style: 'left:30%;top:66%;', risk: { safety: -12, opp: -4, note: 'Ticket theft: the barcode was reused and your entry was already scanned.' } },
+        { key: 'seat', label: 'block 12 row F', style: 'right:10%;top:52%;', risk: { safety: -6, opp: 0, note: 'A seat number tells a stranger exactly where to find you.' } }
+      ],
+      caption: [
+        { text: 'Front row tonight!! ', risk: { safety: -9, opp: 0, note: '"Tonight" plus a venue is a live location broadcast.' } },
+        { text: 'Best night of the year.', risk: null }
+      ],
+      fixed: null
+    },
+    {
+      id: 'e3', year: '2036', name: 'Episode 3 \u00b7 Twenty-eight',
+      title: 'Job application season',
+      art: 'office',
+      audience: 'public',
+      meta: 'No EXIF \u00b7 uploaded from a work laptop',
+      metaRisk: null,
+      oldPost: { text: 'The 2024 post: "honestly the whole department can shove it"', risk: { safety: 0, opp: -16, note: 'A recruiter found the old rant on the first page of results and put your application on hold.' } },
+      spots: [
+        { key: 'badge', label: 'staff badge', style: 'left:36%;top:40%;', risk: { safety: -6, opp: -8, note: 'The badge names your current employer, which is what makes the old rant findable.' } }
+      ],
+      caption: [
+        { text: 'Three years here already. ', risk: null },
+        { text: 'Time flies when the work is good.', risk: null }
+      ],
+      fixed: null
+    }
+  ];
+
+  const state = { ep: 0, opp: 72, safe: 58, redacted: {}, scrubbed: {}, audience: {}, deleted: {}, phase: 'edit', published: {}, best: 0 };
+
+  const els = {
+    postBody: $('#postBody'),
+    ctrlBody: $('#ctrlBody'),
+    epName: $('#epName'),
+    epYear: $('#epYear'),
+    ctrlState: $('#ctrlState'),
+    oppVal: $('#oppVal'),
+    safeVal: $('#safeVal'),
+    oppBar: $('#oppBar'),
+    safeBar: $('#safeBar'),
+    noteLine: $('#noteLine'),
+    publish: $('#publish'),
+    overlay: $('#overlay'),
+    ovKicker: $('#ovKicker'),
+    ovTitle: $('#ovTitle'),
+    ovLead: $('#ovLead'),
+    ovRules: $('#ovRules'),
+    ovScore: $('#ovScore'),
+    ovScoreValue: $('#ovScoreValue'),
+    ovRank: $('#ovRank'),
+    ovBest: $('#ovBest'),
+    ovBtn: $('#ovBtn')
+  };
+
+  const ep = () => EPISODES[state.ep];
+  const clamp = (n) => Math.max(0, Math.min(100, n));
+  const redSet = (id) => state.redacted[id] || (state.redacted[id] = {});
+  const audOf = (id) => state.audience[id] || EPISODES.find((e) => e.id === id).audience;
+
+  function renderMeters() {
+    els.oppVal.textContent = state.opp + '%';
+    els.safeVal.textContent = state.safe + '%';
+    els.oppBar.querySelector('span').style.width = state.opp + '%';
+    els.safeBar.querySelector('span').style.width = state.safe + '%';
+    els.oppBar.className = 'bar opp' + (state.opp <= 30 ? ' low' : '');
+    els.safeBar.className = 'bar safe' + (state.safe <= 30 ? ' low' : '');
+  }
+
+  function renderPost() {
+    const e = ep();
+    const red = redSet(e.id);
+    const aud = AUDIENCES.find((a) => a.id === audOf(e.id));
+    const metaScrubbed = !!state.scrubbed[e.id];
+    const oldDeleted = !!state.deleted[e.id];
+
+    let caption = e.caption.map((seg, i) => {
+      const key = 'cap' + i;
+      const isRed = !!red[key];
+      const cls = seg.risk ? 'seg' + (isRed ? ' red' : '') : '';
+      return seg.risk
+        ? '<span class="' + cls + '" data-red="' + key + '">' + seg.text + '</span>'
+        : '<span>' + seg.text + '</span>';
+    }).join('');
+
+    if (e.oldPost) {
+      caption = '<span class="' + (oldDeleted ? 'seg red' : 'seg') + '" data-old="1">' + e.oldPost.text + '</span><br>' + caption;
+    }
+
+    els.postBody.innerHTML =
+      '<article class="post">' +
+        '<div class="posthead">' +
+          '<div class="avatar">AR</div>' +
+          '<div class="who"><b>Alex Rivera</b><span>' + e.year + ' \u00b7 ' + e.title + '</span></div>' +
+          '<span class="aud ' + aud.id + '">' + aud.label + '</span>' +
+        '</div>' +
+        '<div class="photo" data-art="' + e.art + '">' +
+          e.spots.map((s) => '<span class="spot' + (red[s.key] ? ' red' : '') + '" data-spot="' + s.key + '" style="' + s.style + '">' + s.label + '</span>').join('') +
+        '</div>' +
+        '<div class="caption">' + caption + '</div>' +
+        '<div class="meta' + (metaScrubbed ? ' scrubbed' : '') + '">' + e.meta + (metaScrubbed ? ' \u00b7 stripped' : '') + '</div>' +
+      '</article>';
+
+    els.postBody.querySelectorAll('[data-spot]').forEach((s) => {
+      s.addEventListener('click', () => {
+        if (state.phase !== 'edit') return;
+        const set = redSet(e.id);
+        set[s.dataset.spot] = !set[s.dataset.spot];
+        render();
+      });
+    });
+    els.postBody.querySelectorAll('[data-red]').forEach((s) => {
+      s.addEventListener('click', () => {
+        if (state.phase !== 'edit') return;
+        const set = redSet(e.id);
+        set[s.dataset.red] = !set[s.dataset.red];
+        render();
+      });
+    });
+    const old = els.postBody.querySelector('[data-old]');
+    if (old) old.addEventListener('click', () => {
+      if (state.phase !== 'edit') return;
+      state.deleted[e.id] = !state.deleted[e.id];
+      render();
+    });
+  }
+
+  function renderControls() {
+    const e = ep();
+    const red = redSet(e.id);
+    if (state.phase === 'result') {
+      els.ctrlBody.innerHTML = state.published[e.id] || '';
+      els.ctrlState.textContent = 'ten years later';
+      els.publish.textContent = state.ep === EPISODES.length - 1 ? 'Close the season' : 'Next episode';
+      els.publish.disabled = false;
+      els.publish.dataset.mode = 'next';
+      return;
+    }
+
+    const aud = audOf(e.id);
+    const items = [];
+    e.spots.forEach((s) => items.push({ on: !red[s.key], label: s.label, by: 'photo' }));
+    e.caption.forEach((seg, i) => { if (seg.risk) items.push({ on: !red['cap' + i], label: 'caption phrase ' + (i + 1), by: 'caption' }); });
+    if (e.oldPost) items.push({ on: !state.deleted[e.id], label: 'the 2024 post', by: 'timeline' });
+    if (e.metaRisk) items.push({ on: !state.scrubbed[e.id], label: 'EXIF location data', by: 'metadata' });
+
+    const rows = items.map((it) =>
+      '<div class="row' + (it.on ? '' : ' ok') + '"><i>' + (it.on ? '\u2715' : '\u2713') + '</i>' +
+      '<span>' + it.label + (it.on ? ' \u2014 exposed' : ' \u2014 handled') + '</span></div>').join('');
+
+    els.ctrlBody.innerHTML =
+      '<div class="group"><h3>Audience</h3><p>Who can see this, and who can search it later.</p>' +
+        '<div class="audrow">' + AUDIENCES.map((a) =>
+          '<button class="audbtn" type="button" data-aud="' + a.id + '" aria-pressed="' + (a.id === aud) + '">' + a.label + '</button>').join('') +
+        '</div></div>' +
+      '<div class="group"><h3>Exposure</h3><div class="checklist">' + rows + '</div></div>' +
+      '<div class="group"><h3>Tools</h3>' +
+        (e.metaRisk ? '<button class="toolbtn' + (state.scrubbed[e.id] ? ' on' : '') + '" type="button" id="scrub">' + (state.scrubbed[e.id] ? 'EXIF stripped' : 'Strip EXIF metadata') + '</button>' : '<p>No metadata attached to this one.</p>') +
+      '</div>';
+
+    els.ctrlBody.querySelectorAll('[data-aud]').forEach((b) => {
+      b.addEventListener('click', () => {
+        state.audience[e.id] = b.dataset.aud;
+        render();
+      });
+    });
+    const scrub = els.ctrlBody.querySelector('#scrub');
+    if (scrub) scrub.addEventListener('click', () => {
+      state.scrubbed[e.id] = !state.scrubbed[e.id];
+      render();
+    });
+
+    els.ctrlState.textContent = 'editing';
+    els.publish.textContent = 'Publish post';
+    els.publish.disabled = false;
+    els.publish.dataset.mode = 'publish';
+  }
+
+  function render() {
+    els.epName.textContent = ep().name;
+    els.epYear.textContent = ep().year;
+    renderMeters();
+    renderPost();
+    renderControls();
+  }
+
+  function publish() {
+    const e = ep();
+    const red = redSet(e.id);
+    let safety = 0, opp = 0;
+    const notes = [];
+
+    e.spots.forEach((s) => {
+      if (!red[s.key]) { safety += s.risk.safety; opp += s.risk.opp; notes.push(s.risk.note); }
+    });
+    e.caption.forEach((seg, i) => {
+      if (seg.risk && !red['cap' + i]) { safety += seg.risk.safety; opp += seg.risk.opp; notes.push(seg.risk.note); }
+    });
+    if (e.oldPost && !state.deleted[e.id]) {
+      safety += e.oldPost.risk.safety; opp += e.oldPost.risk.opp; notes.push(e.oldPost.risk.note);
+    }
+    if (e.metaRisk && !state.scrubbed[e.id]) {
+      safety += e.metaRisk.safety; opp += e.metaRisk.opp; notes.push(e.metaRisk.note);
+    }
+    const aud = AUDIENCES.find((a) => a.id === audOf(e.id));
+    safety += aud.safety; opp += aud.opp;
+    if (aud.id === 'public') notes.push('A public post is indexed, mirrored and scraped long before you think about deleting it.');
+    if (!notes.length) {
+      safety += 4; opp += 2;
+      notes.push('Nothing identifying went out. The photo is still a memory, just not a data trail.');
+    }
+
+    state.safe = clamp(state.safe + safety);
+    state.opp = clamp(state.opp + opp);
+
+    const html =
+      '<div class="conseq">' +
+        '<p class="delta">Privacy <b>' + (safety >= 0 ? '+' : '') + safety + '</b> \u00b7 Opportunity <b>' + (opp >= 0 ? '+' : '') + opp + '</b></p>' +
+        notes.map((n) => '<div class="c"><b>2036</b>' + n + '</div>').join('') +
+      '</div>';
+
+    state.published[e.id] = html;
+    state.phase = 'result';
+    render();
+    els.noteLine.textContent = 'Ten years later. Read what survived.';
+  }
+
+  function next() {
+    if (state.phase !== 'result') { publish(); return; }
+    if (state.ep === EPISODES.length - 1) { finish(); return; }
+    state.ep += 1;
+    state.phase = 'edit';
+    render();
+    els.noteLine.textContent = 'Click a label in the photo or caption to redact it';
+  }
+
+  function finish() {
+    const key = Math.min(state.opp, state.safe);
+    if (key > state.best) {
+      state.best = key;
+      try { localStorage.setItem(BEST_KEY, String(key)); } catch (err) { /* ignore */ }
+    }
+    let title, rank, lead;
+    if (state.opp >= 70 && state.safe >= 70) {
+      title = 'A footprint <span class="accent">you chose.</span>';
+      rank = 'Architect';
+      lead = 'Ten years on, the timeline holds exactly what you meant to put there. That is rarer than it sounds.';
+    } else if (state.safe >= 70) {
+      title = 'Safe, <span class="accent">but narrow.</span>';
+      rank = 'Careful';
+      lead = 'Nothing leaked, and nothing much got through either. The old post still sits where recruiters look.';
+    } else if (state.opp >= 70) {
+      title = 'Open doors, <span class="accent">open window.</span>';
+      rank = 'Visible';
+      lead = 'The opportunities arrived, and so did the scrapers. Somewhere a stranger still has your address.';
+    } else {
+      title = 'The post <span class="accent">outlived you.</span>';
+      rank = 'Exposed';
+      lead = 'Ten years of consequences from three posts. None of it was unusual behaviour; all of it was permanent.';
+    }
+    els.ovKicker.textContent = 'Season one complete';
+    els.ovTitle.innerHTML = title;
+    els.ovLead.textContent = lead + ' Final privacy ' + state.safe + '%, opportunity ' + state.opp + '%.';
+    els.ovRules.innerHTML = [
+      'Redaction is a habit: licence numbers, addresses and dates of birth never belong in a photo.',
+      'Audience is a filter, not a guarantee. Close Friends still has screenshots.',
+      'EXIF carries the address the picture does not show.',
+      'Permanence is the point: old posts resurface exactly when someone is checking you.'
+    ].map((t) => '<li class="rule">' + t + '</li>').join('');
+    els.ovScore.hidden = false;
+    els.ovScoreValue.textContent = state.safe + '% / ' + state.opp + '%';
+    els.ovRank.textContent = rank + ' \u00b7 ' + title.replace(/<[^>]+>/g, '');
+    els.ovBest.textContent = 'Best footprint ' + state.best + '%';
+    els.overlay.hidden = false;
+    els.ovBtn.focus();
+  }
+
+  function start() {
+    state.ep = 0;
+    state.opp = 72;
+    state.safe = 58;
+    state.redacted = {};
+    state.scrubbed = {};
+    state.audience = {};
+    state.deleted = {};
+    state.published = {};
+    state.phase = 'edit';
+    els.overlay.hidden = true;
+    els.noteLine.textContent = 'Click a label in the photo or caption to redact it';
+    els.publish.dataset.mode = 'publish';
+    render();
+  }
+
+  els.publish.addEventListener('click', next);
+  els.ovBtn.addEventListener('click', start);
+
+  try { state.best = parseInt(localStorage.getItem(BEST_KEY) || '0', 10) || 0; } catch (e) { state.best = 0; }
+
+  render();
+
+  els.ovTitle.innerHTML = 'Timeline <span class="accent">Architect</span>';
+  els.ovLead.textContent = 'Three posts, three moments in a life, and one ten-year jump after each. Click the labels in the photo and caption to redact them, set an audience, strip the metadata, then publish.';
+  els.ovRules.innerHTML = [
+    'Click a dashed label in the photo or caption to redact it.',
+    'Audience is a setting, not a secret: screenshots leave the room.',
+    'EXIF can carry the address the picture does not show.',
+    'Every episode fast-forwards ten years so you can read the consequences.'
+  ].map((t) => '<li class="rule">' + t + '</li>').join('');
+  els.ovBtn.textContent = 'Start in 2026';
+  els.overlay.hidden = false;
+})();
+</script>
+</body>
+</html>

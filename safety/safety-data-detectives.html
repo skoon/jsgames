@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b1216">
+<title>Safety Data Detectives</title>
+<link rel="stylesheet" href="../common.css">
+<style>
+  :root {
+    --bg-top: #24333a;
+    --bg-mid: #0a1216;
+    --bg-bottom: #050a0c;
+    --stage-bg: #071014;
+    --ink: #eef7fa;
+    --line: rgba(136, 202, 255, 0.18);
+    --teal: #70e7c8;
+    --amber: #ffc86b;
+    --red: #ff8474;
+    --blue: #88caff;
+  }
+  body { overflow-y: auto; }
+
+  #app {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: 8px;
+    padding: 8px;
+    height: 100%;
+    min-height: 0;
+  }
+  .topbar { margin: 0; }
+
+  .workspace {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+    gap: 9px;
+    min-height: 0;
+  }
+
+  .pane {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: rgba(5, 11, 14, 0.76);
+    overflow: hidden;
+  }
+  .pane-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--line);
+    background: rgba(255, 255, 255, 0.02);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .pane-head b { color: var(--blue); font-weight: 700; }
+
+  .pane-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 10px;
+    scrollbar-width: thin;
+  }
+
+  /* ---------- documents ---------- */
+  .doc {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    background: #0d1418;
+    overflow: hidden;
+  }
+  .doc + .doc { margin-top: 9px; }
+  .doc-label {
+    padding: 9px 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    background: linear-gradient(180deg, rgba(255, 248, 225, 0.96), rgba(240, 231, 205, 0.94));
+    color: #1d2326;
+    font-family: var(--font-sans);
+  }
+  .doc-label b {
+    display: block;
+    font-size: 12.5px;
+    letter-spacing: 0.02em;
+  }
+  .doc-label .pict {
+    display: inline-block;
+    margin-top: 4px;
+    padding: 2px 6px;
+    border: 1.5px solid #b3261e;
+    border-radius: 3px;
+    color: #b3261e;
+    font-family: var(--font-mono);
+    font-size: 8.5px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+  }
+  .doc-label p { margin: 5px 0 0; font-size: 10.5px; line-height: 1.45; }
+
+  .doc-title {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 7px 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .section {
+    display: grid;
+    gap: 3px;
+    width: 100%;
+    padding: 8px 10px;
+    border: 0;
+    border-left: 2px solid transparent;
+    background: none;
+    text-align: left;
+    font: inherit;
+    color: rgba(238, 247, 250, 0.8);
+    cursor: pointer;
+  }
+  .section:hover { background: rgba(136, 202, 255, 0.06); }
+  .section[aria-pressed="true"] {
+    border-left-color: var(--amber);
+    background: rgba(255, 200, 107, 0.08);
+  }
+  .section b {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--blue);
+  }
+  .section span { font-size: 11.5px; line-height: 1.5; }
+
+  /* ---------- questions ---------- */
+  .question { display: grid; gap: 8px; }
+  .question h3 {
+    margin: 0;
+    font-size: 12.5px;
+    line-height: 1.45;
+    color: #f2fbff;
+  }
+  .question .counter {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .answers { display: grid; gap: 5px; }
+  .answer {
+    text-align: left;
+    padding: 8px 10px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.03);
+    color: rgba(238, 247, 250, 0.86);
+    font-family: var(--font-sans);
+    font-size: 11.5px;
+    line-height: 1.45;
+    cursor: pointer;
+  }
+  .answer:hover { border-color: rgba(136, 202, 255, 0.5); }
+  .answer:disabled { cursor: default; }
+  .answer.right { border-color: rgba(112, 231, 200, 0.65); background: rgba(112, 231, 200, 0.1); }
+  .answer.wrong { border-color: rgba(255, 132, 116, 0.6); background: rgba(255, 132, 116, 0.09); }
+
+  .evidence {
+    display: grid;
+    gap: 4px;
+    padding: 8px;
+    border: 1px dashed rgba(255, 200, 107, 0.35);
+    border-radius: 8px;
+    background: rgba(255, 200, 107, 0.04);
+  }
+  .evidence > span {
+    font-family: var(--font-mono);
+    font-size: 8.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--amber);
+  }
+  .evidence .chips { display: flex; flex-wrap: wrap; gap: 4px; }
+  .evidence .chip {
+    padding: 3px 7px;
+    border: 1px solid rgba(255, 200, 107, 0.4);
+    border-radius: 999px;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: #ffe6b8;
+  }
+  .evidence .none { font-size: 10px; color: var(--muted); }
+
+  .verdict {
+    padding: 8px 9px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    font-size: 11px;
+    line-height: 1.5;
+    color: rgba(238, 247, 250, 0.8);
+  }
+  .verdict.ok { border-color: rgba(112, 231, 200, 0.45); background: rgba(112, 231, 200, 0.06); color: #c9fdec; }
+  .verdict.no { border-color: rgba(255, 132, 116, 0.45); background: rgba(255, 132, 116, 0.06); color: #ffc9c2; }
+  .verdict[hidden] { display: none; }
+
+  .actionbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 2px; }
+  .actionbar .note-line { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint); }
+  .actionbar .btn { margin: 0; }
+  .btn.small { min-height: 34px; padding: 8px 16px; font-size: 10.5px; }
+
+  @media (max-width: 900px) {
+    .workspace { grid-template-columns: minmax(0, 1fr); }
+    #app { height: auto; }
+    #stage.stage-fluid { height: auto; }
+    .pane-body { overflow: visible; }
+  }
+</style>
+</head>
+<body>
+<h1 class="sr-only">Safety Data Detectives: read labels and safety data sheets</h1>
+<div id="stage" class="stage-fluid">
+  <div id="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">SDS</span>
+        <span>
+          <b>Safety Data Detectives</b>
+          <small>Chemical store inquiry</small>
+        </span>
+      </div>
+      <div class="hud">
+        <div class="stat"><span>Question</span><strong id="hudQ">1/4</strong></div>
+        <div class="stat"><span>Score</span><strong id="hudScore">0000</strong></div>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <section class="pane" aria-label="Documents">
+        <div class="pane-head">
+          <span>Evidence &middot; chemical store</span>
+          <b id="docNote">0 sections cited</b>
+        </div>
+        <div class="pane-body" id="docs"></div>
+      </section>
+
+      <section class="pane" aria-label="Questions">
+        <div class="pane-head">
+          <span>Case questions</span>
+          <b id="qState">open</b>
+        </div>
+        <div class="pane-body">
+          <div id="qWrap" class="question"></div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="actionbar">
+      <span class="note-line" id="noteLine">Cite at least one document section, then answer</span>
+      <div class="row">
+        <button id="next" class="btn small" type="button" hidden>Next question</button>
+      </div>
+    </footer>
+  </div>
+
+  <div id="overlay" class="overlay" role="dialog" aria-modal="true" aria-labelledby="ovTitle" hidden>
+    <div class="panel panel-card">
+      <p id="ovKicker" class="eyebrow"></p>
+      <h2 id="ovTitle" class="title"></h2>
+      <p id="ovLead" class="lead"></p>
+      <ul id="ovRules" class="rules"></ul>
+      <div id="ovScore" class="final-score" hidden>
+        <span>Case score</span>
+        <strong id="ovScoreValue">0</strong>
+        <p id="ovRank" class="rank"></p>
+        <p id="ovBest" class="best"></p>
+      </div>
+      <button id="ovBtn" class="btn" type="button">Open the store</button>
+    </div>
+  </div>
+</div>
+<p class="hint">click sections to cite them &middot; answer from the documents, not from guesswork</p>
+
+<script>
+(() => {
+  'use strict';
+
+  const $ = (s) => document.querySelector(s);
+  const BEST_KEY = 'sdsDetectives.best.v1';
+
+  const DOCS = [
+    {
+      id: 'label',
+      kind: 'label',
+      title: 'Container label',
+      body: 'Sodium hypochlorite solution 12%',
+      pict: 'CORROSIVE',
+      note: 'Causes severe skin burns and eye damage. Wear protective gloves, eye and face protection. Keep out of reach of children.'
+    },
+    {
+      id: 'hazards',
+      title: 'Section 2 \u00b7 Hazard identification',
+      text: 'H314 Causes severe skin burns and eye damage. H318 Causes serious eye damage. H290 May be corrosive to metals.'
+    },
+    {
+      id: 'firstaid',
+      title: 'Section 4 \u00b7 First-aid measures',
+      text: 'After skin contact: wash with plenty of water for at least 15 minutes. Remove contaminated clothing. After eye contact: rinse cautiously with water for several minutes, remove contact lenses, continue rinsing. Get medical advice.'
+    },
+    {
+      id: 'storage',
+      title: 'Section 7 \u00b7 Handling and storage',
+      text: 'Keep container tightly closed in a cool, well-ventilated place. Keep away from acids, reducing agents and combustible materials. Store below 25 \u00b0C. Do not store in unlabelled containers.'
+    },
+    {
+      id: 'exposure',
+      title: 'Section 8 \u00b7 Exposure controls',
+      text: 'Wear chemical-resistant gloves (nitrile), chemical goggles and a face shield, and a chemical-resistant apron. Provide local exhaust ventilation where vapour may form.'
+    },
+    {
+      id: 'reactivity',
+      title: 'Section 10 \u00b7 Stability and reactivity',
+      text: 'Reacts violently with acids, releasing chlorine gas. Decomposes on heating, releasing toxic fumes. Reacts with ammonia to form chloramine vapour.'
+    }
+  ];
+
+  const QUESTIONS = [
+    {
+      prompt: 'A student splashes concentrate onto their forearm during a stock check. What does the sheet say to do first?',
+      answer: 1,
+      evidence: ['firstaid'],
+      options: [
+        'Wipe it off with a paper towel and carry on',
+        'Wash with plenty of water for at least 15 minutes and remove contaminated clothing',
+        'Apply a neutralising cream, then report to the office'
+      ],
+      why: 'Section 4 is explicit: 15 minutes of water, remove contaminated clothing, then get medical advice. Neutralising a corrosive on skin is not in the instructions.'
+    },
+    {
+      prompt: 'Can this drum be stored beside the hydrochloric acid carboy?',
+      answer: 0,
+      evidence: ['reactivity', 'storage'],
+      options: [
+        'No \u2014 it reacts with acids and releases chlorine gas',
+        'Yes \u2014 both are liquids in sealed containers',
+        'Only if both containers are kept below 25 \u00b0C'
+      ],
+      why: 'Section 10 warns of a violent reaction with acids releasing chlorine gas. Temperature control does not prevent that reaction.'
+    },
+    {
+      prompt: 'Which protection does the sheet actually specify when decanting?',
+      answer: 2,
+      evidence: ['exposure', 'label'],
+      options: [
+        'A cloth face mask and standard work gloves',
+        'Safety glasses and a cotton apron',
+        'Chemical-resistant nitrile gloves, chemical goggles, face shield and a chemical apron'
+      ],
+      why: 'Section 8 names nitrile gloves, goggles plus face shield, and a chemical-resistant apron. The label repeats the eye and face requirement.'
+    },
+    {
+      prompt: 'A jug of clear liquid is found on the shelf with no label at all. The cleaner says it is "probably just water". What do you do?',
+      answer: 1,
+      evidence: ['storage'],
+      options: [
+        'Smell it to check whether it is a chemical',
+        'Keep it closed, label it as unidentified, and report it for proper identification',
+        'Pour it down the sink \u2014 it is clear, so it is probably water'
+      ],
+      why: 'Section 7 requires containers to stay labelled. An unknown liquid has no safe handling instructions, so it must be treated as hazardous and identified by someone qualified \u2014 never by smell or by guessing.'
+    }
+  ];
+
+  const state = {
+    q: 0,
+    score: 0,
+    best: 0,
+    cited: [],
+    answered: false
+  };
+
+  const els = {
+    docs: $('#docs'),
+    docNote: $('#docNote'),
+    qWrap: $('#qWrap'),
+    qState: $('#qState'),
+    hudQ: $('#hudQ'),
+    hudScore: $('#hudScore'),
+    noteLine: $('#noteLine'),
+    next: $('#next'),
+    overlay: $('#overlay'),
+    ovKicker: $('#ovKicker'),
+    ovTitle: $('#ovTitle'),
+    ovLead: $('#ovLead'),
+    ovRules: $('#ovRules'),
+    ovScore: $('#ovScore'),
+    ovScoreValue: $('#ovScoreValue'),
+    ovRank: $('#ovRank'),
+    ovBest: $('#ovBest'),
+    ovBtn: $('#ovBtn')
+  };
+
+  const pad = (n) => String(n).padStart(4, '0');
+  const current = () => QUESTIONS[state.q];
+
+  function renderDocs() {
+    els.docs.innerHTML = '';
+    DOCS.forEach((doc) => {
+      if (doc.kind === 'label') {
+        const box = document.createElement('div');
+        box.className = 'doc';
+        box.innerHTML = '<div class="doc-label"><b>' + doc.body + '</b><span class="pict">' + doc.pict + '</span><p>' + doc.note + '</p></div>';
+        els.docs.appendChild(box);
+        return;
+      }
+      const wrap = document.createElement('div');
+      wrap.className = 'doc';
+      wrap.innerHTML = '<div class="doc-title"><span>' + doc.title + '</span><span>click to cite</span></div>';
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'section';
+      b.setAttribute('aria-pressed', String(state.cited.indexOf(doc.id) !== -1));
+      b.innerHTML = '<b>' + doc.title.split('\u00b7')[0] + '</b><span>' + doc.text + '</span>';
+      b.addEventListener('click', () => {
+        if (state.answered) return;
+        const i = state.cited.indexOf(doc.id);
+        if (i === -1) state.cited.push(doc.id);
+        else state.cited.splice(i, 1);
+        renderDocs();
+        renderEvidence();
+      });
+      wrap.appendChild(b);
+      els.docs.appendChild(wrap);
+    });
+    els.docNote.textContent = state.cited.length + ' section' + (state.cited.length === 1 ? '' : 's') + ' cited';
+  }
+
+  function evidenceMarkup() {
+    if (!state.cited.length) return '<span class="none">No sections cited yet.</span>';
+    return state.cited.map((id) => {
+      const doc = DOCS.find((d) => d.id === id);
+      return '<span class="chip">' + (doc ? doc.title.split('\u00b7')[0].trim() : id) + '</span>';
+    }).join('');
+  }
+
+  function renderEvidence() {
+    const box = els.qWrap.querySelector('.evidence .chips');
+    if (box) box.innerHTML = evidenceMarkup();
+  }
+
+  function renderQuestion() {
+    const q = current();
+    state.answered = false;
+    els.next.hidden = true;
+    els.qState.textContent = 'open';
+    els.hudQ.textContent = (state.q + 1) + '/' + QUESTIONS.length;
+    els.hudScore.textContent = pad(state.score);
+    els.noteLine.textContent = 'Cite at least one document section, then answer';
+
+    els.qWrap.innerHTML = '<p class="counter">Question ' + (state.q + 1) + ' of ' + QUESTIONS.length + '</p>' +
+      '<h3>' + q.prompt + '</h3>' +
+      '<div class="evidence"><span>Your evidence</span><div class="chips">' + evidenceMarkup() + '</div></div>' +
+      '<div class="answers"></div>' +
+      '<p class="verdict" hidden></p>';
+
+    const answers = els.qWrap.querySelector('.answers');
+    q.options.forEach((text, i) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'answer';
+      b.textContent = text;
+      b.addEventListener('click', () => answer(i, b));
+      answers.appendChild(b);
+    });
+  }
+
+  function answer(index, btn) {
+    if (state.answered) return;
+    const q = current();
+    if (!state.cited.length) {
+      els.noteLine.textContent = 'Cite a document section first \u2014 evidence before answers.';
+      return;
+    }
+    state.answered = true;
+    els.qState.textContent = 'answered';
+    const correct = index === q.answer;
+    const evidenceHit = q.evidence.some((e) => state.cited.indexOf(e) !== -1);
+
+    [...els.qWrap.querySelectorAll('.answer')].forEach((b, i) => {
+      b.disabled = true;
+      if (i === q.answer) b.classList.add('right');
+      else if (i === index) b.classList.add('wrong');
+    });
+
+    let earned = 0;
+    if (correct) earned += 100;
+    else state.score = Math.max(0, state.score - 20);
+    if (evidenceHit) earned += 50;
+    state.score += earned;
+    els.hudScore.textContent = pad(state.score);
+
+    const verdict = els.qWrap.querySelector('.verdict');
+    verdict.hidden = false;
+    verdict.className = 'verdict ' + (correct ? 'ok' : 'no');
+    verdict.textContent = (correct ? 'Correct. ' : 'Not quite. ') +
+      (evidenceHit ? 'The cited section supports this. ' : 'The right answer is in the document you did not cite. ') +
+      q.why + (earned ? ' +' + earned : ' -20');
+
+    els.noteLine.textContent = correct ? 'Answer logged +' + earned + '.' : 'Answer corrected. Read the sheet again.';
+    els.next.hidden = false;
+    els.next.textContent = state.q === QUESTIONS.length - 1 ? 'Close the case' : 'Next question';
+    els.next.focus();
+  }
+
+  function next() {
+    if (state.q === QUESTIONS.length - 1) {
+      finish();
+      return;
+    }
+    state.q += 1;
+    state.cited = [];
+    renderDocs();
+    renderQuestion();
+  }
+
+  function finish() {
+    if (state.score > state.best) {
+      state.best = state.score;
+      try { localStorage.setItem(BEST_KEY, String(state.score)); } catch (e) { /* ignore */ }
+    }
+    const rank = state.score >= 600 ? 'Chemical safety lead'
+      : state.score >= 480 ? 'Store inspector'
+      : state.score >= 340 ? 'Lab assistant'
+      : 'Visitor';
+    els.ovKicker.textContent = 'Case closed';
+    els.ovTitle.innerHTML = 'The store is <span class="accent">in order.</span>';
+    els.ovLead.textContent = 'Four questions answered from the label and the safety data sheet, including the unlabelled jug that never should have been guessed at.';
+    els.ovRules.innerHTML = '';
+    els.ovScore.hidden = false;
+    els.ovScoreValue.textContent = String(state.score);
+    els.ovRank.textContent = rank;
+    els.ovBest.textContent = 'Best ' + pad(state.best);
+    els.overlay.hidden = false;
+    els.ovBtn.focus();
+  }
+
+  function start() {
+    state.q = 0;
+    state.score = 0;
+    state.cited = [];
+    state.answered = false;
+    els.overlay.hidden = true;
+    renderDocs();
+    renderQuestion();
+  }
+
+  els.next.addEventListener('click', next);
+  els.ovBtn.addEventListener('click', start);
+
+  try { state.best = parseInt(localStorage.getItem(BEST_KEY) || '0', 10) || 0; } catch (e) { state.best = 0; }
+
+  renderDocs();
+  renderQuestion();
+
+  els.ovKicker.textContent = 'Chemical store inquiry';
+  els.ovTitle.innerHTML = 'Safety Data <span class="accent">Detectives</span>';
+  els.ovLead.textContent = 'A chemical store, one product, and four questions that need evidence. Read the label and the safety data sheet sections, cite what you used, then answer.';
+  els.ovRules.innerHTML = [
+    'Click a document section to cite it as evidence.',
+    'Answer only from what the sheet says.',
+    'Correct answers and matching evidence both score.',
+    'One container arrives with no label at all. Guessing is not an option.'
+  ].map((t) => '<li class="rule">' + t + '</li>').join('');
+  els.ovBtn.textContent = 'Open the store';
+  els.overlay.hidden = false;
+})();
+</script>
+</body>
+</html>

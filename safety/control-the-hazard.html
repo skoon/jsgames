@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b1015">
+<title>Control the Hazard</title>
+<link rel="stylesheet" href="../common.css">
+<style>
+  :root {
+    --bg-top: #26333d;
+    --bg-mid: #0a1015;
+    --bg-bottom: #05080b;
+    --stage-bg: #071016;
+    --ink: #eef6fa;
+    --line: rgba(136, 202, 255, 0.18);
+    --teal: #70e7c8;
+    --amber: #ffc86b;
+    --red: #ff8474;
+    --blue: #88caff;
+  }
+  body { overflow-y: auto; }
+
+  #app {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: 8px;
+    padding: 8px;
+    height: 100%;
+    min-height: 0;
+  }
+  .topbar { margin: 0; }
+
+  .workspace {
+    display: grid;
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.75fr);
+    gap: 9px;
+    min-height: 0;
+  }
+
+  .pane {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: rgba(5, 12, 17, 0.76);
+    overflow: hidden;
+  }
+  .pane-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--line);
+    background: rgba(255, 255, 255, 0.02);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .pane-head b { color: var(--blue); font-weight: 700; }
+
+  .pane-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 10px;
+    scrollbar-width: thin;
+  }
+
+  /* ---------- workstations ---------- */
+  .station {
+    display: grid;
+    gap: 7px;
+    padding: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.025);
+  }
+  .station + .station { margin-top: 8px; }
+  .station.solved { border-color: rgba(112, 231, 200, 0.4); }
+  .station.trapped { border-color: rgba(255, 132, 116, 0.45); }
+
+  .station h3 {
+    margin: 0;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: #f2fbff;
+  }
+  .station .hazard {
+    display: block;
+    margin-top: 2px;
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    line-height: 1.45;
+    color: var(--amber);
+  }
+
+  .controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; }
+  .ctrl {
+    display: grid;
+    gap: 2px;
+    padding: 7px 8px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.03);
+    color: rgba(238, 246, 250, 0.85);
+    text-align: left;
+    font: inherit;
+    cursor: pointer;
+  }
+  .ctrl:hover { border-color: rgba(136, 202, 255, 0.5); }
+  .ctrl[aria-pressed="true"] { border-color: rgba(112, 231, 200, 0.7); background: rgba(112, 231, 200, 0.12); }
+  .ctrl b { font-size: 10.5px; font-weight: 600; line-height: 1.35; }
+  .ctrl small {
+    font-family: var(--font-mono);
+    font-size: 8.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+  .station.trapped .ctrl[aria-pressed="true"] { border-color: rgba(255, 132, 116, 0.75); background: rgba(255, 132, 116, 0.12); }
+
+  .verdict {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    line-height: 1.5;
+    color: var(--muted);
+  }
+  .verdict.ok { color: #a9efd9; }
+  .verdict.no { color: #ffc3bb; }
+
+  /* ---------- ranking ---------- */
+  .rank-list { display: grid; gap: 5px; }
+  .rank-item {
+    display: grid;
+    grid-template-columns: 18px 1fr auto;
+    gap: 6px;
+    align-items: center;
+    padding: 6px 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.03);
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    line-height: 1.4;
+    color: rgba(238, 246, 250, 0.8);
+  }
+  .rank-item .pos { color: var(--amber); }
+  .rank-item .movers { display: flex; gap: 3px; }
+  .rank-item .movers button {
+    width: 20px;
+    height: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--ink);
+    font-size: 10px;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .rank-item .movers button:hover { border-color: rgba(136, 202, 255, 0.5); }
+  .rank-item .movers button:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  .note {
+    margin: 8px 0 0;
+    font-size: 10.5px;
+    line-height: 1.5;
+    color: rgba(238, 246, 250, 0.6);
+  }
+  .note b { color: var(--ink); }
+
+  .ladder {
+    display: grid;
+    gap: 3px;
+    margin: 8px 0 10px;
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+  }
+  .ladder div {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 4px 7px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.03);
+    color: rgba(238, 246, 250, 0.7);
+  }
+  .ladder div b { color: var(--teal); font-weight: 600; }
+
+  .actionbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 2px; }
+  .actionbar .note-line { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint); }
+  .actionbar .row { display: flex; gap: 7px; }
+  .actionbar .btn { margin: 0; }
+  .btn.small { min-height: 34px; padding: 8px 16px; font-size: 10.5px; }
+
+  @media (max-width: 900px) {
+    .workspace { grid-template-columns: minmax(0, 1fr); }
+    #app { height: auto; }
+    #stage.stage-fluid { height: auto; }
+    .pane-body { overflow: visible; }
+    .controls { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<h1 class="sr-only">Control the Hazard: a workplace risk-reduction strategy game</h1>
+<div id="stage" class="stage-fluid">
+  <div id="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">CH</span>
+        <span>
+          <b>Control the Hazard</b>
+          <small>Factory redesign unit</small>
+        </span>
+      </div>
+      <div class="hud">
+        <div class="stat"><span>Site</span><strong id="hudSite">1/3</strong></div>
+        <div class="stat"><span>Score</span><strong id="hudScore">0000</strong></div>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <section class="pane" aria-label="Workstations">
+        <div class="pane-head">
+          <span id="siteName">Packing hall</span>
+          <b id="installNote">0 / 3 installed</b>
+        </div>
+        <div class="pane-body" id="stations"></div>
+      </section>
+
+      <aside class="pane" aria-label="Hierarchy of controls">
+        <div class="pane-head">
+          <span>Hierarchy of controls</span>
+          <b>source first</b>
+        </div>
+        <div class="pane-body">
+          <div class="ladder">
+            <div><span>1. Eliminate / substitute</span><b>120</b></div>
+            <div><span>2. Engineering control</span><b>90</b></div>
+            <div><span>3. Administrative control</span><b>60</b></div>
+            <div><span>4. PPE</span><b>25</b></div>
+          </div>
+          <div id="rankWrap" hidden>
+            <p class="note" style="margin-bottom:6px"><b>Rank what you installed</b> &mdash; closest to the source at the top.</p>
+            <div id="rank" class="rank-list"></div>
+            <button id="rankHint" class="btn small btn-secondary" type="button">Why this order?</button>
+            <p id="rankWhy" class="note" hidden></p>
+          </div>
+          <p id="idleNote" class="note">Choose one control per workstation. The tempting cheap ones are marked &mdash; they usually leave the hazard running.</p>
+        </div>
+      </aside>
+    </main>
+
+    <footer class="actionbar">
+      <span class="note-line" id="noteLine">Pick a control for each workstation</span>
+      <div class="row">
+        <button id="inspect" class="btn small" type="button">Inspect redesign</button>
+      </div>
+    </footer>
+  </div>
+
+  <div id="overlay" class="overlay" role="dialog" aria-modal="true" aria-labelledby="ovTitle" hidden>
+    <div class="panel panel-card">
+      <p id="ovKicker" class="eyebrow"></p>
+      <h2 id="ovTitle" class="title"></h2>
+      <p id="ovLead" class="lead"></p>
+      <ul id="ovRules" class="rules"></ul>
+      <div id="ovScore" class="final-score" hidden>
+        <span>Redesign score</span>
+        <strong id="ovScoreValue">0</strong>
+        <p id="ovRank" class="rank"></p>
+        <p id="ovBest" class="best"></p>
+      </div>
+      <button id="ovBtn" class="btn" type="button">Open the packing hall</button>
+    </div>
+  </div>
+</div>
+<p class="hint">install a control per station &middot; rank them &middot; inspect the redesign</p>
+
+<script>
+(() => {
+  'use strict';
+
+  const $ = (s) => document.querySelector(s);
+  const BEST_KEY = 'controlHazard.best.v1';
+
+  const LEVEL_POINTS = { 0: 120, 1: 90, 2: 60, 3: 25 };
+  const LEVEL_NAME = { 0: 'Eliminate / substitute', 1: 'Engineering', 2: 'Administrative', 3: 'PPE' };
+
+  const SITES = [
+    {
+      name: 'Packing hall',
+      stations: [
+        {
+          id: 'printer',
+          name: 'Label printer',
+          hazard: 'Solvent fumes rise from the label adhesive all shift.',
+          controls: [
+            { id: 'water', t: 'Switch to water-based adhesive', level: 0, cost: 'process change' },
+            { id: 'extract', t: 'Enclose the printer and extract the vapour', level: 1, cost: 'installation' },
+            { id: 'rotate', t: 'Rotate operators every two hours', level: 2, cost: 'cheap' },
+            { id: 'mask', t: 'Issue half-mask respirators', level: 3, cost: 'cheap' }
+          ]
+        },
+        {
+          id: 'conveyor',
+          name: 'Conveyor transfer',
+          hazard: 'Belt nip points sit at waist height where people reach in.',
+          controls: [
+            { id: 'redesign', t: 'Remove the transfer drop entirely', level: 0, cost: 'process change' },
+            { id: 'guard', t: 'Fit an interlocked fixed guard', level: 1, cost: 'installation' },
+            { id: 'sign', t: 'Add warning signs and a briefing', level: 2, cost: 'cheap' },
+            { id: 'gloves', t: 'Issue cut-resistant gloves', level: 3, cost: 'cheap', trap: true, why: 'Gloves do not stop a nip point pulling a hand into rollers.' }
+          ]
+        },
+        {
+          id: 'stack',
+          name: 'Manual stacking',
+          hazard: 'Fifteen-kilogram boxes are lifted from floor to shoulder height, 200 times a shift.',
+          controls: [
+            { id: 'palletiser', t: 'Install an automatic palletiser', level: 0, cost: 'capital' },
+            { id: 'vacuum', t: 'Provide a vacuum lift assist', level: 1, cost: 'equipment' },
+            { id: 'training', t: 'Run manual handling training', level: 2, cost: 'cheap' },
+            { id: 'belt', t: 'Issue back-support belts', level: 3, cost: 'cheap' }
+          ]
+        }
+      ]
+    },
+    {
+      name: 'Paint shop',
+      stations: [
+        {
+          id: 'mixing',
+          name: 'Mixing bench',
+          hazard: 'Solvent vapour escapes whenever a drum is decanted by hand.',
+          controls: [
+            { id: 'closed', t: 'Use a closed decanting system', level: 0, cost: 'process change' },
+            { id: 'exhaust', t: 'Fit local exhaust ventilation at the bench', level: 1, cost: 'installation' },
+            { id: 'shifts', t: 'Shorten exposure with shorter shifts', level: 2, cost: 'cheap' },
+            { id: 'respirator', t: 'Issue solvent respirators', level: 3, cost: 'cheap' }
+          ]
+        },
+        {
+          id: 'sanding',
+          name: 'Sanding bay',
+          hazard: 'Fine dust fills the bay during hand sanding.',
+          controls: [
+            { id: 'wet', t: 'Switch to wet sanding and dust-free filler', level: 0, cost: 'process change' },
+            { id: 'table', t: 'Use a downdraft extraction table', level: 1, cost: 'installation' },
+            { id: 'screens', t: 'Add screens between bays', level: 2, cost: 'cheap' },
+            { id: 'dustmask', t: 'Issue disposable dust masks', level: 3, cost: 'cheap' }
+          ]
+        },
+        {
+          id: 'booth',
+          name: 'Spray booth',
+          hazard: 'Isocyanate mist hangs in the booth during each pass.',
+          controls: [
+            { id: 'waterbased', t: 'Substitute water-based paint', level: 0, cost: 'process change' },
+            { id: 'vent', t: 'Upgrade booth extraction and airflow', level: 1, cost: 'installation' },
+            { id: 'timer', t: 'Limit time in the booth per painter', level: 2, cost: 'cheap' },
+            { id: 'cloth', t: 'Issue cloth masks at the door', level: 3, cost: 'cheap', trap: true, why: 'A cloth mask does nothing against isocyanate mist.' }
+          ]
+        }
+      ]
+    },
+    {
+      name: 'Warehouse',
+      stations: [
+        {
+          id: 'racking',
+          name: 'Racking aisle',
+          hazard: 'Forklifts clip the racking uprights several times a month.',
+          controls: [
+            { id: 'routes', t: 'Separate pedestrian and forklift routes', level: 0, cost: 'layout change' },
+            { id: 'barriers', t: 'Fit impact barriers at every upright', level: 1, cost: 'installation' },
+            { id: 'markings', t: 'Repaint floor markings and re-brief drivers', level: 2, cost: 'cheap' },
+            { id: 'hivis', t: 'Require hi-vis vests for everyone', level: 3, cost: 'cheap' }
+          ]
+        },
+        {
+          id: 'loading',
+          name: 'Trailer loading',
+          hazard: 'Loaders step up and down from the trailer bed all day.',
+          controls: [
+            { id: 'leveller', t: 'Install a dock leveller flush with the bed', level: 0, cost: 'capital' },
+            { id: 'height', t: 'Adjust the trailer height to the dock', level: 1, cost: 'equipment' },
+            { id: 'team', t: 'Use two-person lifts', level: 2, cost: 'cheap' },
+            { id: 'boots', t: 'Issue reinforced boots', level: 3, cost: 'cheap' }
+          ]
+        },
+        {
+          id: 'compressor',
+          name: 'Compressor room',
+          hazard: 'The compressor runs at 102 dB, right beside the pick face.',
+          controls: [
+            { id: 'relocate', t: 'Relocate the compressor outside the building', level: 0, cost: 'capital' },
+            { id: 'enclosure', t: 'Build an acoustic enclosure', level: 1, cost: 'installation' },
+            { id: 'rotation', t: 'Rotate pickers away from the wall', level: 2, cost: 'cheap' },
+            { id: 'plugs', t: 'Hand out foam earplugs', level: 3, cost: 'cheap' }
+          ]
+        }
+      ]
+    }
+  ];
+
+  const state = {
+    site: 0,
+    score: 0,
+    best: 0,
+    chosen: {},
+    order: [],
+    inspected: false
+  };
+
+  const els = {
+    stations: $('#stations'),
+    siteName: $('#siteName'),
+    installNote: $('#installNote'),
+    rankWrap: $('#rankWrap'),
+    rank: $('#rank'),
+    rankHint: $('#rankHint'),
+    rankWhy: $('#rankWhy'),
+    idleNote: $('#idleNote'),
+    noteLine: $('#noteLine'),
+    hudSite: $('#hudSite'),
+    hudScore: $('#hudScore'),
+    inspect: $('#inspect'),
+    overlay: $('#overlay'),
+    ovKicker: $('#ovKicker'),
+    ovTitle: $('#ovTitle'),
+    ovLead: $('#ovLead'),
+    ovRules: $('#ovRules'),
+    ovScore: $('#ovScore'),
+    ovScoreValue: $('#ovScoreValue'),
+    ovRank: $('#ovRank'),
+    ovBest: $('#ovBest'),
+    ovBtn: $('#ovBtn')
+  };
+
+  const site = () => SITES[state.site];
+  const pad = (n) => String(n).padStart(4, '0');
+
+  function chosenControl(stationId) {
+    const st = site().stations.find((s) => s.id === stationId);
+    return st.controls.find((c) => c.id === state.chosen[stationId]);
+  }
+
+  function renderStations() {
+    els.stations.innerHTML = '';
+    site().stations.forEach((st) => {
+      const card = document.createElement('article');
+      card.className = 'station';
+      card.dataset.station = st.id;
+      const chosen = chosenControl(st.id);
+      if (chosen && chosen.trap) card.classList.add('trapped');
+      if (chosen && !chosen.trap && state.inspected) card.classList.add('solved');
+
+      const buttons = st.controls.map((c) => (
+        '<button type="button" class="ctrl" data-control="' + c.id + '" aria-pressed="' +
+        (state.chosen[st.id] === c.id) + '"><b>' + c.t + '</b><small>' + (c.trap ? 'cheap · unlikely to work' : c.cost) + '</small></button>'
+      )).join('');
+
+      card.innerHTML = '<div><h3>' + st.name + '</h3><span class="hazard">' + st.hazard + '</span></div>' +
+        '<div class="controls">' + buttons + '</div>' +
+        '<p class="verdict" hidden></p>';
+
+      card.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-control]');
+        if (!btn) return;
+        state.inspected = false;
+        state.chosen[st.id] = btn.dataset.control;
+        if (state.order.indexOf(st.id) === -1) state.order.push(st.id);
+        renderAll();
+      });
+
+      els.stations.appendChild(card);
+    });
+    const installed = Object.keys(state.chosen).length;
+    els.installNote.textContent = installed + ' / ' + site().stations.length + ' installed';
+    els.hudSite.textContent = (state.site + 1) + '/' + SITES.length;
+    els.hudScore.textContent = pad(state.score);
+  }
+
+  function renderRanking() {
+    const all = site().stations.every((s) => state.chosen[s.id]);
+    els.rankWrap.hidden = !all;
+    els.idleNote.hidden = all;
+    if (!all) return;
+    els.rank.innerHTML = '';
+    state.order.forEach((id, i) => {
+      const st = site().stations.find((s) => s.id === id);
+      const c = chosenControl(id);
+      const row = document.createElement('div');
+      row.className = 'rank-item';
+      row.innerHTML = '<span class="pos">' + (i + 1) + '</span><span>' + st.name + ': ' + c.t + '</span>';
+      const movers = document.createElement('span');
+      movers.className = 'movers';
+      const up = document.createElement('button');
+      up.type = 'button';
+      up.textContent = '\u2191';
+      up.setAttribute('aria-label', 'Move ' + st.name + ' up');
+      up.disabled = i === 0;
+      up.addEventListener('click', () => {
+        state.order.splice(i, 1);
+        state.order.splice(i - 1, 0, id);
+        state.inspected = false;
+        renderRanking();
+      });
+      const down = document.createElement('button');
+      down.type = 'button';
+      down.textContent = '\u2193';
+      down.setAttribute('aria-label', 'Move ' + st.name + ' down');
+      down.disabled = i === state.order.length - 1;
+      down.addEventListener('click', () => {
+        state.order.splice(i, 1);
+        state.order.splice(i + 1, 0, id);
+        state.inspected = false;
+        renderRanking();
+      });
+      movers.appendChild(up);
+      movers.appendChild(down);
+      row.appendChild(movers);
+      els.rank.appendChild(row);
+    });
+  }
+
+  function renderAll() {
+    renderStations();
+    renderRanking();
+  }
+
+  function correctOrder() {
+    return [...site().stations]
+      .map((s) => ({ id: s.id, level: chosenControl(s.id).level }))
+      .sort((a, b) => a.level - b.level)
+      .map((x) => x.id);
+  }
+
+  function inspect() {
+    const stations = site().stations;
+    const missing = stations.filter((s) => !state.chosen[s.id]);
+    if (missing.length) {
+      els.noteLine.textContent = 'Every workstation needs a control before inspection.';
+      return;
+    }
+    state.inspected = true;
+    renderStations();
+    let earned = 0;
+    stations.forEach((st) => {
+      const c = chosenControl(st.id);
+      const card = els.stations.querySelector('[data-station="' + st.id + '"]');
+      const verdict = card.querySelector('.verdict');
+      verdict.hidden = false;
+      const pts = c.trap ? 0 : LEVEL_POINTS[c.level];
+      earned += pts;
+      if (c.trap) {
+        verdict.className = 'verdict no';
+        verdict.textContent = 'No points: ' + c.why;
+      } else {
+        verdict.className = 'verdict ok';
+        verdict.textContent = LEVEL_NAME[c.level] + ' \u2014 +' + pts + '.';
+      }
+    });
+
+    const want = correctOrder().join(',');
+    const rankOk = state.order.join(',') === want ||
+      // accept any ordering that is non-decreasing in level
+      state.order.every((id, i, arr) => i === 0 || chosenControl(arr[i - 1]).level <= chosenControl(id).level);
+    if (rankOk) earned += 60;
+
+    state.score += earned;
+    els.hudScore.textContent = pad(state.score);
+
+    const traps = stations.filter((s) => chosenControl(s.id).trap).length;
+    if (traps === 0) {
+      els.noteLine.textContent = (rankOk ? 'Order correct. ' : 'Order needs work. ') + 'Site cleared +' + earned + '.';
+      els.inspect.textContent = state.site === SITES.length - 1 ? 'Finish the redesign' : 'Next site';
+      els.inspect.dataset.mode = 'next';
+      els.rankWhy.hidden = false;
+      els.rankWhy.innerHTML = 'Elimination acts on the hazard itself, so nothing is left to control. Each step down the ladder relies more on people behaving perfectly.';
+    } else {
+      els.noteLine.textContent = 'A cheap fix left a hazard running. Read the red stations and try again.';
+    }
+  }
+
+  function nextSite() {
+    if (state.site === SITES.length - 1) {
+      finish();
+      return;
+    }
+    state.site += 1;
+    loadSite();
+  }
+
+  function loadSite() {
+    state.chosen = {};
+    state.order = [];
+    state.inspected = false;
+    els.siteName.textContent = site().name;
+    els.inspect.textContent = 'Inspect redesign';
+    els.inspect.dataset.mode = 'inspect';
+    els.noteLine.textContent = 'Pick a control for each workstation';
+    els.rankWhy.hidden = true;
+    renderAll();
+  }
+
+  function finish() {
+    if (state.score > state.best) {
+      state.best = state.score;
+      try { localStorage.setItem(BEST_KEY, String(state.score)); } catch (e) { /* ignore */ }
+    }
+    const rank = state.score >= 800 ? 'Health and safety lead'
+      : state.score >= 620 ? 'Risk engineer'
+      : state.score >= 420 ? 'Supervisor'
+      : 'Trainee';
+    els.ovKicker.textContent = 'Redesign complete';
+    els.ovTitle.innerHTML = 'Hazards <span class="accent">controlled.</span>';
+    els.ovLead.textContent = 'Three sites redesigned. The pattern: the further a control sits from the source, the more it depends on people being perfect every single shift.';
+    els.ovRules.innerHTML = '';
+    els.ovScore.hidden = false;
+    els.ovScoreValue.textContent = String(state.score);
+    els.ovRank.textContent = rank;
+    els.ovBest.textContent = 'Best ' + pad(state.best);
+    els.overlay.hidden = false;
+    els.ovBtn.focus();
+  }
+
+  function start() {
+    state.site = 0;
+    state.score = 0;
+    els.overlay.hidden = true;
+    loadSite();
+  }
+
+  els.inspect.addEventListener('click', () => {
+    if (els.inspect.dataset.mode === 'next') nextSite();
+    else inspect();
+  });
+  els.rankHint.addEventListener('click', () => {
+    els.rankWhy.hidden = !els.rankWhy.hidden;
+  });
+  els.ovBtn.addEventListener('click', start);
+
+  try { state.best = parseInt(localStorage.getItem(BEST_KEY) || '0', 10) || 0; } catch (e) { state.best = 0; }
+
+  loadSite();
+
+  els.ovKicker.textContent = 'Factory redesign unit';
+  els.ovTitle.innerHTML = 'Control the <span class="accent">Hazard</span>';
+  els.ovLead.textContent = 'Three sites, nine workstations, and a budget that always tempts you toward the cheap fix. Install a control at each station, rank them, then inspect the redesign.';
+  els.ovRules.innerHTML = [
+    'Choose one control per workstation.',
+    'Closer to the source scores higher: eliminate, engineer, administrate, then PPE.',
+    'Rank your three controls, closest to the source at the top.',
+    'The cheap fixes are marked — most leave the hazard running.'
+  ].map((t) => '<li class="rule">' + t + '</li>').join('');
+  els.ovBtn.textContent = 'Open the packing hall';
+  els.overlay.hidden = false;
+})();
+</script>
+</body>
+</html>

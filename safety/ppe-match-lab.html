@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d1210">
+<title>PPE Match Lab</title>
+<link rel="stylesheet" href="../common.css">
+<style>
+  :root {
+    --bg-top: #2c3a2c;
+    --bg-mid: #0b1310;
+    --bg-bottom: #050907;
+    --stage-bg: #08100d;
+    --ink: #f0f7f1;
+    --line: rgba(134, 231, 197, 0.18);
+    --teal: #70e7c8;
+    --amber: #ffc86b;
+    --red: #ff8474;
+  }
+  body { overflow-y: auto; }
+
+  #app {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: 8px;
+    padding: 8px;
+    height: 100%;
+    min-height: 0;
+  }
+  .topbar { margin: 0; }
+
+  .workspace {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+    gap: 9px;
+    min-height: 0;
+  }
+
+  .pane {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: rgba(6, 14, 11, 0.76);
+    overflow: hidden;
+  }
+  .pane-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--line);
+    background: rgba(255, 255, 255, 0.02);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .pane-head b { color: var(--teal); font-weight: 700; }
+
+  .pane-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 10px;
+    scrollbar-width: thin;
+  }
+
+  /* ---------- task cards ---------- */
+  .task {
+    display: grid;
+    gap: 7px;
+    padding: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.025);
+    transition: border-color 120ms ease, background 120ms ease;
+  }
+  .task + .task { margin-top: 8px; }
+  .task.over { border-color: rgba(112, 231, 200, 0.6); background: rgba(112, 231, 200, 0.07); }
+  .task.good { border-color: rgba(112, 231, 200, 0.45); }
+  .task.bad { border-color: rgba(255, 132, 116, 0.5); }
+
+  .task-head h3 {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    color: #f4fff9;
+  }
+  .task-head .hazard {
+    display: block;
+    margin-top: 2px;
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    letter-spacing: 0.05em;
+    color: var(--amber);
+  }
+
+  .slots {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    min-height: 30px;
+    padding: 5px;
+    border: 1px dashed rgba(255, 255, 255, 0.14);
+    border-radius: 7px;
+  }
+  .slot {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 8px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.05);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: #dffff4;
+  }
+  .slot button {
+    border: 0;
+    background: none;
+    padding: 0;
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .slot button:hover { color: var(--red); }
+  .slots .empty {
+    padding: 2px 4px;
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    letter-spacing: 0.06em;
+    color: var(--faint);
+  }
+
+  .control-q {
+    display: grid;
+    gap: 5px;
+    padding: 8px;
+    border-left: 2px solid rgba(255, 200, 107, 0.6);
+    border-radius: 0 7px 7px 0;
+    background: rgba(255, 200, 107, 0.05);
+  }
+  .control-q p {
+    margin: 0;
+    font-size: 11px;
+    line-height: 1.45;
+    color: #ffe6b8;
+  }
+  .control-q .opts { display: grid; gap: 4px; }
+  .control-q button {
+    text-align: left;
+    padding: 6px 8px;
+    border: 1px solid rgba(255, 255, 255, 0.13);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.03);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    line-height: 1.4;
+    color: rgba(240, 247, 241, 0.82);
+    cursor: pointer;
+  }
+  .control-q button:hover { border-color: rgba(255, 200, 107, 0.5); }
+  .control-q button[aria-pressed="true"] { border-color: rgba(255, 200, 107, 0.7); background: rgba(255, 200, 107, 0.12); }
+
+  .verdict {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    line-height: 1.45;
+    color: var(--muted);
+  }
+  .verdict.ok { color: #a9efd9; }
+  .verdict.no { color: #ffc3bb; }
+
+  /* ---------- equipment ---------- */
+  .tray { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+  .kit {
+    display: grid;
+    gap: 2px;
+    padding: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.03);
+    color: #eafff5;
+    text-align: left;
+    font: inherit;
+    cursor: grab;
+  }
+  .kit:hover { border-color: rgba(112, 231, 200, 0.5); background: rgba(112, 231, 200, 0.07); }
+  .kit[aria-pressed="true"] { border-color: rgba(112, 231, 200, 0.75); background: rgba(112, 231, 200, 0.14); }
+  .kit span { font-size: 16px; line-height: 1; }
+  .kit b {
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    line-height: 1.35;
+  }
+
+  .note {
+    margin: 9px 0 0;
+    font-size: 10.5px;
+    line-height: 1.5;
+    color: rgba(240, 247, 241, 0.58);
+  }
+  .note b { color: var(--ink); }
+
+  .limitation {
+    margin: 8px 0 0;
+    padding: 8px 9px;
+    border: 1px solid rgba(112, 231, 200, 0.25);
+    border-radius: 8px;
+    background: rgba(112, 231, 200, 0.05);
+    font-size: 10.5px;
+    line-height: 1.5;
+    color: #c9fdec;
+  }
+
+  .actionbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 2px; }
+  .actionbar .note-line { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint); }
+  .actionbar .row { display: flex; gap: 7px; }
+  .actionbar .btn { margin: 0; }
+  .btn.small { min-height: 34px; padding: 8px 16px; font-size: 10.5px; }
+
+  @media (max-width: 900px) {
+    .workspace { grid-template-columns: minmax(0, 1fr); }
+    #app { height: auto; }
+    #stage.stage-fluid { height: auto; }
+    .pane-body { overflow: visible; }
+  }
+</style>
+</head>
+<body>
+<h1 class="sr-only">PPE Match Lab: match protective equipment to workplace tasks</h1>
+<div id="stage" class="stage-fluid">
+  <div id="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">PPE</span>
+        <span>
+          <b>PPE Match Lab</b>
+          <small>Equipment station</small>
+        </span>
+      </div>
+      <div class="hud">
+        <div class="stat"><span>Station</span><strong id="hudStation">1/3</strong></div>
+        <div class="stat"><span>Score</span><strong id="hudScore">0000</strong></div>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <section class="pane" aria-label="Tasks">
+        <div class="pane-head">
+          <span id="stationName">Workshop</span>
+          <b id="taskNote">0 / 3 tasks ready</b>
+        </div>
+        <div class="pane-body" id="tasks"></div>
+      </section>
+
+      <aside class="pane" aria-label="Equipment rack">
+        <div class="pane-head">
+          <span>Equipment rack</span>
+          <b>drag or pick</b>
+        </div>
+        <div class="pane-body">
+          <div id="tray" class="tray"></div>
+          <p class="note">Pick a piece of equipment, then click a task &mdash; or drag the card straight onto it.</p>
+          <div id="lesson"></div>
+        </div>
+      </aside>
+    </main>
+
+    <footer class="actionbar">
+      <span class="note-line" id="noteLine">Match the kit, then inspect the station</span>
+      <div class="row">
+        <button id="clear" class="btn small btn-secondary" type="button">Clear station</button>
+        <button id="inspect" class="btn small" type="button">Inspect station</button>
+      </div>
+    </footer>
+  </div>
+
+  <div id="overlay" class="overlay" role="dialog" aria-modal="true" aria-labelledby="ovTitle" hidden>
+    <div class="panel panel-card">
+      <p id="ovKicker" class="eyebrow"></p>
+      <h2 id="ovTitle" class="title"></h2>
+      <p id="ovLead" class="lead"></p>
+      <ul id="ovRules" class="rules"></ul>
+      <div id="ovScore" class="final-score" hidden>
+        <span>Lab score</span>
+        <strong id="ovScoreValue">0</strong>
+        <p id="ovRank" class="rank"></p>
+        <p id="ovBest" class="best"></p>
+      </div>
+      <button id="ovBtn" class="btn" type="button">Open the station</button>
+    </div>
+  </div>
+</div>
+<p class="hint">drag kit onto tasks &middot; some jobs need more than PPE</p>
+
+<script>
+(() => {
+  'use strict';
+
+  const $ = (s) => document.querySelector(s);
+  const BEST_KEY = 'ppeMatchLab.best.v1';
+
+  const EQUIPMENT = [
+    { id: 'gloves-cut', name: 'Cut-resistant gloves', icon: '\u{1F9E4}' },
+    { id: 'gloves-chem', name: 'Chemical gloves', icon: '\u{1F9EA}' },
+    { id: 'glasses', name: 'Safety glasses', icon: '\u{1F97D}' },
+    { id: 'faceshield', name: 'Face shield', icon: '\u{1F6E1}' },
+    { id: 'respirator', name: 'Respirator', icon: '\u{1F637}' },
+    { id: 'earmuffs', name: 'Ear defenders', icon: '\u{1F3A7}' },
+    { id: 'boots', name: 'Steel-toe boots', icon: '\u{1F97E}' },
+    { id: 'vest', name: 'Hi-vis vest', icon: '\u{1F9BA}' }
+  ];
+
+  const STATIONS = [
+    {
+      name: 'Workshop',
+      tasks: [
+        {
+          id: 'bar', title: 'Cut a metal bar to length', hazard: 'Sharp edges and flying chips',
+          need: ['gloves-cut', 'glasses'],
+          lesson: 'Gloves protect the hands from the cut edge; safety glasses stop chips reaching the eye. Neither one slows the blade.'
+        },
+        {
+          id: 'grind', title: 'Angle-grind a weld', hazard: 'Hot sparks, metal dust, 96 dB',
+          need: ['faceshield', 'gloves-cut', 'earmuffs'],
+          control: {
+            prompt: 'A face shield catches sparks but the dust still fills the bay. What else must change?',
+            options: [
+              { id: 'guard', t: 'Fit the wheel guard and dust extraction', ok: true },
+              { id: 'double', t: 'Wear two pairs of gloves instead', ok: false },
+              { id: 'rotate', t: 'Rotate operators every 30 minutes', ok: false }
+            ],
+            why: 'A guard and extraction remove the dust at the source; extra gloves and rotation only share the exposure around.'
+          },
+          lesson: 'PPE is the last line of defence. The guard and dust extraction do the work the shield cannot.'
+        },
+        {
+          id: 'paint', title: 'Spray-paint a chassis', hazard: 'Solvent vapour, splashes',
+          need: ['respirator', 'gloves-chem', 'glasses'],
+          control: {
+            prompt: 'The bay has no airflow. What belongs in the plan before the respirator?',
+            options: [
+              { id: 'booth', t: 'Spray inside a ventilated booth', ok: true },
+              { id: 'mask', t: 'Issue a higher-rated filter and keep spraying', ok: false },
+              { id: 'quick', t: 'Spray faster so exposure is shorter', ok: false }
+            ],
+            why: 'Ventilation removes vapour before it reaches the worker. A better filter only handles what has already escaped.'
+          },
+          lesson: 'A respirator filters the air you breathe; a booth means there is far less solvent in that air to begin with.'
+        }
+      ]
+    },
+    {
+      name: 'Receiving dock',
+      tasks: [
+        {
+          id: 'forklift', title: 'Guide a reversing forklift', hazard: 'Moving plant, blind corners',
+          need: ['vest', 'boots'],
+          control: {
+            prompt: 'The corner is blind and the horn is drowned out by fans. What is the real control?',
+            options: [
+              { id: 'mirror', t: 'Fit a convex mirror and mark a pedestrian route', ok: true },
+              { id: 'louder', t: 'Ask the driver to sound the horn more often', ok: false },
+              { id: 'careful', t: 'Tell staff to be more careful', ok: false }
+            ],
+            why: 'Separating people from plant and opening the sightline removes the conflict instead of relying on warnings.'
+          },
+          lesson: 'A hi-vis vest helps the driver see you; a marked route and a mirror stop the near miss happening at all.'
+        },
+        {
+          id: 'unload', title: 'Unload a pallet by hand', hazard: 'Crushed fingers, heavy lifts',
+          need: ['gloves-cut', 'boots'],
+          lesson: 'Gloves and boots protect the extremities, but they do not make a 40 kg pallet lighter.'
+        },
+        {
+          id: 'chemicals', title: 'Move a drum of cleaning concentrate', hazard: 'Splash and skin contact',
+          need: ['gloves-chem', 'glasses', 'boots'],
+          lesson: 'Chemical gloves resist the splash; diverting the drum onto a trolley removes the carry altogether.'
+        }
+      ]
+    },
+    {
+      name: 'Grounds',
+      tasks: [
+        {
+          id: 'mow', title: 'Mow the sports field', hazard: 'Thrown stones, 92 dB',
+          need: ['earmuffs', 'glasses', 'boots'],
+          lesson: 'Hearing protection and glasses reduce what reaches you; a mower with a discharge guard reduces what is thrown.'
+        },
+        {
+          id: 'trim', title: 'Strim the verge beside the car park', hazard: 'Flying debris, passing traffic',
+          need: ['faceshield', 'vest', 'boots'],
+          control: {
+            prompt: 'Debris is hitting parked cars. What should change before the next pass?',
+            options: [
+              { id: 'close', t: 'Close the nearest parking bays and cone the work zone', ok: true },
+              { id: 'visor', t: 'Add a second visor layer', ok: false },
+              { id: 'slower', t: 'Run the strimmer at half throttle', ok: false }
+            ],
+            why: 'Excluding people and vehicles from the debris zone removes the risk; more PPE only protects the operator.'
+          },
+          lesson: 'Your face shield protects you. The hazard to everyone else is the flying debris, and that needs a work zone.'
+        },
+        {
+          id: 'ladder', title: 'Clear gutters from a ladder', hazard: 'Falls from height',
+          need: ['boots', 'gloves-cut'],
+          control: {
+            prompt: 'The ladder is the tallest thing on site. What is the stronger control?',
+            options: [
+              { id: 'tower', t: 'Use the mobile tower with guard rails', ok: true },
+              { id: 'steady', t: 'Have a colleague hold the ladder', ok: false },
+              { id: 'nonslip', t: 'Wear non-slip gloves while climbing', ok: false }
+            ],
+            why: 'A guarded platform removes the fall exposure. Footing the ladder is a useful habit, but it is not a hazard removal.'
+          },
+          lesson: 'Grip and footwear help you hold on. Working from a guarded platform means there is nothing to fall from.'
+        }
+      ]
+    }
+  ];
+
+  const state = {
+    station: 0,
+    score: 0,
+    best: 0,
+    assigned: {},
+    controls: {},
+    checked: false,
+    selected: null
+  };
+
+  const els = {
+    tasks: $('#tasks'),
+    tray: $('#tray'),
+    stationName: $('#stationName'),
+    taskNote: $('#taskNote'),
+    lesson: $('#lesson'),
+    noteLine: $('#noteLine'),
+    hudStation: $('#hudStation'),
+    hudScore: $('#hudScore'),
+    inspect: $('#inspect'),
+    clear: $('#clear'),
+    overlay: $('#overlay'),
+    ovKicker: $('#ovKicker'),
+    ovTitle: $('#ovTitle'),
+    ovLead: $('#ovLead'),
+    ovRules: $('#ovRules'),
+    ovScore: $('#ovScore'),
+    ovScoreValue: $('#ovScoreValue'),
+    ovRank: $('#ovRank'),
+    ovBest: $('#ovBest'),
+    ovBtn: $('#ovBtn')
+  };
+
+  const station = () => STATIONS[state.station];
+  const pad = (n) => String(n).padStart(4, '0');
+  const kitName = (id) => (EQUIPMENT.find((e) => e.id === id) || {}).name || id;
+
+  function assignedFor(taskId) {
+    if (!state.assigned[taskId]) state.assigned[taskId] = [];
+    return state.assigned[taskId];
+  }
+
+  function taskReady(task) {
+    const assigned = assignedFor(task.id);
+    const missing = task.need.filter((n) => assigned.indexOf(n) === -1);
+    const extra = assigned.filter((a) => task.need.indexOf(a) === -1);
+    const controlOk = !task.control || (state.controls[task.id] && task.control.options.find((o) => o.id === state.controls[task.id]).ok);
+    return missing.length === 0 && extra.length === 0 && controlOk;
+  }
+
+  function renderTray() {
+    els.tray.innerHTML = '';
+    EQUIPMENT.forEach((item) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'kit';
+      b.draggable = true;
+      b.setAttribute('aria-pressed', String(state.selected === item.id));
+      b.innerHTML = '<span aria-hidden="true">' + item.icon + '</span><b>' + item.name + '</b>';
+      b.addEventListener('click', () => {
+        state.selected = state.selected === item.id ? null : item.id;
+        renderTray();
+      });
+      b.addEventListener('dragstart', (e) => {
+        e.dataTransfer.setData('text/plain', item.id);
+        e.dataTransfer.effectAllowed = 'copy';
+      });
+      els.tray.appendChild(b);
+    });
+  }
+
+  function renderTasks() {
+    els.tasks.innerHTML = '';
+    station().tasks.forEach((task) => {
+      const card = document.createElement('article');
+      card.className = 'task';
+      card.dataset.task = task.id;
+      const assigned = assignedFor(task.id);
+      const chips = assigned.map((id) => (
+        '<span class="slot">' + kitName(id) +
+        '<button type="button" aria-label="Remove ' + kitName(id) + '" data-remove="' + id + '">&times;</button></span>'
+      )).join('') || '<span class="empty">drag equipment here</span>';
+
+      let controlBlock = '';
+      if (task.control) {
+        controlBlock = '<div class="control-q"><p>' + task.control.prompt + '</p><div class="opts">' +
+          task.control.options.map((o) => (
+            '<button type="button" data-control="' + o.id + '" aria-pressed="' +
+            (state.controls[task.id] === o.id) + '">' + o.t + '</button>'
+          )).join('') + '</div></div>';
+      }
+
+      card.innerHTML = '<div class="task-head"><h3>' + task.title + '</h3><span class="hazard">' + task.hazard + '</span></div>' +
+        '<div class="slots">' + chips + '</div>' + controlBlock +
+        '<p class="verdict" hidden></p>';
+
+      card.addEventListener('dragover', (e) => { e.preventDefault(); card.classList.add('over'); });
+      card.addEventListener('dragleave', () => card.classList.remove('over'));
+      card.addEventListener('drop', (e) => {
+        e.preventDefault();
+        card.classList.remove('over');
+        const id = e.dataTransfer.getData('text/plain');
+        if (id) assign(task.id, id);
+      });
+      card.addEventListener('click', (e) => {
+        if (e.target.closest('[data-remove]')) {
+          const id = e.target.closest('[data-remove]').dataset.remove;
+          const list = assignedFor(task.id);
+          const i = list.indexOf(id);
+          if (i !== -1) list.splice(i, 1);
+          renderTasks();
+          return;
+        }
+        const ctrl = e.target.closest('[data-control]');
+        if (ctrl) {
+          state.controls[task.id] = ctrl.dataset.control;
+          renderTasks();
+          return;
+        }
+        if (state.selected) assign(task.id, state.selected);
+      });
+
+      els.tasks.appendChild(card);
+    });
+    updateNote();
+  }
+
+  function assign(taskId, equipId) {
+    const list = assignedFor(taskId);
+    const i = list.indexOf(equipId);
+    if (i === -1) list.push(equipId);
+    else list.splice(i, 1);
+    state.checked = false;
+    renderTasks();
+  }
+
+  function updateNote() {
+    const ready = station().tasks.filter(taskReady).length;
+    els.taskNote.textContent = ready + ' / ' + station().tasks.length + ' tasks ready';
+    els.hudStation.textContent = (state.station + 1) + '/' + STATIONS.length;
+    els.hudScore.textContent = pad(state.score);
+  }
+
+  function inspect() {
+    let earned = 0;
+    let complete = true;
+    station().tasks.forEach((task) => {
+      const card = els.tasks.querySelector('[data-task="' + task.id + '"]');
+      const assigned = assignedFor(task.id);
+      const missing = task.need.filter((n) => assigned.indexOf(n) === -1);
+      const extra = assigned.filter((a) => task.need.indexOf(a) === -1);
+      let points = Math.max(0, (task.need.length - missing.length) * 20) - extra.length * 12;
+      if (points < 0) points = 0;
+      let controlOk = true;
+      if (task.control) {
+        const chosen = task.control.options.find((o) => o.id === state.controls[task.id]);
+        controlOk = !!(chosen && chosen.ok);
+        if (controlOk) points += 40;
+      }
+      earned += points;
+
+      const verdict = card.querySelector('.verdict');
+      verdict.hidden = false;
+      if (missing.length === 0 && extra.length === 0 && controlOk) {
+        card.classList.add('good');
+        card.classList.remove('bad');
+        verdict.className = 'verdict ok';
+        verdict.textContent = 'Correct kit (+' + points + '). ' + task.lesson;
+      } else {
+        complete = false;
+        card.classList.add('bad');
+        card.classList.remove('good');
+        verdict.className = 'verdict no';
+        const bits = [];
+        if (missing.length) bits.push('missing ' + missing.map(kitName).join(', '));
+        if (extra.length) bits.push('not needed here: ' + extra.map(kitName).join(', '));
+        if (!controlOk) bits.push('the PPE-only answer leaves the hazard in place');
+        verdict.textContent = 'Not ready: ' + bits.join('; ') + '. +' + points + '.';
+      }
+    });
+
+    state.score += Math.max(0, earned);
+    updateNote();
+    state.checked = true;
+
+    if (complete) {
+      els.lesson.innerHTML = station().tasks.map((t) =>
+        '<p class="limitation"><b>' + t.title + '.</b> ' + t.lesson + '</p>'
+      ).join('');
+      els.noteLine.textContent = 'Station passed +' + earned + '. Move to the next station.';
+      els.inspect.textContent = state.station === STATIONS.length - 1 ? 'Finish the lab' : 'Next station';
+      els.inspect.dataset.mode = 'next';
+    } else {
+      els.noteLine.textContent = 'Station inspection found gaps. Fix the red cards and inspect again.';
+      els.lesson.innerHTML = '<p class="note">Remember: if the hazard is in the air, the noise or the moving machine, PPE alone is not the answer.</p>';
+    }
+  }
+
+  function nextStation() {
+    if (state.station === STATIONS.length - 1) {
+      finish();
+      return;
+    }
+    state.station += 1;
+    loadStation();
+  }
+
+  function loadStation() {
+    state.assigned = {};
+    state.controls = {};
+    state.checked = false;
+    state.selected = null;
+    station().tasks.forEach((t) => { state.assigned[t.id] = []; });
+    els.stationName.textContent = station().name;
+    els.inspect.textContent = 'Inspect station';
+    els.inspect.dataset.mode = 'inspect';
+    els.lesson.innerHTML = '';
+    els.noteLine.textContent = 'Match the kit, then inspect the station';
+    renderTray();
+    renderTasks();
+  }
+
+  function finish() {
+    if (state.score > state.best) {
+      state.best = state.score;
+      try { localStorage.setItem(BEST_KEY, String(state.score)); } catch (e) { /* ignore */ }
+    }
+    const rank = state.score >= 620 ? 'Safety officer'
+      : state.score >= 500 ? 'Equipment lead'
+      : state.score >= 380 ? 'Store hand'
+      : 'New starter';
+    els.ovKicker.textContent = 'Lab complete';
+    els.ovTitle.innerHTML = 'Every task <span class="accent">kitted.</span>';
+    els.ovLead.textContent = 'Three stations matched, including the jobs where no glove or mask could fix the hazard. PPE is the last line of defence, not the first.';
+    els.ovRules.innerHTML = '';
+    els.ovScore.hidden = false;
+    els.ovScoreValue.textContent = String(state.score);
+    els.ovRank.textContent = rank;
+    els.ovBest.textContent = 'Best ' + pad(state.best);
+    els.overlay.hidden = false;
+    els.ovBtn.focus();
+  }
+
+  function start() {
+    state.station = 0;
+    state.score = 0;
+    els.overlay.hidden = true;
+    loadStation();
+  }
+
+  els.inspect.addEventListener('click', () => {
+    if (els.inspect.dataset.mode === 'next') nextStation();
+    else inspect();
+  });
+  els.clear.addEventListener('click', () => {
+    station().tasks.forEach((t) => { state.assigned[t.id] = []; });
+    state.controls = {};
+    els.lesson.innerHTML = '';
+    renderTasks();
+  });
+  els.ovBtn.addEventListener('click', start);
+
+  try { state.best = parseInt(localStorage.getItem(BEST_KEY) || '0', 10) || 0; } catch (e) { state.best = 0; }
+
+  loadStation();
+
+  els.ovKicker.textContent = 'Equipment station';
+  els.ovTitle.innerHTML = 'PPE <span class="accent">Match Lab</span>';
+  els.ovLead.textContent = 'Three stations, nine jobs. Drag the right protective equipment onto each task \u2014 then notice the jobs where equipment alone leaves the hazard running.';
+  els.ovRules.innerHTML = [
+    'Drag equipment onto a task, or pick a card and click the task.',
+    'Match the hazard: cut, chemical, dust, noise, impact, visibility.',
+    'Some tasks also need a control that removes the hazard at source.',
+    'An unnecessary item costs points; so does missing one.'
+  ].map((t) => '<li class="rule">' + t + '</li>').join('');
+  els.ovBtn.textContent = 'Open the station';
+  els.overlay.hidden = false;
+})();
+</script>
+</body>
+</html>

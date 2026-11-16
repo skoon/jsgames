@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#141018">
+<title>Cat-astrophe: Antique Heist</title>
+<link rel="stylesheet" href="../common.css">
+<style>
+  :root {
+    --bg-top: #3a2a33;
+    --bg-mid: #120c11;
+    --bg-bottom: #060406;
+    --stage-bg: #0d080c;
+    --ink: #fdf1f6;
+    --line: rgba(255, 170, 200, 0.2);
+    --teal: #6ef0c8;
+    --amber: #ffc86b;
+    --red: #ff7d86;
+    --blue: #8cc6ff;
+    --pink: #ffa8c4;
+  }
+  body { overflow: hidden; }
+
+  #app {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: 7px;
+    padding: 8px;
+    height: 100%;
+    min-height: 0;
+  }
+  .topbar { margin: 0; }
+
+  .stats { display: flex; align-items: center; gap: 12px; }
+  .statbox {
+    display: grid; gap: 1px; min-width: 74px;
+    font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .statbox b { font-family: var(--font-mono); font-size: 14px; letter-spacing: 0; color: #fff; }
+  .statbox b.gold { color: var(--amber); }
+  .statbox b.mult { color: var(--teal); }
+  .instinct { display: grid; gap: 3px; min-width: 96px; }
+  .instinct span {
+    font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .ibar { height: 7px; border-radius: 999px; background: rgba(255,255,255,0.1); overflow: hidden; }
+  .ibar i { display: block; height: 100%; width: 0%; background: linear-gradient(90deg, #ff9f6e, var(--red)); transition: width 100ms linear; }
+  .ibar.hot i { background: var(--red); }
+
+  .arena {
+    position: relative;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: #0b0710;
+    overflow: hidden;
+    min-height: 0;
+  }
+  canvas { display: block; width: 100%; height: 100%; }
+  .flash {
+    position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(circle at 50% 60%, rgba(255, 60, 80, 0.35), transparent 70%);
+    opacity: 0; transition: opacity 180ms ease;
+  }
+  .flash.on { opacity: 1; }
+
+  .actionbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 2px; flex-wrap: wrap; }
+  .actionbar .note-line {
+    font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--faint);
+  }
+  .actionbar .btn { margin: 0; }
+  .btn.small { min-height: 30px; padding: 6px 13px; font-size: 9.5px; }
+
+  @media (max-width: 760px) {
+    .stats { flex-wrap: wrap; gap: 8px; width: 100%; }
+    .statbox { min-width: 62px; }
+    .topbar { flex-wrap: wrap; row-gap: 6px; }
+    .arena { aspect-ratio: 900 / 560; }
+  }
+</style>
+</head>
+<body>
+<h1 class="sr-only">Cat-astrophe: a stray cat breaks every antique in a museum without waking the guard</h1>
+<div id="stage" class="stage-fluid">
+  <div id="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">CA</span>
+        <span>
+          <b>Cat-astrophe</b>
+          <small>Antique heist &middot; 02:14</small>
+        </span>
+      </div>
+      <div class="stats">
+        <div class="statbox"><span>Chaos</span><b class="gold" id="hudChaos">$0</b></div>
+        <div class="statbox"><span>Stealth</span><b class="mult" id="hudMult">&times;1.0</b></div>
+        <div class="statbox"><span>Time</span><b id="hudTime">2:00</b></div>
+        <div class="instinct">
+          <span>Instinct</span>
+          <div class="ibar" id="ibar"><i id="ibarFill"></i></div>
+        </div>
+      </div>
+    </header>
+
+    <main class="arena" id="arena">
+      <canvas id="cv" width="900" height="560"></canvas>
+      <div class="flash" id="flash"></div>
+    </main>
+
+    <footer class="actionbar">
+      <span class="note-line" id="noteLine">WASD move &middot; space leap &middot; click swat &middot; C loaf</span>
+      <button id="restart" class="btn small" type="button">New heist</button>
+    </footer>
+  </div>
+
+  <div id="overlay" class="overlay" role="dialog" aria-modal="true" aria-labelledby="ovTitle" hidden>
+    <div class="panel panel-card">
+      <p class="eyebrow" id="ovKicker">Heist over</p>
+      <h2 id="ovTitle" class="title"></h2>
+      <p id="ovLead" class="lead"></p>
+      <ul id="ovRules" class="rules"></ul>
+      <div id="ovScore" class="final-score" hidden>
+        <span>Chaos valuation</span>
+        <strong id="ovScoreValue">$0</strong>
+        <p id="ovRank" class="rank"></p>
+        <p id="ovBest" class="best"></p>
+      </div>
+      <button id="ovBtn" class="btn" type="button">Prowl again</button>
+    </div>
+  </div>
+</div>
+<p class="hint">soft landings still pay &middot; floor landings wake the guard</p>
+
+<script>
+(() => {
+  'use strict';
+
+  const cv = document.getElementById('cv');
+  const ctx = cv.getContext('2d');
+  const $ = (s) => document.querySelector(s);
+  const W = 900, H = 560;
+  const FLOOR = 470;
+  const GRAV = 1500;
+  const BEST_KEY = 'catastrophe.best.v1';
+
+  const PLATFORMS = [
+    { x: 0, y: FLOOR, w: 900, h: 90, floor: true },
+    { x: 250, y: 412, w: 54, h: 58 },
+    { x: 312, y: 360, w: 52, h: 110 },
+    { x: 372, y: 306, w: 120, h: 28 },
+    { x: 60, y: 300, w: 210, h: 18 },
+    { x: 620, y: 216, w: 220, h: 18 },
+    { x: 520, y: 146, w: 84, h: 14 },
+    { x: 120, y: 78, w: 660, h: 16 }
+  ];
+
+  const SOFT = [
+    { x: 386, y: FLOOR - 6, w: 96, label: 'rug' },
+    { x: 512, y: FLOOR - 26, w: 78, h: 26, label: 'basket' },
+    { x: 600, y: FLOOR - 22, w: 96, h: 22, label: 'cushions' },
+    { x: 108, y: FLOOR - 24, w: 74, h: 24, label: 'laundry' }
+  ];
+
+  const COVER = [
+    { x: 226, y: FLOOR - 66, w: 24, h: 66 },
+    { x: 760, y: FLOOR - 78, w: 26, h: 78 }
+  ];
+
+  const TREASURES = [
+    { id: 'vase', name: 'Ming vase', x: 424, y: 306 - 42, w: 26, h: 42, value: 42000, plat: 3 },
+    { id: 'chandelier', name: 'Crystal chandelier', x: 636, y: 96, w: 52, h: 40, value: 18000, plat: 6, hanging: true },
+    { id: 'ink', name: 'Ink pot', x: 150, y: 300 - 26, w: 22, h: 26, value: 6000, plat: 4 },
+    { id: 'statue', name: 'Bronze sculpture', x: 726, y: 216 - 54, w: 30, h: 54, value: 30000, plat: 5 }
+  ];
+
+  const state = {
+    cat: null, objs: [], guard: null, laser: null,
+    chaos: 0, mult: 1, time: 120, instinct: 0, lunge: 0,
+    running: false, over: false, alerted: 0, cushioned: 0, noisy: 0,
+    best: 0, flashT: 0, shake: 0
+  };
+
+  const keys = {};
+  let mouse = { x: 0, y: 0, down: false };
+
+  function reset() {
+    state.cat = { x: 120, y: FLOOR - 22, w: 30, h: 22, vx: 0, vy: 0, onGround: true, loaf: false, face: 1, hidden: false };
+    state.objs = TREASURES.map((t) => ({ ...t, vy: 0, vx: 0, falling: false, broken: false, rest: true }));
+    state.guard = { x: 300, y: FLOOR - 64, w: 26, h: 64, dir: 1, speed: 52, paused: 0 };
+    state.laser = { on: false, t: 0, x: 400, y: 300, timer: 9 };
+    state.chaos = 0; state.mult = 1; state.time = 120; state.instinct = 0; state.lunge = 0;
+    state.over = false; state.running = true;
+    state.alerted = 0; state.cushioned = 0; state.noisy = 0;
+    state.flashT = 0; state.shake = 0;
+    document.getElementById('flash').classList.remove('on');
+  }
+
+  /* ---------------- physics helpers ---------------- */
+  function platformTopAt(x, y, w, h, vy) {
+    let best = null;
+    for (const p of PLATFORMS) {
+      if (x + w < p.x || x > p.x + p.w) continue;
+      const prevBottom = y + h - vy * 0.016;
+      if (y + h <= p.y + 4 && y + h >= p.y - Math.max(12, vy * 0.03) && p.y >= prevBottom - 40) {
+        if (!best || p.y < best.y) best = p;
+      }
+    }
+    return best;
+  }
+
+  function softAt(x, w) {
+    for (const s of SOFT) {
+      if (x + w > s.x && x < s.x + s.w) return s;
+    }
+    return null;
+  }
+
+  function breakObject(o, cushioned) {
+    o.broken = true;
+    o.falling = false;
+    state.chaos += o.value;
+    if (cushioned) state.cushioned += 1;
+    else {
+      state.noisy += 1;
+      state.guard.paused = 0.9;
+      state.mult = Math.max(0.1, state.mult - 0.25);
+      state.shake = 12;
+      const flash = document.getElementById('flash');
+      flash.classList.add('on');
+      state.flashT = 0.3;
+      const dx = o.x - state.guard.x;
+      state.guard.dir = dx >= 0 ? 1 : -1;
+    }
+  }
+
+  /* ---------------- update ---------------- */
+  function update(dt) {
+    if (!state.running || state.over) return;
+    state.time -= dt;
+    if (state.time <= 0) { state.time = 0; end('time'); return; }
+
+    const cat = state.cat;
+
+    if (state.lunge > 0) {
+      state.lunge -= dt;
+    } else {
+      let ax = 0;
+      if (keys.a || keys.ArrowLeft) ax -= 1;
+      if (keys.d || keys.ArrowRight) ax += 1;
+      cat.vx = ax * (cat.loaf ? 0 : 210);
+      if (ax) cat.face = ax;
+      if ((keys.w || keys.ArrowUp || keys[' ']) && cat.onGround && !cat.loaf) {
+        cat.vy = -590;
+        cat.onGround = false;
+      }
+      cat.loaf = !!keys.c;
+      if (cat.loaf) cat.vx = 0;
+    }
+
+    cat.vy += GRAV * dt;
+    const prevY = cat.y;
+    cat.x += cat.vx * dt;
+    cat.x = Math.max(4, Math.min(W - cat.w - 4, cat.x));
+    cat.y += cat.vy * dt;
+    cat.onGround = false;
+    if (cat.vy >= 0) {
+      const p = platformTopAt(cat.x, cat.y, cat.w, cat.h, cat.vy);
+      if (p && prevY + cat.h <= p.y + 2) {
+        cat.y = p.y - cat.h;
+        cat.vy = 0;
+        cat.onGround = true;
+      }
+    }
+    if (cat.y > H + 60) { cat.y = FLOOR - cat.h; cat.vy = 0; }
+
+    // hidden if loafing inside a cover rect
+    cat.hidden = cat.loaf && COVER.some((c) => cat.x + cat.w > c.x - 26 && cat.x < c.x + c.w + 26);
+
+    // objects
+    for (const o of state.objs) {
+      if (o.broken) continue;
+      if (!o.falling) continue;
+      o.vy += GRAV * dt;
+      o.x += o.vx * dt;
+      o.y += o.vy * dt;
+      // chain reaction: hit another treasure
+      for (const other of state.objs) {
+        if (other === o || other.broken || other.falling) continue;
+        if (o.x + o.w > other.x && o.x < other.x + other.w && o.y + o.h > other.y && o.y < other.y + other.h) {
+          other.falling = true;
+          other.vy = Math.max(120, o.vy * 0.6);
+          other.vx = o.vx * 0.5;
+        }
+      }
+      const soft = softAt(o.x, o.w);
+      const floorHit = o.y + o.h >= FLOOR - (soft ? 14 : 0);
+      if (floorHit) {
+        o.y = FLOOR - o.h - (soft ? 12 : 0);
+        breakObject(o, !!soft);
+      }
+    }
+
+    // guard patrol
+    const g = state.guard;
+    if (g.paused > 0) g.paused -= dt;
+    else {
+      g.x += g.dir * g.speed * dt;
+      if (g.x < 40) { g.x = 40; g.dir = 1; }
+      if (g.x > W - 70) { g.x = W - 70; g.dir = -1; }
+    }
+
+    // vision cone
+    if (!cat.hidden && state.lunge <= 0) {
+      const dx = cat.x - g.x;
+      const dy = (cat.y + cat.h / 2) - (g.y + g.h / 2);
+      const facing = (dx >= 0) === (g.dir === 1);
+      if (facing && Math.abs(dx) < 250 && Math.abs(dy) < 130) {
+        spotted(dt);
+      }
+    }
+
+    // laser pointer
+    const L = state.laser;
+    L.timer -= dt;
+    if (!L.on && L.timer <= 0) {
+      L.on = true; L.t = 4.5; L.timer = 15;
+      L.x = g.x + g.dir * 90;
+      L.y = 360;
+    }
+    if (L.on) {
+      L.t -= dt;
+      L.x += Math.sin(performance.now() / 320) * 260 * dt;
+      L.y = 360 + Math.cos(performance.now() / 240) * 90;
+      if (L.x < 40 || L.x > W - 40) L.x = Math.max(40, Math.min(W - 40, L.x));
+      const near = Math.hypot(L.x - (cat.x + cat.w / 2), L.y - (cat.y + cat.h / 2));
+      if (!cat.hidden && L.t > 0) {
+        const los = !COVER.some((c) => {
+          const minX = Math.min(L.x, cat.x + cat.w / 2), maxX = Math.max(L.x, cat.x + cat.w / 2);
+          return c.x > minX && c.x < maxX && c.h > Math.abs(L.y - (cat.y + cat.h / 2)) * 0.2;
+        });
+        if (los && near < 210) state.instinct = Math.min(1, state.instinct + dt * (1.1 - near / 260));
+        else state.instinct = Math.max(0, state.instinct - dt * 0.7);
+      } else {
+        state.instinct = Math.max(0, state.instinct - dt * 0.9);
+      }
+      if (state.instinct >= 1) {
+        state.instinct = 0.35;
+        state.lunge = 0.85;
+        cat.vy = -420;
+        cat.vx = Math.sign(L.x - cat.x) * 340;
+      }
+      if (L.t <= 0) { L.on = false; L.timer = 15; }
+    } else {
+      state.instinct = Math.max(0, state.instinct - dt * 0.8);
+    }
+
+    if (state.flashT > 0) {
+      state.flashT -= dt;
+      if (state.flashT <= 0) document.getElementById('flash').classList.remove('on');
+    }
+    if (state.shake > 0) state.shake = Math.max(0, state.shake - dt * 40);
+
+    if (state.objs.every((o) => o.broken)) end('done');
+    updateHud();
+  }
+
+  let spotCooldown = 0;
+  function spotted(dt) {
+    if (spotCooldown > 0) { spotCooldown -= dt; return; }
+    spotCooldown = 3.2;
+    state.mult = Math.max(0.1, state.mult - 0.25);
+    state.alerted += 1;
+    state.guard.paused = 1.1;
+    state.shake = 10;
+    const flash = document.getElementById('flash');
+    flash.classList.add('on');
+    state.flashT = 0.35;
+    const g = state.guard;
+    g.dir = (state.cat.x >= g.x) ? 1 : -1;
+  }
+
+  /* ---------------- render ---------------- */
+  function rr(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function draw() {
+    ctx.save();
+    if (state.shake > 0) ctx.translate((Math.random() - 0.5) * state.shake, (Math.random() - 0.5) * state.shake);
+
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, '#241628');
+    g.addColorStop(0.55, '#150d19');
+    g.addColorStop(1, '#0a0610');
+    ctx.fillStyle = g;
+    ctx.fillRect(-20, -20, W + 40, H + 40);
+
+    // wall panels
+    ctx.strokeStyle = 'rgba(255,170,200,0.07)';
+    ctx.lineWidth = 1;
+    for (let x = 60; x < W; x += 90) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, FLOOR); ctx.stroke();
+    }
+
+    // platforms
+    for (const p of PLATFORMS) {
+      if (p.floor) {
+        ctx.fillStyle = '#1c1220';
+        ctx.fillRect(p.x, p.y, p.w, p.h);
+        ctx.fillStyle = 'rgba(255,170,200,0.12)';
+        ctx.fillRect(p.x, p.y, p.w, 3);
+      } else {
+        ctx.fillStyle = '#2a1a2e';
+        rr(p.x, p.y, p.w, p.h, 3); ctx.fill();
+        ctx.fillStyle = 'rgba(255,200,220,0.16)';
+        ctx.fillRect(p.x, p.y, p.w, 2);
+      }
+    }
+
+    // soft landing zones
+    for (const s of SOFT) {
+      ctx.fillStyle = 'rgba(110,240,200,0.1)';
+      ctx.fillRect(s.x, s.y, s.w, s.h || 14);
+      ctx.strokeStyle = 'rgba(110,240,200,0.4)';
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(s.x + s.w, s.y); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = 'rgba(110,240,200,0.55)';
+      ctx.font = '9px ui-monospace, monospace';
+      ctx.fillText(s.label, s.x + 4, s.y - 4);
+    }
+
+    // cover
+    for (const c of COVER) {
+      ctx.fillStyle = '#33223a';
+      rr(c.x, c.y, c.w, c.h, 4); ctx.fill();
+      ctx.strokeStyle = 'rgba(140,198,255,0.28)';
+      ctx.stroke();
+    }
+
+    // treasures
+    for (const o of state.objs) {
+      if (o.broken) {
+        ctx.fillStyle = 'rgba(255,180,190,0.2)';
+        for (let i = 0; i < 5; i++) {
+          ctx.fillRect(o.x + (i * 7) % 24, FLOOR - 5 - (i % 3) * 3, 5, 3);
+        }
+        continue;
+      }
+      if (o.id === 'vase') {
+        ctx.fillStyle = '#dfe8ef';
+        ctx.beginPath();
+        ctx.ellipse(o.x + o.w / 2, o.y + o.h * 0.55, o.w / 2, o.h * 0.5, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#4f7fd4';
+        ctx.fillRect(o.x + 3, o.y + o.h * 0.45, o.w - 6, 3);
+      } else if (o.id === 'chandelier') {
+        ctx.strokeStyle = 'rgba(255,220,150,0.6)';
+        ctx.beginPath(); ctx.moveTo(o.x + o.w / 2, 78); ctx.lineTo(o.x + o.w / 2, o.y); ctx.stroke();
+        ctx.fillStyle = '#ffe9a8';
+        for (let i = 0; i < 5; i++) {
+          ctx.beginPath();
+          ctx.arc(o.x + 6 + i * 10, o.y + 12 + (i % 2) * 14, 3.5, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      } else if (o.id === 'ink') {
+        ctx.fillStyle = '#26283a';
+        ctx.fillRect(o.x, o.y + o.h * 0.35, o.w, o.h * 0.65);
+        ctx.fillStyle = '#8cc6ff';
+        ctx.fillRect(o.x + 4, o.y, o.w - 8, 6);
+      } else {
+        ctx.fillStyle = '#a9773f';
+        ctx.beginPath();
+        ctx.moveTo(o.x + o.w / 2, o.y);
+        ctx.lineTo(o.x + o.w, o.y + o.h);
+        ctx.lineTo(o.x, o.y + o.h);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.fillStyle = 'rgba(255,200,107,0.85)';
+      ctx.font = '8px ui-monospace, monospace';
+      ctx.fillText('$' + (o.value / 1000) + 'k', o.x - 2, o.y - 5);
+    }
+
+    // guard
+    const gd = state.guard;
+    ctx.save();
+    ctx.globalAlpha = 0.14;
+    ctx.fillStyle = gd.dir === 1 ? '#ff7d86' : '#ff7d86';
+    ctx.beginPath();
+    ctx.moveTo(gd.x + gd.w / 2, gd.y + gd.h / 2);
+    const reach = 250;
+    const spread = 0.55;
+    const a0 = gd.dir === 1 ? -spread : Math.PI - spread;
+    ctx.arc(gd.x + gd.w / 2, gd.y + gd.h / 2, reach, a0, a0 + spread * 2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+
+    ctx.fillStyle = '#2f2a44';
+    rr(gd.x, gd.y, gd.w, gd.h, 5); ctx.fill();
+    ctx.fillStyle = '#4a4266';
+    ctx.beginPath();
+    ctx.arc(gd.x + gd.w / 2, gd.y, 9, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#ffd08a';
+    ctx.fillRect(gd.x + (gd.dir === 1 ? gd.w - 6 : 2), gd.y + 12, 4, 4);
+
+    // laser dot
+    const L = state.laser;
+    if (L.on) {
+      ctx.save();
+      ctx.shadowColor = '#ff3b4e';
+      ctx.shadowBlur = 14;
+      ctx.fillStyle = '#ff5566';
+      ctx.beginPath();
+      ctx.arc(L.x, L.y, 4.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      ctx.strokeStyle = 'rgba(255,80,100,0.18)';
+      ctx.beginPath(); ctx.moveTo(gd.x + gd.w / 2, gd.y); ctx.lineTo(L.x, L.y); ctx.stroke();
+    }
+
+    // cat
+    const c = state.cat;
+    ctx.save();
+    if (c.loaf) {
+      ctx.fillStyle = c.hidden ? '#5c6b78' : '#8b98a6';
+      rr(c.x, c.y + 6, c.w, c.h - 6, 8); ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(c.x + c.w - 12, c.y + 8);
+      ctx.lineTo(c.x + c.w - 7, c.y - 2);
+      ctx.lineTo(c.x + c.w - 2, c.y + 8);
+      ctx.fill();
+    } else {
+      ctx.fillStyle = '#c9d3dd';
+      rr(c.x, c.y, c.w, c.h, 7); ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(c.x + c.w - 2, c.y + 6);
+      ctx.lineTo(c.x + c.w + 6 * c.face, c.y - 4);
+      ctx.lineTo(c.x + c.w + 2 * c.face, c.y + 8);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(c.x + c.w - 6 * (c.face === 1 ? 0 : 1) - 4, c.y + 4, 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#2b3340';
+      ctx.fillRect(c.x + c.w - 9, c.y + 3, 2, 2);
+      ctx.fillRect(c.x + c.w - 4, c.y + 3, 2, 2);
+    }
+    ctx.restore();
+
+    // swat reach hint
+    if (mouse.down) {
+      ctx.strokeStyle = 'rgba(255,200,107,0.5)';
+      ctx.beginPath();
+      ctx.arc(c.x + c.w / 2, c.y + c.h / 2, 96, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  }
+
+  /* ---------------- hud / flow ---------------- */
+  function updateHud() {
+    document.getElementById('hudChaos').textContent = '$' + state.chaos.toLocaleString('en-US');
+    document.getElementById('hudMult').textContent = '×' + state.mult.toFixed(1);
+    const t = Math.max(0, Math.ceil(state.time));
+    document.getElementById('hudTime').textContent = Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0');
+    const fill = document.getElementById('ibarFill');
+    fill.style.width = Math.round(state.instinct * 100) + '%';
+    document.getElementById('ibar').classList.toggle('hot', state.instinct > 0.75);
+  }
+
+  function end(reason) {
+    if (state.over) return;
+    state.over = true;
+    state.running = false;
+    const total = Math.round(state.chaos * state.mult);
+    if (total > state.best) {
+      state.best = total;
+      try { localStorage.setItem(BEST_KEY, String(total)); } catch (e) { /* ignore */ }
+    }
+    const rank = total >= 90000 ? 'Museum legend'
+      : total >= 60000 ? 'Silent wrecking ball'
+      : total >= 30000 ? 'Promising menace'
+      : total > 0 ? 'Clumsy kitten'
+      : 'Cat asleep on the job';
+    const ov = document.getElementById('overlay');
+    document.getElementById('ovKicker').textContent = reason === 'done' ? 'Every antique broken' : 'Guard called it';
+    document.getElementById('ovTitle').innerHTML = reason === 'done'
+      ? 'Total <span class="accent">cat-astrophe.</span>'
+      : 'The heist <span class="accent">ran out.</span>';
+    document.getElementById('ovLead').textContent =
+      'Chaos value $' + state.chaos.toLocaleString('en-US') + ' times a stealth multiplier of ×' + state.mult.toFixed(1) +
+      '. ' + state.cushioned + ' cushioned landing(s), ' + state.noisy + ' heard on the floor, ' + state.alerted + ' time(s) spotted.';
+    document.getElementById('ovRules').innerHTML = [
+      'A cushioned landing still pays the full value and keeps the guard quiet.',
+      'A floor landing costs a quarter of your stealth multiplier.',
+      'Chain reactions: drop one object onto another and both break.',
+      'When the laser appears, break line of sight or the instinct takes over.'
+    ].map((t) => '<li class="rule">' + t + '</li>').join('');
+    document.getElementById('ovScore').hidden = false;
+    document.getElementById('ovScoreValue').textContent = '$' + total.toLocaleString('en-US');
+    document.getElementById('ovRank').textContent = rank;
+    document.getElementById('ovBest').textContent = 'Best $' + state.best.toLocaleString('en-US');
+    ov.hidden = false;
+    document.getElementById('ovBtn').focus();
+  }
+
+  /* ---------------- input ---------------- */
+  function toLocal(e) {
+    const r = cv.getBoundingClientRect();
+    return { x: (e.clientX - r.left) / r.width * W, y: (e.clientY - r.top) / r.height * H };
+  }
+
+  cv.addEventListener('mousemove', (e) => { mouse = { ...mouse, ...toLocal(e) }; });
+  cv.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    mouse.down = true;
+    if (!state.running) return;
+    const c = state.cat;
+    const cx = c.x + c.w / 2, cy = c.y + c.h / 2;
+    let target = null, bestD = 999;
+    for (const o of state.objs) {
+      if (o.broken || o.falling) continue;
+      const d = Math.hypot(o.x + o.w / 2 - cx, o.y + o.h / 2 - cy);
+      if (d < 100 && d < bestD) { target = o; bestD = d; }
+    }
+    if (target) {
+      target.falling = true;
+      target.rest = false;
+      target.vy = 60;
+      const dir = mouse.x > cx ? 1 : -1;
+      target.vx = dir * 90;
+      c.vy = -140;
+    }
+    setTimeout(() => { mouse.down = false; }, 220);
+  });
+  cv.addEventListener('mouseleave', () => { mouse.down = false; });
+
+  window.addEventListener('keydown', (e) => {
+    keys[e.key] = true;
+    if (e.key === 'c' || e.key === 'C') keys.c = true;
+    if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].indexOf(e.key) !== -1) e.preventDefault();
+  });
+  window.addEventListener('keyup', (e) => {
+    keys[e.key] = false;
+    if (e.key === 'c' || e.key === 'C') keys.c = false;
+  });
+
+  document.getElementById('ovBtn').addEventListener('click', () => {
+    document.getElementById('overlay').hidden = true;
+    reset();
+  });
+  document.getElementById('restart').addEventListener('click', () => {
+    document.getElementById('overlay').hidden = true;
+    reset();
+  });
+
+  try { state.best = parseInt(localStorage.getItem(BEST_KEY) || '0', 10) || 0; } catch (e) { state.best = 0; }
+
+  reset();
+  state.running = false;
+
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.033, (now - last) / 1000);
+    last = now;
+    if (state.running) update(dt);
+    draw();
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  document.getElementById('ovTitle').innerHTML = 'Cat-astrophe <span class="accent">Antique Heist</span>';
+  document.getElementById('ovLead').textContent = 'Four priceless antiques, one night guard, and a cat with opinions. Swat things off their pedestals, but land them on something soft or the guard hears the crash.';
+  document.getElementById('ovRules').innerHTML = [
+    'WASD to prowl, Space to leap between shelves and rafters.',
+    'Click within reach to swat an antique off its stand.',
+    'C curls you into a loaf: silent, and hidden behind furniture.',
+    'The laser pointer can override your controls. Break line of sight.'
+  ].map((t) => '<li class="rule">' + t + '</li>').join('');
+  document.getElementById('ovScore').hidden = true;
+  document.getElementById('ovBtn').textContent = 'Start the heist';
+  document.getElementById('overlay').hidden = false;
+})();
+</script>
+</body>
+</html>

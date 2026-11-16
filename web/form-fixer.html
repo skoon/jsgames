@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#08110f">
+<title>Form Fixer</title>
+<link rel="stylesheet" href="../common.css">
+<style>
+  :root {
+    --bg-top: #1d3330;
+    --bg-mid: #081210;
+    --bg-bottom: #040807;
+    --stage-bg: #07100e;
+    --ink: #effaf6;
+    --line: rgba(134, 231, 197, 0.2);
+    --teal: #70e7c8;
+    --amber: #ffc86b;
+    --red: #ff8474;
+    --blue: #88caff;
+  }
+  body { overflow-y: auto; }
+
+  #app {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: 8px;
+    padding: 8px;
+    height: 100%;
+    min-height: 0;
+  }
+  .topbar { margin: 0; }
+
+  .workspace {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+    gap: 9px;
+    min-height: 0;
+  }
+
+  .pane {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: rgba(6, 14, 12, 0.78);
+    overflow: hidden;
+  }
+  .pane-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--line);
+    background: rgba(255, 255, 255, 0.02);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .pane-head b { color: var(--teal); font-weight: 700; }
+
+  .pane-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 10px;
+    scrollbar-width: thin;
+  }
+
+  /* ---------- registration form ---------- */
+  .desk {
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 10px;
+    background: #0b1512;
+    overflow: hidden;
+    font-family: var(--font-sans);
+  }
+  .desk-head {
+    padding: 10px 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.03);
+  }
+  .desk-head b {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #eafff8;
+  }
+  .desk-head small { display: block; margin-top: 2px; font-size: 10.5px; color: rgba(234, 255, 248, 0.5); }
+
+  .form-body { display: grid; gap: 10px; padding: 12px; }
+  .field {
+    display: grid;
+    gap: 4px;
+    padding: 7px 8px;
+    border: 1px solid transparent;
+    border-radius: 7px;
+    cursor: pointer;
+  }
+  .field:hover { background: rgba(112, 231, 200, 0.05); }
+  .field.selected { border-color: rgba(112, 231, 200, 0.55); background: rgba(112, 231, 200, 0.07); }
+  .field label, .field .fake-label {
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(234, 255, 248, 0.74);
+  }
+  .field input {
+    padding: 8px 9px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 6px;
+    background: #050d0b;
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: 12.5px;
+  }
+  .field input::placeholder { color: rgba(234, 255, 248, 0.32); }
+  .field .flag {
+    font-family: var(--font-mono);
+    font-size: 8.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--red);
+  }
+
+  /* ---------- property panel ---------- */
+  .prop { display: grid; gap: 8px; }
+  .prop h3 {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--teal);
+  }
+  .prop .group { display: grid; gap: 3px; }
+  .prop .group > span {
+    font-family: var(--font-mono);
+    font-size: 8.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px; }
+  .chip {
+    min-height: 24px;
+    padding: 4px 7px;
+    border: 1px solid rgba(255, 255, 255, 0.11);
+    border-radius: 5px;
+    background: rgba(255, 255, 255, 0.03);
+    color: rgba(239, 250, 246, 0.74);
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    cursor: pointer;
+  }
+  .chip:hover { border-color: rgba(112, 231, 200, 0.45); color: #fff; }
+  .chip[aria-checked="true"] {
+    border-color: rgba(112, 231, 200, 0.6);
+    background: rgba(112, 231, 200, 0.14);
+    color: #d6fff4;
+  }
+
+  .note { margin: 0; font-size: 10.5px; line-height: 1.5; color: rgba(239, 250, 246, 0.6); }
+  .excerpt {
+    margin: 0;
+    padding: 7px 8px;
+    border-left: 2px solid rgba(112, 231, 200, 0.5);
+    border-radius: 0 6px 6px 0;
+    background: rgba(255, 255, 255, 0.03);
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    line-height: 1.5;
+    color: rgba(239, 250, 246, 0.66);
+  }
+
+  /* ---------- results ---------- */
+  .results { display: grid; gap: 4px; margin-top: 10px; }
+  .results h3 {
+    margin: 0 0 2px;
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .sample {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 8px;
+    align-items: center;
+    padding: 5px 7px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    color: rgba(239, 250, 246, 0.72);
+  }
+  .sample .verdict { font-size: 8.5px; letter-spacing: 0.08em; text-transform: uppercase; }
+  .sample.pass { border-color: rgba(112, 231, 200, 0.35); }
+  .sample.pass .verdict { color: var(--teal); }
+  .sample.fail { border-color: rgba(255, 132, 116, 0.4); }
+  .sample.fail .verdict { color: var(--red); }
+
+  .actionbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 2px; }
+  .actionbar .note-line { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint); }
+  .actionbar .row { display: flex; gap: 7px; }
+  .actionbar .btn { margin: 0; }
+  .btn.small { min-height: 34px; padding: 8px 16px; font-size: 10.5px; }
+
+  @media (max-width: 900px) {
+    .workspace { grid-template-columns: minmax(0, 1fr); }
+    #app { height: auto; }
+    #stage.stage-fluid { height: auto; }
+    .pane-body { overflow: visible; }
+  }
+</style>
+</head>
+<body>
+<h1 class="sr-only">Form Fixer: an accessible forms repair game</h1>
+<div id="stage" class="stage-fluid">
+  <div id="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">FF</span>
+        <span>
+          <b>Form Fixer</b>
+          <small>Event registration desk</small>
+        </span>
+      </div>
+      <div class="hud">
+        <div class="stat"><span>Form</span><strong id="hudForm">1/4</strong></div>
+        <div class="stat"><span>Score</span><strong id="hudScore">0000</strong></div>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <section class="pane" aria-label="Registration form">
+        <div class="pane-head">
+          <span>Live form</span>
+          <b id="passLine">0 / 3 fields ready</b>
+        </div>
+        <div class="pane-body">
+          <div class="desk">
+            <div class="desk-head">
+              <b id="formTitle">Autumn open evening</b>
+              <small>Northside events desk &middot; one ticket per student</small>
+            </div>
+            <div id="formFields" class="form-body"></div>
+          </div>
+          <div id="results" class="results" hidden></div>
+        </div>
+      </section>
+
+      <aside class="pane" aria-label="Field properties">
+        <div class="pane-head">
+          <span>Field settings</span>
+          <b id="selectedName">name</b>
+        </div>
+        <div class="pane-body">
+          <div id="props" class="prop"></div>
+        </div>
+      </aside>
+    </main>
+
+    <footer class="actionbar">
+      <span class="note-line" id="noteLine">Click a field to change its settings</span>
+      <div class="row">
+        <button id="test" class="btn small" type="button">Test submissions</button>
+      </div>
+    </footer>
+  </div>
+
+  <div id="overlay" class="overlay" role="dialog" aria-modal="true" aria-labelledby="ovTitle" hidden>
+    <div class="panel panel-card">
+      <p id="ovKicker" class="eyebrow"></p>
+      <h2 id="ovTitle" class="title"></h2>
+      <p id="ovLead" class="lead"></p>
+      <ul id="ovRules" class="rules"></ul>
+      <div id="ovScore" class="final-score" hidden>
+        <span>Repair score</span>
+        <strong id="ovScoreValue">0</strong>
+        <p id="ovRank" class="rank"></p>
+        <p id="ovBest" class="best"></p>
+      </div>
+      <button id="ovBtn" class="btn" type="button">Open the desk</button>
+    </div>
+  </div>
+</div>
+<p class="hint">click a field &middot; choose type, label, validation and error text &middot; test real submissions</p>
+
+<script>
+(() => {
+  'use strict';
+
+  const $ = (s) => document.querySelector(s);
+  const BEST_KEY = 'formfixer.best.v1';
+
+  const NAME_TOLERANT = /^[\p{L}][\p{L}\p{M}\s'.-]*$/u;
+  const NAME_STRICT = /^[A-Za-z ]+$/;
+  const PHONE_TOLERANT = /^\+?[\d\s().-]{7,}$/;
+  const PHONE_STRICT = /^\d{10}$/;
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  const FORMS = [
+    {
+      title: 'Autumn open evening',
+      fields: [
+        {
+          id: 'name', kind: 'name', label: 'Full name', placeholder: 'Your name',
+          valid: ["Ana María O'Brien", 'José Núñez-Smith'],
+          invalid: ['Ana2', ''],
+          why: 'Names carry accents, apostrophes and hyphens. A strict letters-only rule rejects real students.'
+        },
+        {
+          id: 'email', kind: 'email', label: 'Email address', placeholder: 'you@school.edu',
+          valid: ['ana.obrien@school.edu', 'j.nunez+events@school.co.uk'],
+          invalid: ['ana@', 'ana(at)school.edu'],
+          why: 'type="email" lets the browser check the shape of the address instead of you guessing with a regex.'
+        },
+        {
+          id: 'phone', kind: 'phone', label: 'Mobile number', placeholder: '+1 555 010 9999',
+          valid: ['+1 (555) 010-9999', '555 010 1234'],
+          invalid: ['555-01', 'call me'],
+          why: 'People write numbers with country codes, spaces, dots and dashes. Ten bare digits rejects most of them.'
+        }
+      ]
+    },
+    {
+      title: 'Science fair sign-up',
+      fields: [
+        {
+          id: 'name', kind: 'name', label: 'Student name', placeholder: 'Student name',
+          valid: ['Dara Okafor', "Méabh O'Rourke"],
+          invalid: ['Dara O.', '1234'],
+          why: 'Initials and digits are not names, but accents and apostrophes absolutely are.'
+        },
+        {
+          id: 'email', kind: 'email', label: 'Guardian email', placeholder: 'guardian@example.com',
+          valid: ['guardian@example.com', 'dara.okafor@school.edu'],
+          invalid: ['dara@@school.edu', 'dara.okafor'],
+          why: 'Without type="email" a form happily accepts "dara.okafor" and the ticket never arrives.'
+        },
+        {
+          id: 'phone', kind: 'phone', label: 'Contact number', placeholder: '+44 7700 900123',
+          valid: ['+44 7700 900123', '07700 900123'],
+          invalid: ['12345', 'n/a'],
+          why: 'International guardians will type a + and a country code. Make the rule fit the real entries.'
+        }
+      ]
+    },
+    {
+      title: 'Sports day registration',
+      fields: [
+        {
+          id: 'name', kind: 'name', label: 'Runner name', placeholder: 'Runner name',
+          valid: ['Zoë Ångström', "Liam O'Connell"],
+          invalid: ['Zoë3', '—'],
+          why: 'Unicode letters are ordinary. Rejecting them quietly excludes students with non-English names.'
+        },
+        {
+          id: 'email', kind: 'email', label: 'Email', placeholder: 'runner@school.edu',
+          valid: ['runner@school.edu', 'liam.oconnell+track@school.edu'],
+          invalid: ['runner@school', 'runner school.edu'],
+          why: 'A single type attribute catches missing @ signs and missing domains.'
+        },
+        {
+          id: 'phone', kind: 'phone', label: 'Emergency number', placeholder: '+1 555 010 0000',
+          valid: ['+1 555 010 0000', '(555) 010-0000'],
+          invalid: ['555', '000-000'],
+          why: 'An emergency contact that the form rejects is worse than no field at all.'
+        }
+      ]
+    },
+    {
+      title: 'Library card',
+      fields: [
+        {
+          id: 'name', kind: 'name', label: 'Cardholder name', placeholder: 'Cardholder name',
+          valid: ["Siobhán O'Neill", 'Ahmed Al-Rashid'],
+          invalid: ['Siobhan1', 'A'],
+          why: 'Hyphens and apostrophes are part of names, not typos.'
+        },
+        {
+          id: 'email', kind: 'email', label: 'Email for reminders', placeholder: 'name@example.org',
+          valid: ['name@example.org', 'a.alrashid@library.org'],
+          invalid: ['name@', '@library.org'],
+          why: 'Reminder emails need a real address, and only the email input type checks that reliably.'
+        },
+        {
+          id: 'phone', kind: 'phone', label: 'Phone (optional)', placeholder: '+1 555 010 4444',
+          valid: ['+1 555 010 4444', '555.010.4444'],
+          invalid: ['555 01', 'phone'],
+          why: 'Dots and spaces are common separators. Accept the formats people actually type.'
+        }
+      ]
+    }
+  ];
+
+  const TYPES = {
+    name: [{ v: 'text', t: 'text' }, { v: 'number', t: 'number' }],
+    email: [{ v: 'email', t: 'email' }, { v: 'text', t: 'text' }],
+    phone: [{ v: 'tel', t: 'tel' }, { v: 'number', t: 'number' }, { v: 'text', t: 'text' }]
+  };
+
+  const CORRECT = {
+    name: { type: 'text', label: 'visible', validation: 'tolerant', error: 'helpful' },
+    email: { type: 'email', label: 'visible', error: 'helpful' },
+    phone: { type: 'tel', label: 'visible', validation: 'tolerant', error: 'helpful' }
+  };
+
+  const state = {
+    form: 0,
+    score: 0,
+    best: 0,
+    selected: 'name',
+    configs: {},
+    results: null,
+    fieldsScored: 0
+  };
+
+  const els = {
+    formTitle: $('#formTitle'),
+    formFields: $('#formFields'),
+    props: $('#props'),
+    selectedName: $('#selectedName'),
+    passLine: $('#passLine'),
+    results: $('#results'),
+    noteLine: $('#noteLine'),
+    hudForm: $('#hudForm'),
+    hudScore: $('#hudScore'),
+    test: $('#test'),
+    overlay: $('#overlay'),
+    ovKicker: $('#ovKicker'),
+    ovTitle: $('#ovTitle'),
+    ovLead: $('#ovLead'),
+    ovRules: $('#ovRules'),
+    ovScore: $('#ovScore'),
+    ovScoreValue: $('#ovScoreValue'),
+    ovRank: $('#ovRank'),
+    ovBest: $('#ovBest'),
+    ovBtn: $('#ovBtn')
+  };
+
+  const form = () => FORMS[state.form];
+  const fieldById = (id) => form().fields.find((f) => f.id === id);
+  const pad = (n) => String(n).padStart(4, '0');
+
+  function defaultConfig(kind) {
+    return { type: TYPES[kind][TYPES[kind].length - 1].v, label: 'placeholder', validation: 'strict', error: 'terse' };
+  }
+
+  function loadForm() {
+    const f = form();
+    state.selected = f.fields[0].id;
+    state.configs = {};
+    state.results = null;
+    f.fields.forEach((field) => {
+      state.configs[field.id] = defaultConfig(field.kind);
+    });
+    els.formTitle.textContent = f.title;
+    els.results.hidden = true;
+    els.hudForm.textContent = (state.form + 1) + '/' + FORMS.length;
+    els.hudScore.textContent = pad(state.score);
+    els.test.textContent = 'Test submissions';
+    els.test.dataset.mode = 'test';
+    els.noteLine.textContent = 'Click a field to change its settings';
+    renderForm();
+    renderProps();
+  }
+
+  function renderForm() {
+    const f = form();
+    els.formFields.innerHTML = '';
+    f.fields.forEach((field) => {
+      const cfg = state.configs[field.id];
+      const wrap = document.createElement('div');
+      wrap.className = 'field' + (state.selected === field.id ? ' selected' : '');
+      wrap.dataset.field = field.id;
+
+      const id = 'field-' + field.id;
+      let labelMarkup = '';
+      if (cfg.label === 'visible') {
+        labelMarkup = '<label for="' + id + '">' + field.label + '</label>';
+      } else if (cfg.label === 'placeholder') {
+        labelMarkup = '<span class="fake-label" aria-hidden="true">' + field.label + '</span><span class="flag">placeholder only</span>';
+      } else {
+        labelMarkup = '<span class="flag">no label at all</span>';
+      }
+
+      wrap.innerHTML = labelMarkup +
+        '<input id="' + id + '" type="' + cfg.type + '" ' +
+        (cfg.label === 'none' ? '' : 'placeholder="' + field.placeholder + '"') +
+        ' aria-label="' + (cfg.label === 'none' ? 'unlabelled field' : field.label) + '">';
+
+      wrap.addEventListener('click', () => {
+        state.selected = field.id;
+        renderForm();
+        renderProps();
+      });
+      els.formFields.appendChild(wrap);
+    });
+
+    const ready = f.fields.filter((field) => isFieldCorrect(field)).length;
+    els.passLine.textContent = ready + ' / ' + f.fields.length + ' fields ready';
+  }
+
+  function isFieldCorrect(field) {
+    const cfg = state.configs[field.id];
+    const correct = CORRECT[field.kind];
+    if (cfg.type !== correct.type) return false;
+    if (cfg.label !== correct.label) return false;
+    if (cfg.error !== correct.error) return false;
+    if (correct.validation && cfg.validation !== correct.validation) return false;
+    return true;
+  }
+
+  function renderProps() {
+    const field = fieldById(state.selected);
+    const cfg = state.configs[field.id];
+    els.selectedName.textContent = field.id;
+    els.props.innerHTML = '';
+
+    const title = document.createElement('h3');
+    title.textContent = field.label + ' \u00b7 ' + field.kind;
+    els.props.appendChild(title);
+
+    const groups = [
+      {
+        key: 'type', label: 'Input type', opts: TYPES[field.kind].map((t) => ({ v: t.v, t: t.t }))
+      },
+      {
+        key: 'label', label: 'Label',
+        opts: [
+          { v: 'visible', t: 'Visible <label>' },
+          { v: 'placeholder', t: 'Placeholder only' },
+          { v: 'none', t: 'No label' }
+        ]
+      }
+    ];
+
+    if (field.kind === 'name' || field.kind === 'phone') {
+      groups.push({
+        key: 'validation', label: 'Validation rule',
+        opts: [
+          { v: 'tolerant', t: field.kind === 'name' ? 'Unicode letters, \' and -' : 'Digits, +, (), spaces' },
+          { v: 'strict', t: field.kind === 'name' ? 'A–Z letters only' : 'Exactly 10 digits' }
+        ]
+      });
+    }
+
+    groups.push({
+      key: 'error', label: 'Error message',
+      opts: [
+        { v: 'helpful', t: '"Enter your mobile, e.g. +1 555 010 9999"' },
+        { v: 'terse', t: '"Invalid input"' }
+      ]
+    });
+
+    groups.forEach((g) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'group';
+      const label = document.createElement('span');
+      label.textContent = g.label;
+      const chips = document.createElement('div');
+      chips.className = 'chips';
+      g.opts.forEach((o) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'chip';
+        b.textContent = o.t;
+        b.setAttribute('role', 'radio');
+        b.setAttribute('aria-checked', String(cfg[g.key] === o.v));
+        b.addEventListener('click', () => {
+          cfg[g.key] = o.v;
+          state.results = null;
+          els.results.hidden = true;
+          renderForm();
+          renderProps();
+        });
+        chips.appendChild(b);
+      });
+      wrap.appendChild(label);
+      wrap.appendChild(chips);
+      els.props.appendChild(wrap);
+    });
+
+    const why = document.createElement('p');
+    why.className = 'excerpt';
+    why.textContent = field.why;
+    els.props.appendChild(why);
+
+    const note = document.createElement('p');
+    note.className = 'note';
+    note.textContent = 'Sample entries are fixed for each form, including entries that look unusual but are completely valid.';
+    els.props.appendChild(note);
+  }
+
+  function verdict(field, cfg, value, shouldBeValid) {
+    let accepted = false;
+    if (field.kind === 'name') {
+      if (cfg.type === 'number') accepted = false;
+      else accepted = (cfg.validation === 'strict' ? NAME_STRICT : NAME_TOLERANT).test(value);
+    } else if (field.kind === 'email') {
+      accepted = cfg.type === 'email' ? EMAIL_RE.test(value) : value.trim().length > 0;
+    } else {
+      if (cfg.type === 'number') accepted = /^\d+$/.test(value);
+      else accepted = (cfg.validation === 'strict' ? PHONE_STRICT : PHONE_TOLERANT).test(value);
+    }
+    return { value: value, expected: shouldBeValid, accepted: accepted, ok: accepted === shouldBeValid };
+  }
+
+  function test() {
+    if (state.results) return;
+    const f = form();
+    const rows = [];
+    let allGood = true;
+
+    f.fields.forEach((field) => {
+      const cfg = state.configs[field.id];
+      field.valid.forEach((v) => {
+        const r = verdict(field, cfg, v, true);
+        rows.push({ field: field.id, text: v, r: r, label: field.label });
+        if (!r.ok) allGood = false;
+      });
+      field.invalid.forEach((v) => {
+        const r = verdict(field, cfg, v, false);
+        rows.push({ field: field.id, text: v === '' ? '(empty)' : v, r: r, label: field.label });
+        if (!r.ok) allGood = false;
+      });
+      if (cfg.error !== 'helpful') allGood = false;
+      if (cfg.label !== 'visible') allGood = false;
+    });
+
+    const correctFields = f.fields.filter((field) => isFieldCorrect(field)).length;
+    const fieldPoints = correctFields * 60;
+    const bonus = allGood ? 120 : 0;
+    const earned = fieldPoints + bonus;
+    state.score += earned;
+    state.fieldsScored = correctFields;
+    state.results = rows;
+    els.hudScore.textContent = pad(state.score);
+
+    els.results.hidden = false;
+    els.results.innerHTML = '<h3>Sample submissions \u00b7 +' + earned + '</h3>' + rows.map((row) => (
+      '<div class="sample ' + (row.r.ok ? 'pass' : 'fail') + '">' +
+      '<span>' + row.label + ': ' + row.text + '</span>' +
+      '<span class="verdict">' + (row.r.ok ? 'handled' : (row.r.accepted ? 'wrongly accepted' : 'wrongly rejected')) + '</span></div>'
+    )).join('');
+
+    els.noteLine.textContent = allGood
+      ? 'Every valid entry accepted, every invalid entry explained. +' + earned
+      : correctFields + ' of ' + f.fields.length + ' fields configured well. ' + (allGood ? '' : 'Check the red samples.');
+
+    els.test.textContent = state.form === FORMS.length - 1 ? 'Finish the day' : 'Next form';
+    els.test.dataset.mode = 'next';
+  }
+
+  function nextForm() {
+    if (state.form === FORMS.length - 1) {
+      finish();
+      return;
+    }
+    state.form += 1;
+    loadForm();
+  }
+
+  function finish() {
+    if (state.score > state.best) {
+      state.best = state.score;
+      try { localStorage.setItem(BEST_KEY, String(state.score)); } catch (e) { /* ignore */ }
+    }
+    const rank = state.score >= 1050 ? 'Forms lead'
+      : state.score >= 800 ? 'Accessibility reviewer'
+      : state.score >= 550 ? 'Desk clerk'
+      : 'Volunteer';
+    els.ovKicker.textContent = 'Desk closed';
+    els.ovTitle.innerHTML = 'Every form <span class="accent">works.</span>';
+    els.ovLead.textContent = 'Four registration forms repaired. The rule to keep: accept the entries people really type, reject the ones that cannot work, and say what to fix.';
+    els.ovRules.innerHTML = '';
+    els.ovScore.hidden = false;
+    els.ovScoreValue.textContent = String(state.score);
+    els.ovRank.textContent = rank;
+    els.ovBest.textContent = 'Best ' + pad(state.best);
+    els.overlay.hidden = false;
+    els.ovBtn.focus();
+  }
+
+  function start() {
+    state.form = 0;
+    state.score = 0;
+    els.overlay.hidden = true;
+    loadForm();
+  }
+
+  els.test.addEventListener('click', () => {
+    if (els.test.dataset.mode === 'next') nextForm();
+    else test();
+  });
+  els.ovBtn.addEventListener('click', start);
+
+  try { state.best = parseInt(localStorage.getItem(BEST_KEY) || '0', 10) || 0; } catch (e) { state.best = 0; }
+
+  loadForm();
+
+  els.ovKicker.textContent = 'Northside events desk';
+  els.ovTitle.innerHTML = 'Form <span class="accent">Fixer</span>';
+  els.ovLead.textContent = 'Four registration forms are turning students away. Set each field\u2019s type, label, validation and error text, then test real submissions \u2014 including the ones that look odd but are perfectly valid.';
+  els.ovRules.innerHTML = [
+    'Click a field, then choose its input type, label and error text.',
+    'Visible labels beat placeholders every time.',
+    'Test the samples: valid entries must get through, invalid ones must be explained.',
+    'Loose enough for real names and numbers, strict enough to catch mistakes.'
+  ].map((t) => '<li class="rule">' + t + '</li>').join('');
+  els.ovBtn.textContent = 'Open the desk';
+  els.overlay.hidden = false;
+})();
+</script>
+</body>
+</html>

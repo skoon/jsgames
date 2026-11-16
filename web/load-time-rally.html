@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0b12">
+<title>Load-Time Rally</title>
+<link rel="stylesheet" href="../common.css">
+<style>
+  :root {
+    --bg-top: #2b2033;
+    --bg-mid: #0c0b12;
+    --bg-bottom: #050409;
+    --stage-bg: #0a0a10;
+    --ink: #f5f2ff;
+    --line: rgba(255, 200, 107, 0.2);
+    --teal: #70e7c8;
+    --amber: #ffc86b;
+    --red: #ff8474;
+    --blue: #88caff;
+  }
+  body { overflow-y: auto; }
+
+  #app {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: 8px;
+    padding: 8px;
+    height: 100%;
+    min-height: 0;
+  }
+  .topbar { margin: 0; }
+
+  .workspace {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 9px;
+    min-height: 0;
+  }
+
+  .pane {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: rgba(8, 8, 14, 0.78);
+    overflow: hidden;
+  }
+  .pane-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--line);
+    background: rgba(255, 255, 255, 0.02);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .pane-head b { color: var(--amber); font-weight: 700; }
+
+  .pane-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 10px;
+    scrollbar-width: thin;
+  }
+
+  /* ---------- race ---------- */
+  .stage-brief {
+    display: grid;
+    gap: 3px;
+    margin-bottom: 9px;
+  }
+  .stage-brief h2 { margin: 0; font-size: 15px; color: #fff3dd; }
+  .stage-brief p { margin: 0; font-size: 11px; line-height: 1.5; color: rgba(245, 242, 255, 0.6); }
+
+  .track {
+    position: relative;
+    height: 96px;
+    margin-bottom: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    background:
+      repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.06) 0 2px, transparent 2px 44px),
+      linear-gradient(180deg, #14121c, #0a0a12);
+    overflow: hidden;
+  }
+  .lane-line {
+    position: absolute;
+    left: 10px;
+    right: 10px;
+    top: 50%;
+    height: 2px;
+    background: repeating-linear-gradient(90deg, rgba(255, 200, 107, 0.35) 0 14px, transparent 14px 26px);
+  }
+  .flag {
+    position: absolute;
+    right: 9px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 18px;
+  }
+  .car {
+    position: absolute;
+    top: 50%;
+    left: 10px;
+    transform: translateY(-50%);
+    font-size: 22px;
+    transition: left 900ms cubic-bezier(0.22, 0.9, 0.25, 1);
+  }
+  .car.slow { filter: saturate(0.5) brightness(0.85); }
+  .race-caption {
+    position: absolute;
+    left: 10px;
+    bottom: 6px;
+    font-family: var(--font-mono);
+    font-size: 8.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: rgba(245, 242, 255, 0.45);
+  }
+
+  .readouts {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .readout {
+    padding: 7px 8px;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 8px;
+  }
+  .readout span {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 8.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .readout strong {
+    display: block;
+    margin-top: 2px;
+    font-family: var(--font-mono);
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+  }
+  .readout.good strong { color: var(--teal); }
+  .readout.bad strong { color: var(--red); }
+
+  .diagnosis {
+    margin-top: 9px;
+    padding: 8px 9px;
+    border: 1px solid rgba(255, 132, 116, 0.3);
+    border-radius: 8px;
+    background: rgba(255, 132, 116, 0.06);
+    font-size: 10.5px;
+    line-height: 1.5;
+    color: #ffd0c9;
+  }
+  .diagnosis[hidden] { display: none; }
+
+  /* ---------- assets ---------- */
+  .asset {
+    display: grid;
+    gap: 4px;
+    padding: 7px 8px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.02);
+  }
+  .asset + .asset { margin-top: 6px; }
+  .asset-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    letter-spacing: 0.08em;
+    color: rgba(245, 242, 255, 0.72);
+  }
+  .asset-head em {
+    font-style: normal;
+    font-size: 9px;
+    color: var(--faint);
+  }
+  .asset-head em.heavy { color: var(--red); }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px; }
+  .chip {
+    min-height: 24px;
+    padding: 4px 7px;
+    border: 1px solid rgba(255, 255, 255, 0.11);
+    border-radius: 5px;
+    background: rgba(255, 255, 255, 0.03);
+    color: rgba(245, 242, 255, 0.74);
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    cursor: pointer;
+  }
+  .chip:hover { border-color: rgba(255, 200, 107, 0.45); color: #fff; }
+  .chip[aria-checked="true"] {
+    border-color: rgba(255, 200, 107, 0.6);
+    background: rgba(255, 200, 107, 0.13);
+    color: #ffe9c2;
+  }
+
+  .actionbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 2px; }
+  .actionbar .note { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint); }
+  .actionbar .row { display: flex; gap: 7px; }
+  .actionbar .btn { margin: 0; }
+  .btn.small { min-height: 34px; padding: 8px 16px; font-size: 10.5px; }
+
+  @media (max-width: 900px) {
+    .workspace { grid-template-columns: minmax(0, 1fr); }
+    #app { height: auto; }
+    #stage.stage-fluid { height: auto; }
+    .pane-body { overflow: visible; }
+  }
+</style>
+</head>
+<body>
+<h1 class="sr-only">Load-Time Rally: a web performance strategy game</h1>
+<div id="stage" class="stage-fluid">
+  <div id="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">LT</span>
+        <span>
+          <b>Load-Time Rally</b>
+          <small>Asset delivery crew</small>
+        </span>
+      </div>
+      <div class="hud">
+        <div class="stat"><span>Run</span><strong id="hudStage">1/4</strong></div>
+        <div class="stat"><span>Score</span><strong id="hudScore">0000</strong></div>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <section class="pane" aria-label="Race track">
+        <div class="pane-head">
+          <span>Delivery run</span>
+          <b id="targetLine">target 1400 ms</b>
+        </div>
+        <div class="pane-body">
+          <div class="stage-brief">
+            <h2 id="stageName">Homepage</h2>
+            <p id="stageBrief">The truck carries every asset in the page.</p>
+          </div>
+          <div class="track">
+            <div class="lane-line"></div>
+            <span class="flag" aria-hidden="true">&#127937;</span>
+            <span class="car" id="car" aria-hidden="true">&#128666;</span>
+            <span class="race-caption" id="raceCaption">not run yet</span>
+          </div>
+          <div class="readouts">
+            <div class="readout" id="rTime"><span>Est. load</span><strong id="timeOut">0 ms</strong></div>
+            <div class="readout" id="rPayload"><span>Payload</span><strong id="payloadOut">0 KB</strong></div>
+            <div class="readout" id="rQuality"><span>Quality</span><strong id="qualityOut">100</strong></div>
+          </div>
+          <p id="diagnosis" class="diagnosis" hidden></p>
+        </div>
+      </section>
+
+      <section class="pane" aria-label="Assets">
+        <div class="pane-head">
+          <span>Manifest</span>
+          <b id="reqLine">0 requests</b>
+        </div>
+        <div class="pane-body" id="assets"></div>
+      </section>
+    </main>
+
+    <footer class="actionbar">
+      <span class="note" id="noteLine">Pick formats, sizes and loading strategies</span>
+      <div class="row">
+        <button id="reset" class="btn small btn-secondary" type="button">Reset manifest</button>
+        <button id="race" class="btn small" type="button">Run the truck</button>
+      </div>
+    </footer>
+  </div>
+
+  <div id="overlay" class="overlay" role="dialog" aria-modal="true" aria-labelledby="ovTitle" hidden>
+    <div class="panel panel-card">
+      <p id="ovKicker" class="eyebrow"></p>
+      <h2 id="ovTitle" class="title"></h2>
+      <p id="ovLead" class="lead"></p>
+      <ul id="ovRules" class="rules"></ul>
+      <div id="ovScore" class="final-score" hidden>
+        <span>Delivery score</span>
+        <strong id="ovScoreValue">0</strong>
+        <p id="ovRank" class="rank"></p>
+        <p id="ovBest" class="best"></p>
+      </div>
+      <button id="ovBtn" class="btn" type="button">Start the first run</button>
+    </div>
+  </div>
+</div>
+<p class="hint">every kilobyte is cargo &middot; every request is a stop &middot; keep quality above 85</p>
+
+<script>
+(() => {
+  'use strict';
+
+  const $ = (s) => document.querySelector(s);
+  const BEST_KEY = 'loadtimerally.best.v1';
+  const QUALITY_FLOOR = 85;
+
+  const ASSETS = [
+    {
+      id: 'hero', label: 'Hero image',
+      options: [
+        { v: 'hero-jpeg', t: 'JPEG 2400px', kb: 3200, q: 100, req: 1 },
+        { v: 'hero-webp', t: 'WebP 1600px', kb: 620, q: 100, req: 1 },
+        { v: 'hero-avif', t: 'AVIF 1600px', kb: 340, q: 100, req: 1 },
+        { v: 'hero-small', t: 'JPEG 900px', kb: 380, q: 70, req: 1 }
+      ]
+    },
+    {
+      id: 'gallery', label: 'Gallery',
+      options: [
+        { v: 'gal-eager', t: 'Load all 12 now', kb: 2400, q: 100, req: 12 },
+        { v: 'gal-lazy', t: 'Lazy-load below fold', kb: 320, q: 100, req: 1 }
+      ]
+    },
+    {
+      id: 'script', label: 'main.js',
+      options: [
+        { v: 'js-block', t: 'Blocking <script>', kb: 240, q: 100, req: 1, blocking: 600 },
+        { v: 'js-defer', t: 'defer', kb: 240, q: 100, req: 1 },
+        { v: 'js-async', t: 'async', kb: 240, q: 100, req: 1 }
+      ]
+    },
+    {
+      id: 'analytics', label: 'analytics.js',
+      options: [
+        { v: 'an-keep', t: 'Keep', kb: 180, q: 100, req: 2 },
+        { v: 'an-drop', t: 'Remove', kb: 0, q: 100, req: 0 }
+      ]
+    },
+    {
+      id: 'font', label: 'Display font',
+      options: [
+        { v: 'font-web', t: 'Web font 120 KB', kb: 120, q: 100, req: 2 },
+        { v: 'font-system', t: 'System font', kb: 0, q: 95, req: 0 }
+      ]
+    }
+  ];
+
+  const STAGES = [
+    {
+      name: 'Homepage',
+      brief: 'The landing page carries a full-size hero, a twelve-image gallery, a blocking script and analytics. Target: 1400 ms.',
+      target: 1400,
+      start: { hero: 'hero-jpeg', gallery: 'gal-eager', script: 'js-block', analytics: 'an-keep', font: 'font-web' }
+    },
+    {
+      name: 'Gallery',
+      brief: 'The gallery page is the slowest on the site. Target: 1100 ms.',
+      target: 1100,
+      start: { hero: 'hero-jpeg', gallery: 'gal-eager', script: 'js-block', analytics: 'an-keep', font: 'font-web' }
+    },
+    {
+      name: 'Enrollment',
+      brief: 'Families fill this in on phones. Target: 1000 ms.',
+      target: 1000,
+      start: { hero: 'hero-webp', gallery: 'gal-eager', script: 'js-block', analytics: 'an-keep', font: 'font-web' }
+    },
+    {
+      name: 'Club dashboard',
+      brief: 'One last run, and the tightest target of the day. Target: 900 ms.',
+      target: 900,
+      start: { hero: 'hero-jpeg', gallery: 'gal-lazy', script: 'js-block', analytics: 'an-keep', font: 'font-system' }
+    }
+  ];
+
+  const state = {
+    stage: 0,
+    score: 0,
+    best: 0,
+    config: {},
+    ran: false,
+    passed: false
+  };
+
+  const els = {
+    assets: $('#assets'),
+    stageName: $('#stageName'),
+    stageBrief: $('#stageBrief'),
+    targetLine: $('#targetLine'),
+    reqLine: $('#reqLine'),
+    car: $('#car'),
+    raceCaption: $('#raceCaption'),
+    timeOut: $('#timeOut'),
+    payloadOut: $('#payloadOut'),
+    qualityOut: $('#qualityOut'),
+    rTime: $('#rTime'),
+    rQuality: $('#rQuality'),
+    diagnosis: $('#diagnosis'),
+    noteLine: $('#noteLine'),
+    hudStage: $('#hudStage'),
+    hudScore: $('#hudScore'),
+    race: $('#race'),
+    reset: $('#reset'),
+    overlay: $('#overlay'),
+    ovKicker: $('#ovKicker'),
+    ovTitle: $('#ovTitle'),
+    ovLead: $('#ovLead'),
+    ovRules: $('#ovRules'),
+    ovScore: $('#ovScore'),
+    ovScoreValue: $('#ovScoreValue'),
+    ovRank: $('#ovRank'),
+    ovBest: $('#ovBest'),
+    ovBtn: $('#ovBtn')
+  };
+
+  const stage = () => STAGES[state.stage];
+  const pad = (n) => String(n).padStart(4, '0');
+  const optionFor = (assetId, value) => ASSETS.find((a) => a.id === assetId).options.find((o) => o.v === value);
+
+  function compute() {
+    let kb = 0;
+    let req = 0;
+    let blocking = 0;
+    let quality = 100;
+    ASSETS.forEach((a) => {
+      const opt = optionFor(a.id, state.config[a.id]);
+      if (!opt) return;
+      kb += opt.kb;
+      req += opt.req;
+      if (opt.blocking) blocking += opt.blocking;
+      if (opt.q < quality) quality = opt.q;
+    });
+    const time = Math.round(220 + kb * 0.55 + req * 45 + blocking);
+    return { kb: kb, req: req, time: time, quality: quality, blocking: blocking };
+  }
+
+  function renderAssets() {
+    els.assets.innerHTML = '';
+    ASSETS.forEach((a) => {
+      const unit = document.createElement('div');
+      unit.className = 'asset';
+      const opt = optionFor(a.id, state.config[a.id]);
+      const heavy = opt && opt.kb >= 500;
+      unit.innerHTML = '<div class="asset-head"><span>' + a.label + '</span><em class="' + (heavy ? 'heavy' : '') + '">' + opt.kb + ' KB &middot; ' + opt.req + ' req</em></div>';
+      const chips = document.createElement('div');
+      chips.className = 'chips';
+      a.options.forEach((o) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'chip';
+        b.textContent = o.t;
+        b.setAttribute('role', 'radio');
+        b.setAttribute('aria-checked', String(state.config[a.id] === o.v));
+        b.addEventListener('click', () => {
+          if (state.passed) return;
+          state.config[a.id] = o.v;
+          state.ran = false;
+          els.diagnosis.hidden = true;
+          renderAssets();
+          updateReadouts();
+          resetCar();
+        });
+        chips.appendChild(b);
+      });
+      unit.appendChild(chips);
+      els.assets.appendChild(unit);
+    });
+    els.reqLine.textContent = compute().req + ' requests';
+  }
+
+  function updateReadouts() {
+    const c = compute();
+    els.timeOut.textContent = c.time + ' ms';
+    els.payloadOut.textContent = c.kb.toLocaleString() + ' KB';
+    els.qualityOut.textContent = c.time <= stage().target && c.quality >= QUALITY_FLOOR ? String(c.quality) : String(c.quality);
+    els.rTime.className = 'readout ' + (c.time <= stage().target ? 'good' : 'bad');
+    els.rQuality.className = 'readout ' + (c.quality >= QUALITY_FLOOR ? 'good' : 'bad');
+    els.targetLine.textContent = 'target ' + stage().target + ' ms';
+    els.noteLine.textContent = c.quality < QUALITY_FLOOR
+      ? 'Quality below ' + QUALITY_FLOOR + ': the page looks cheap, even if it is fast.'
+      : 'Pick formats, sizes and loading strategies';
+  }
+
+  function resetCar() {
+    els.car.style.left = '10px';
+    els.car.classList.add('slow');
+    els.raceCaption.textContent = 'not run yet';
+  }
+
+  function diagnose(c) {
+    const hero = optionFor('hero', state.config.hero);
+    const gallery = optionFor('gallery', state.config.gallery);
+    const script = optionFor('script', state.config.script);
+    const analytics = optionFor('analytics', state.config.analytics);
+    const notes = [];
+    if (hero && hero.kb >= 1000) notes.push('the hero image alone is ' + hero.kb + ' KB');
+    if (gallery && gallery.req > 4) notes.push('the gallery fires ' + gallery.req + ' requests at once');
+    if (script && script.blocking) notes.push('a blocking script stalls the whole page');
+    if (analytics && analytics.kb > 0) notes.push('analytics.js ships 180 KB nobody needs on this page');
+    if (c.quality < QUALITY_FLOOR) notes.push('quality dropped to ' + c.quality + ' — the image is too small');
+    return notes.length ? 'Slowing you down: ' + notes.join('; ') + '.' : 'Everything on the manifest is reasonable.';
+  }
+
+  function run() {
+    if (state.passed) return;
+    const c = compute();
+    const pass = c.time <= stage().target && c.quality >= QUALITY_FLOOR;
+    state.ran = true;
+    state.passed = pass;
+
+    const ratio = Math.min(1, stage().target / c.time);
+    const trackWidth = els.car.parentElement.clientWidth - 56;
+    els.car.classList.toggle('slow', !pass);
+    els.car.style.left = (10 + ratio * trackWidth) + 'px';
+    els.raceCaption.textContent = pass ? 'delivered in ' + c.time + ' ms' : 'late: ' + c.time + ' ms';
+
+    if (pass) {
+      const margin = Math.max(0, Math.round(((stage().target - c.time) / stage().target) * 260));
+      const earned = 150 + Math.min(50, margin);
+      state.score += earned;
+      els.hudScore.textContent = pad(state.score);
+      els.diagnosis.hidden = true;
+      els.noteLine.textContent = 'Run cleared +' + earned + '. Next manifest.';
+      els.race.textContent = state.stage === STAGES.length - 1 ? 'Finish the day' : 'Next run';
+      els.race.dataset.mode = 'next';
+    } else {
+      els.diagnosis.hidden = false;
+      els.diagnosis.innerHTML = diagnose(c) + ' Target is ' + stage().target + ' ms; you are at ' + c.time + ' ms.';
+      els.noteLine.textContent = 'Run missed the target by ' + (c.time - stage().target) + ' ms.';
+      state.passed = false;
+    }
+  }
+
+  function nextStage() {
+    if (state.stage === STAGES.length - 1) {
+      finish();
+      return;
+    }
+    state.stage += 1;
+    loadStage();
+  }
+
+  function loadStage() {
+    const s = stage();
+    state.config = Object.assign({}, s.start);
+    state.ran = false;
+    state.passed = false;
+    els.stageName.textContent = s.name;
+    els.stageBrief.textContent = s.brief;
+    els.hudStage.textContent = (state.stage + 1) + '/' + STAGES.length;
+    els.hudScore.textContent = pad(state.score);
+    els.race.textContent = 'Run the truck';
+    els.race.dataset.mode = 'race';
+    els.diagnosis.hidden = true;
+    renderAssets();
+    updateReadouts();
+    resetCar();
+  }
+
+  function finish() {
+    if (state.score > state.best) {
+      state.best = state.score;
+      try { localStorage.setItem(BEST_KEY, String(state.score)); } catch (e) { /* ignore */ }
+    }
+    const rank = state.score >= 740 ? 'Performance chief'
+      : state.score >= 600 ? 'Speed engineer'
+      : state.score >= 440 ? 'Loader'
+      : 'Rookie';
+    els.ovKicker.textContent = 'Day complete';
+    els.ovTitle.innerHTML = 'Every page <span class="accent">delivered.</span>';
+    els.ovLead.textContent = 'Four manifests, all inside their budget. The wins came from modern formats, lazy loading, and deleting a script nobody needed.';
+    els.ovRules.innerHTML = '';
+    els.ovScore.hidden = false;
+    els.ovScoreValue.textContent = String(state.score);
+    els.ovRank.textContent = rank;
+    els.ovBest.textContent = 'Best ' + pad(state.best);
+    els.overlay.hidden = false;
+    els.ovBtn.focus();
+  }
+
+  function start() {
+    state.stage = 0;
+    state.score = 0;
+    els.overlay.hidden = true;
+    loadStage();
+  }
+
+  els.race.addEventListener('click', () => {
+    if (els.race.dataset.mode === 'next') nextStage();
+    else run();
+  });
+
+  els.reset.addEventListener('click', () => {
+    if (state.passed) return;
+    state.config = Object.assign({}, stage().start);
+    state.ran = false;
+    els.diagnosis.hidden = true;
+    renderAssets();
+    updateReadouts();
+    resetCar();
+  });
+
+  els.ovBtn.addEventListener('click', start);
+
+  try { state.best = parseInt(localStorage.getItem(BEST_KEY) || '0', 10) || 0; } catch (e) { state.best = 0; }
+
+  loadStage();
+
+  els.ovKicker.textContent = 'Asset delivery crew';
+  els.ovTitle.innerHTML = 'Load-Time <span class="accent">Rally</span>';
+  els.ovLead.textContent = 'Your truck carries the whole page. Choose image formats, sizes, loading strategies and scripts — then run it. Beat the target time without wrecking quality.';
+  els.ovRules.innerHTML = [
+    'Hero image: format and resolution both matter.',
+    'Lazy-loading the gallery saves twelve requests upfront.',
+    'Blocking scripts stall the truck; defer or async keeps it moving.',
+    'Quality below 85 fails the run, no matter how fast it is.'
+  ].map((t) => '<li class="rule">' + t + '</li>').join('');
+  els.ovBtn.textContent = 'Start the first run';
+  els.overlay.hidden = false;
+})();
+</script>
+</body>
+</html>

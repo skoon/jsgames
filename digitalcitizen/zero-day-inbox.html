@@ -1,0 +1,1002 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b1016">
+<title>Zero-Day Inbox</title>
+<link rel="stylesheet" href="../common.css">
+<style>
+  :root {
+    --bg-top: #22342f;
+    --bg-mid: #0a1114;
+    --bg-bottom: #05080a;
+    --stage-bg: #071013;
+    --ink: #eef7f4;
+    --line: rgba(120, 220, 190, 0.18);
+    --teal: #6ef0c8;
+    --amber: #ffc86b;
+    --red: #ff8b7a;
+    --violet: #c1a6ff;
+    --green: #9df5b8;
+    --danger: #ff6f5e;
+  }
+  body { overflow-y: auto; background: var(--bg-mid); }
+
+  #app {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: 8px;
+    padding: 8px;
+    height: 100%;
+    min-height: 0;
+  }
+  .topbar { margin: 0; }
+
+  .mail {
+    display: grid;
+    grid-template-columns: minmax(0, 0.72fr) minmax(0, 1.5fr) minmax(0, 0.78fr);
+    gap: 8px;
+    min-height: 0;
+  }
+
+  .pane {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: rgba(6, 13, 15, 0.8);
+    overflow: hidden;
+  }
+  .pane-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--line);
+    background: rgba(255, 255, 255, 0.02);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .pane-head b { color: var(--teal); font-weight: 700; }
+  .pane-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 9px;
+    scrollbar-width: thin;
+  }
+
+  /* ---------- inbox list ---------- */
+  .daytag {
+    margin: 0 0 6px;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: rgba(238, 247, 244, 0.4);
+  }
+  .mailitem {
+    display: grid;
+    gap: 3px;
+    width: 100%;
+    padding: 8px 9px;
+    margin-bottom: 5px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.025);
+    color: rgba(238, 247, 244, 0.85);
+    text-align: left;
+    font: inherit;
+    cursor: grab;
+  }
+  .mailitem:hover { border-color: rgba(110, 240, 200, 0.4); }
+  .mailitem[aria-current="true"] { border-color: rgba(110, 240, 200, 0.55); background: rgba(110, 240, 200, 0.07); }
+  .mailitem .who {
+    display: flex;
+    justify-content: space-between;
+    gap: 6px;
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    letter-spacing: 0.04em;
+    color: rgba(238, 247, 244, 0.6);
+  }
+  .mailitem .who b { color: #fff; font-weight: 600; max-width: 66%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mailitem .subj { font-size: 11px; line-height: 1.35; color: rgba(238, 247, 244, 0.9); }
+  .mailitem.done { opacity: 0.55; }
+  .mailitem.done .subj { text-decoration: line-through; }
+  .mailitem .mark {
+    font-family: var(--font-mono);
+    font-size: 8.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .mark.safe { color: var(--green); }
+  .mark.verify { color: var(--amber); }
+  .mark.report { color: var(--red); }
+
+  /* ---------- reading pane ---------- */
+  .msghead {
+    display: grid;
+    grid-template-columns: 34px 1fr auto;
+    gap: 9px;
+    align-items: start;
+    padding-bottom: 9px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    cursor: grab;
+  }
+  .avatar {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: linear-gradient(180deg, #2e6d63, #173b39);
+    color: #d9fff5;
+    font-family: var(--font-mono);
+    font-size: 11px;
+  }
+  .from { font-size: 12px; color: #fff; line-height: 1.3; word-break: break-all; }
+  .from span { color: rgba(238, 247, 244, 0.5); font-family: var(--font-mono); font-size: 10px; }
+  .subj { margin-top: 2px; font-size: 13.5px; font-weight: 600; color: #fff; line-height: 1.35; }
+  .meta { margin-top: 3px; font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.06em; color: rgba(238, 247, 244, 0.42); }
+  .flag {
+    padding: 3px 6px;
+    border: 1px solid rgba(255, 138, 116, 0.5);
+    border-radius: 4px;
+    color: var(--danger);
+    font-family: var(--font-mono);
+    font-size: 8.5px;
+    letter-spacing: 0.12em;
+  }
+
+  .body { padding: 10px 2px 4px; font-size: 12.5px; line-height: 1.6; color: rgba(238, 247, 244, 0.86); }
+  .body p { margin: 0 0 8px; }
+  .body ul { margin: 0 0 8px; padding-left: 18px; }
+  .body li { margin-bottom: 3px; }
+  .lnk {
+    display: inline-block;
+    margin: 2px 0;
+    padding: 5px 11px;
+    border: 1px solid rgba(110, 240, 200, 0.4);
+    border-radius: 6px;
+    background: rgba(110, 240, 200, 0.08);
+    color: #b7ffe9;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    cursor: pointer;
+    text-decoration: none;
+  }
+  .lnk:hover, .lnk:focus-visible { border-color: rgba(110, 240, 200, 0.8); background: rgba(110, 240, 200, 0.16); }
+
+  .voice {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin: 4px 0 8px;
+    padding: 8px 10px;
+    border: 1px solid rgba(193, 166, 255, 0.35);
+    border-radius: 8px;
+    background: rgba(193, 166, 255, 0.07);
+  }
+  .voice .wave { display: flex; align-items: center; gap: 2px; height: 20px; }
+  .voice .wave i { display: block; width: 2px; border-radius: 2px; background: var(--violet); opacity: 0.8; }
+  .voice button {
+    padding: 4px 9px;
+    border: 1px solid rgba(193, 166, 255, 0.5);
+    border-radius: 5px;
+    background: rgba(193, 166, 255, 0.12);
+    color: #e8ddff;
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    cursor: pointer;
+  }
+  .voice .vtxt { font-family: var(--font-mono); font-size: 9.5px; color: rgba(238, 247, 244, 0.6); }
+  .transcript {
+    margin: 0 0 8px;
+    padding: 8px 10px;
+    border-left: 2px solid rgba(193, 166, 255, 0.6);
+    background: rgba(193, 166, 255, 0.05);
+    font-size: 11.5px;
+    line-height: 1.55;
+    color: #e6dcff;
+    font-style: italic;
+  }
+  .transcript b { display: block; margin-bottom: 3px; font-style: normal; font-family: var(--font-mono); font-size: 8.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--violet); }
+
+  .hdrbtn {
+    margin: 2px 0 0;
+    padding: 5px 10px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.03);
+    color: rgba(238, 247, 244, 0.75);
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    letter-spacing: 0.08em;
+    cursor: pointer;
+  }
+  .hdrbtn:hover { border-color: rgba(110, 240, 200, 0.5); color: #fff; }
+  .headers {
+    margin-top: 7px;
+    padding: 8px 10px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    background: #060f12;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    line-height: 1.6;
+    overflow-x: auto;
+  }
+  .headers[hidden] { display: none; }
+  .headers div { display: grid; grid-template-columns: 108px 1fr; gap: 8px; }
+  .headers dt { color: rgba(238, 247, 244, 0.42); }
+  .headers dd { margin: 0; color: #cfe9e3; word-break: break-all; }
+  .headers .bad dd { color: #ffb3a5; }
+  .headers .bad dd::after { content: "  \25C0 mismatch"; color: rgba(255, 111, 94, 0.75); font-size: 8.5px; }
+
+  .result {
+    margin-top: 10px;
+    padding: 9px 11px;
+    border-radius: 9px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.03);
+  }
+  .result[hidden] { display: none; }
+  .result.ok { border-color: rgba(110, 240, 200, 0.45); background: rgba(110, 240, 200, 0.06); }
+  .result.no { border-color: rgba(255, 111, 94, 0.45); background: rgba(255, 111, 94, 0.06); }
+  .result .delta {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    letter-spacing: 0.06em;
+  }
+  .result.ok .delta { color: var(--teal); }
+  .result.no .delta { color: var(--danger); }
+  .result p { margin: 5px 0 0; font-size: 11.5px; line-height: 1.55; color: rgba(238, 247, 244, 0.8); }
+  .result .lesson { color: #cfe9e3; }
+
+  .linkbar {
+    padding: 7px 10px;
+    border-top: 1px solid var(--line);
+    background: rgba(0, 0, 0, 0.25);
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    line-height: 1.45;
+    color: rgba(238, 247, 244, 0.45);
+    word-break: break-all;
+  }
+  .linkbar.bad { color: #ffb3a5; background: rgba(255, 111, 94, 0.08); }
+  .linkbar.good { color: #b9ffe6; background: rgba(110, 240, 200, 0.06); }
+
+  /* ---------- trays ---------- */
+  .tray {
+    display: grid;
+    gap: 2px;
+    padding: 10px;
+    margin-bottom: 7px;
+    border: 1px dashed rgba(255, 255, 255, 0.2);
+    border-radius: 9px;
+    background: rgba(255, 255, 255, 0.02);
+    color: rgba(238, 247, 244, 0.82);
+    text-align: left;
+    font: inherit;
+    cursor: pointer;
+  }
+  .tray:hover, .tray:focus-visible { border-color: rgba(110, 240, 200, 0.55); background: rgba(110, 240, 200, 0.05); }
+  .tray.over { border-color: var(--teal); border-style: solid; background: rgba(110, 240, 200, 0.1); }
+  .tray b { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; }
+  .tray span { font-size: 10.5px; line-height: 1.4; color: rgba(238, 247, 244, 0.55); }
+  .tray[data-tray="safe"] b { color: var(--green); }
+  .tray[data-tray="verify"] b { color: var(--amber); }
+  .tray[data-tray="report"] b { color: var(--red); }
+  .tray:disabled { opacity: 0.4; cursor: default; }
+
+  .dir {
+    margin-top: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    padding-top: 8px;
+  }
+  .dir h3 {
+    margin: 0 0 5px;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: rgba(238, 247, 244, 0.42);
+  }
+  .dir ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 3px; }
+  .dir li {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 10.5px;
+    color: rgba(238, 247, 244, 0.7);
+  }
+  .dir li em { font-style: normal; font-family: var(--font-mono); font-size: 10px; color: var(--teal); }
+  .dir p { margin: 6px 0 0; font-size: 10px; line-height: 1.5; color: rgba(238, 247, 244, 0.42); }
+
+  .actionbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 2px; }
+  .actionbar .note-line {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+  .actionbar .btn { margin: 0; }
+  .btn.small { min-height: 34px; padding: 8px 16px; font-size: 10.5px; }
+  .btn[disabled] { opacity: 0.4; cursor: default; }
+
+  .daycard { display: grid; gap: 8px; }
+  .daycard ul { margin: 0; padding-left: 18px; }
+  .daycard li { margin-bottom: 5px; font-size: 12px; line-height: 1.55; color: rgba(238, 247, 244, 0.82); }
+
+  @media (max-width: 1050px) {
+    .mail { grid-template-columns: minmax(0, 1fr); }
+    #app { height: auto; }
+    #stage.stage-fluid { height: auto; }
+    .pane-body { overflow: visible; max-height: none; }
+    .pane { max-height: none; }
+  }
+</style>
+</head>
+<body>
+<h1 class="sr-only">Zero-Day Inbox: triage a mailroom's worth of phishing, social engineering and spoofed internal accounts</h1>
+<div id="stage" class="stage-fluid">
+  <div id="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">ZD</span>
+        <span>
+          <b>Zero-Day Inbox</b>
+          <small>Northgate mailroom</small>
+        </span>
+      </div>
+      <div class="hud">
+        <div class="stat"><span>Day</span><strong id="hudDay">1/3</strong></div>
+        <div class="stat"><span>Integrity</span><strong id="hudScore">0</strong></div>
+      </div>
+    </header>
+
+    <main class="mail">
+      <section class="pane" aria-label="Inbox">
+        <div class="pane-head"><span>Inbox</span><b id="inboxCount">4 to triage</b></div>
+        <div class="pane-body" id="list"></div>
+      </section>
+
+      <section class="pane" aria-label="Message">
+        <div class="pane-head"><span id="fromLabel">Message</span><b id="msgState">unread</b></div>
+        <div class="pane-body" id="view"></div>
+        <div class="linkbar" id="linkStatus">Hover a link to see where it really goes.</div>
+      </section>
+
+      <aside class="pane" aria-label="Routing trays">
+        <div class="pane-head"><span>Route it</span><b id="trayHint">drag or click</b></div>
+        <div class="pane-body">
+          <button class="tray" type="button" data-tray="safe">
+            <b>Safe Inbox</b>
+            <span>Genuine, nothing to act on beyond the request itself.</span>
+          </button>
+          <button class="tray" type="button" data-tray="verify">
+            <b>Verify via Secondary Channel</b>
+            <span>Looks internal or plausible, but needs a callback first.</span>
+          </button>
+          <button class="tray" type="button" data-tray="report">
+            <b>Report &amp; Quarantine</b>
+            <span>Evidence of spoofing or harvesting. Do not reply.</span>
+          </button>
+          <div class="dir">
+            <h3>Staff directory</h3>
+            <ul id="dirList"></ul>
+            <p>Extensions are the out-of-band channel. A name in the From line proves nothing on its own.</p>
+          </div>
+        </div>
+      </aside>
+    </main>
+
+    <footer class="actionbar">
+      <span class="note-line" id="noteLine">Read the message, inspect the headers, then route it</span>
+      <button id="next" class="btn small" type="button" disabled>Route this message first</button>
+    </footer>
+  </div>
+
+  <div id="dayOverlay" class="overlay" role="dialog" aria-modal="true" aria-labelledby="dayTitle" hidden>
+    <div class="panel panel-card">
+      <p class="eyebrow" id="dayKicker">Day 2</p>
+      <h2 id="dayTitle" class="title"></h2>
+      <div class="daycard">
+        <p class="lead" id="dayLead"></p>
+        <ul id="dayRules" class="rules"></ul>
+      </div>
+      <button id="dayBtn" class="btn" type="button">Start the day</button>
+    </div>
+  </div>
+
+  <div id="overlay" class="overlay" role="dialog" aria-modal="true" aria-labelledby="ovTitle" hidden>
+    <div class="panel panel-card">
+      <p class="eyebrow">Shift over</p>
+      <h2 id="ovTitle" class="title"></h2>
+      <p id="ovLead" class="lead"></p>
+      <ul id="ovRules" class="rules"></ul>
+      <div id="ovScore" class="final-score" hidden>
+        <span>Security integrity</span>
+        <strong id="ovScoreValue">0</strong>
+        <p id="ovRank" class="rank"></p>
+        <p id="ovBest" class="best"></p>
+      </div>
+      <button id="ovBtn" class="btn" type="button">Work another shift</button>
+    </div>
+  </div>
+</div>
+<p class="hint">3 days &middot; 12 messages &middot; the sender name is not evidence</p>
+
+<script>
+(() => {
+  'use strict';
+
+  const $ = (s) => document.querySelector(s);
+  const BEST_KEY = 'zeroDay.best.v1';
+
+  const DIRECTORY = [
+    { who: 'Elena Marsh', role: 'CEO', ext: 'x1001' },
+    { who: 'Dana Whitfield', role: 'Finance', ext: 'x4412' },
+    { who: 'Marcus Bell', role: 'Facilities', ext: 'x3108' },
+    { who: 'IT Service Desk', role: 'Internal', ext: 'x2200' }
+  ];
+
+  const DAY_TEXT = {
+    2: {
+      kicker: 'Day 2',
+      title: 'Better disguised.',
+      lead: 'Same tricks, more polish. The lookalikes are closer to your real vendors, and the urgency is quieter.',
+      rules: [
+        'Compare the domain to the real one, character by character.',
+        'A display name is free to type. Only the address and headers cost an attacker anything.',
+        'Reply-To is where a reply actually goes, not who the From line claims.'
+      ]
+    },
+    3: {
+      kicker: 'Day 3',
+      title: 'Deepfake escalation.',
+      lead: 'Attackers now have compromised internal accounts and synthetic voice memos. The From line reads like a colleague because it is one \u2014 the account is just not theirs any more.',
+      rules: [
+        'Clean headers do not prove intent. A compromised mailbox passes every check.',
+        'A voice memo is a file, not a person. Synthesised speech is cheap now.',
+        'Anything involving money, credentials or data gets an out-of-band call: use the directory extension, never the number in the email.'
+      ]
+    }
+  };
+
+  const MSGS = [
+    {
+      id: 'm1', day: 1, kind: 'phish',
+      name: 'IT Support',
+      addr: 'IT-Support@g00gle-security.net',
+      subject: 'URGENT: Password expired \u2014 workstation locks in 15 minutes',
+      date: 'Mon 08:42 \u00b7 to me',
+      urgent: true,
+      body: '<p>Your network password expired at 08:00 this morning.</p>' +
+        '<p><b>Your workstation will lock in 15 minutes</b> unless it is verified through the security portal.</p>' +
+        '<p><a class="lnk" href="#" data-url="http://login-verify-account.ru/token=99281" data-bad="1">Update Password Here</a></p>' +
+        '<p>Failure to act within the window will require a desk visit and a \u00a340 reinstatement fee.</p>' +
+        '<p style="color:rgba(238,247,244,0.45)">IT Support \u00b7 Security Operations</p>',
+      headers: [
+        { k: 'From', v: 'IT-Support@g00gle-security.net' },
+        { k: 'Return-Path', v: '&lt;bounce@mailer-9921.bulkrelay.top&gt;', bad: true },
+        { k: 'Reply-To', v: 'recover@g00gle-security.net' },
+        { k: 'Received', v: 'from bulkrelay.top (185.221.71.9)', bad: true },
+        { k: 'Authentication-Results', v: 'spf=pass dkim=fail dmarc=fail', bad: true }
+      ],
+      lesson: 'Three tells in one email: a deadline short enough to stop you thinking, a lookalike domain with two zeros standing in for the "oo", and a button that points at a Russian host unrelated to any Google service.'
+    },
+    {
+      id: 'm2', day: 1, kind: 'genuine',
+      name: 'Northwind Payroll',
+      addr: 'payroll@northwind-payroll.com',
+      subject: 'Your November payslip is ready',
+      date: 'Mon 09:15 \u00b7 to me',
+      urgent: false,
+      body: '<p>Your payslip for November is now available in the payroll portal.</p>' +
+        '<p><a class="lnk" href="#" data-url="https://portal.northwind-payroll.com/payslips/2026-11" data-bad="0">Open payslip</a></p>' +
+        '<p>No action is needed unless something looks wrong \u2014 if it does, raise a ticket with HR.</p>',
+      headers: [
+        { k: 'From', v: 'payroll@northwind-payroll.com' },
+        { k: 'Return-Path', v: '&lt;payroll@northwind-payroll.com&gt;' },
+        { k: 'Received', v: 'from mail.northwind-payroll.com (34.246.11.6)' },
+        { k: 'Authentication-Results', v: 'spf=pass dkim=pass dmarc=pass' }
+      ],
+      lesson: 'The domain matches the payroll provider exactly, the link points back at their own portal, and the authentication results all pass. Nothing here is urgent, and nothing asks for a credential.'
+    },
+    {
+      id: 'm3', day: 1, kind: 'genuine',
+      name: 'Nadia Okafor',
+      addr: 'nadia.okafor@acmecorp.com',
+      subject: 'The doc for tomorrow\u2019s review',
+      date: 'Mon 10:03 \u00b7 to me',
+      urgent: false,
+      body: '<p>Here it is before I forget \u2014 the cost model with the Q4 numbers in it.</p>' +
+        '<p><a class="lnk" href="#" data-url="https://docs.acmecorp.com/d/8f21c4" data-bad="0">Cost model v4</a></p>' +
+        '<p>Page 3 is the bit I\u2019m unsure about, so shout if it looks off.</p>',
+      headers: [
+        { k: 'From', v: 'nadia.okafor@acmecorp.com' },
+        { k: 'Return-Path', v: '&lt;nadia.okafor@acmecorp.com&gt;' },
+        { k: 'Received', v: 'from mail.acmecorp.com (10.4.2.18)' },
+        { k: 'Authentication-Results', v: 'spf=pass dkim=pass dmarc=pass' }
+      ],
+      lesson: 'An internal sender on the internal domain, sharing a document on the internal docs host. This is what the safe tray is for: it needs handling, not suspicion.'
+    },
+    {
+      id: 'm4', day: 1, kind: 'phish',
+      name: 'Accounts Payable',
+      addr: 'ap@acmecorp-invoices.net',
+      subject: 'Invoice 8812 overdue \u2014 banking details updated',
+      date: 'Mon 11:26 \u00b7 to me',
+      urgent: true,
+      body: '<p>Our records show invoice 8812 is still outstanding.</p>' +
+        '<p>Please note our banking details have changed this quarter. Confirm the new account before the 14:00 payment run.</p>' +
+        '<p><a class="lnk" href="#" data-url="http://acmecorp-invoices.net/pay/8812" data-bad="1">View updated invoice</a></p>' +
+        '<p>Late payment will attract interest under clause 7.</p>',
+      headers: [
+        { k: 'From', v: 'ap@acmecorp-invoices.net' },
+        { k: 'Return-Path', v: '&lt;ap@acmecorp-invoices.net&gt;' },
+        { k: 'Reply-To', v: 'accounts@acmecorp-invoices.net' },
+        { k: 'Received', v: 'from vps-8812.hostfresh.net (91.203.4.77)', bad: true },
+        { k: 'Authentication-Results', v: 'spf=pass dkim=none dmarc=none', bad: true }
+      ],
+      lesson: 'The domain reads like your company but is not your company: acmecorp-invoices.net is registered to someone else. "Banking details have changed" is the single most expensive sentence in business email. Any payment change gets a call to a number you already had.'
+    },
+    {
+      id: 'm5', day: 2, kind: 'phish',
+      name: 'Elena Marsh',
+      addr: 'e.marsh@acmecorp.co',
+      subject: 'Are you at your desk?',
+      date: 'Tue 08:58 \u00b7 to me',
+      urgent: false,
+      body: '<p>I need a favour and I\u2019m in back-to-back meetings until four.</p>' +
+        '<p>I have to send three suppliers a thank-you payment today for the conference. Could you pick up \u00a3300 of gift cards and send me the codes? I\u2019ll approve the expense tonight.</p>' +
+        '<p>Please keep this between us for now.</p>',
+      headers: [
+        { k: 'From', v: 'e.marsh@acmecorp.co' },
+        { k: 'Return-Path', v: '&lt;elena.marsh@gmail.com&gt;', bad: true },
+        { k: 'Reply-To', v: 'e.marsh.finance@protonmail.com', bad: true },
+        { k: 'Received', v: 'from mail.protonmail.ch (185.70.40.6)', bad: true },
+        { k: 'Authentication-Results', v: 'spf=pass dkim=pass dmarc=pass' }
+      ],
+      lesson: 'The domain is acmecorp.co, one letter short of the real acmecorp.com, and every reply would have gone to a free mailbox. Gift-card requests and "keep this between us" exist so nobody checks with anyone else.'
+    },
+    {
+      id: 'm6', day: 2, kind: 'genuine',
+      name: 'IT Security',
+      addr: 'security@acmecorp.com',
+      subject: 'MFA re-enrolment starts Monday',
+      date: 'Tue 09:40 \u00b7 to all staff',
+      urgent: false,
+      body: '<p>From Monday, everyone re-enrols their authenticator app. It takes about four minutes.</p>' +
+        '<p>You will be prompted at next sign-in. Security will never ask you for a code, a password or a screenshot of your authenticator \u2014 if someone does, forward it to us.</p>' +
+        '<p>No links in this message: sign in the way you normally do.</p>',
+      headers: [
+        { k: 'From', v: 'security@acmecorp.com' },
+        { k: 'Return-Path', v: '&lt;security@acmecorp.com&gt;' },
+        { k: 'Received', v: 'from mail.acmecorp.com (10.4.2.9)' },
+        { k: 'Authentication-Results', v: 'spf=pass dkim=pass dmarc=pass' }
+      ],
+      lesson: 'A genuine internal notice that deliberately contains no links and no request. Notice what good security comms look like: they tell you what they will never ask for.'
+    },
+    {
+      id: 'm7', day: 2, kind: 'phish',
+      name: 'ParcelTrack',
+      addr: 'tracking-noreply@parcel-track.info',
+      subject: 'Missed delivery \u2014 \u00a31.99 redelivery fee outstanding',
+      date: 'Tue 12:11 \u00b7 to me',
+      urgent: true,
+      body: '<p>We attempted delivery today and nobody was available.</p>' +
+        '<p>A redelivery fee of \u00a31.99 is outstanding. Pay within 24 hours or the parcel returns to the sender.</p>' +
+        '<p><a class="lnk" href="#" data-url="http://parcel-track.info/redeliver?ref=GB8812" data-bad="1">Pay redelivery fee</a></p>' +
+        '<p>Tracking reference GB8812.</p>',
+      headers: [
+        { k: 'From', v: 'tracking-noreply@parcel-track.info' },
+        { k: 'Return-Path', v: '&lt;bounce@parcel-track.info&gt;' },
+        { k: 'Received', v: 'from srv44.bulkhost.ru (45.132.9.18)', bad: true },
+        { k: 'Authentication-Results', v: 'spf=pass dkim=fail dmarc=fail', bad: true }
+      ],
+      lesson: 'A \u00a31.99 charge is deliberately too small to argue about, and 24 hours is deliberately too short to check. Real couriers do not bill a card for a redelivery through a link in an email.'
+    },
+    {
+      id: 'm8', day: 2, kind: 'genuine',
+      name: 'HR Team',
+      addr: 'hr@acmecorp.com',
+      subject: 'Confirm your emergency contact by Friday',
+      date: 'Tue 14:20 \u00b7 to me',
+      urgent: true,
+      body: '<p>Our records are missing an emergency contact for you. Please confirm one by Friday so the fire marshal\u2019s list is complete.</p>' +
+        '<p><a class="lnk" href="#" data-url="https://hr.acmecorp.com/contacts" data-bad="0">Update emergency contact</a></p>' +
+        '<p>If you would rather do it in person, come to the second floor desk.</p>',
+      headers: [
+        { k: 'From', v: 'hr@acmecorp.com' },
+        { k: 'Return-Path', v: '&lt;hr@acmecorp.com&gt;' },
+        { k: 'Received', v: 'from mail.acmecorp.com (10.4.2.31)' },
+        { k: 'Authentication-Results', v: 'spf=pass dkim=pass dmarc=pass' }
+      ],
+      lesson: 'Genuine but urgent \u2014 exactly the kind of message that gets wrongly quarantined by a nervous click. Reporting this costs the company a real deadline; the internal domain and HR host are consistent.'
+    },
+    {
+      id: 'm9', day: 3, kind: 'ambiguous', highValue: true,
+      name: 'Dana Whitfield',
+      addr: 'dana.whitfield@acmecorp.com',
+      subject: 'Supplier bank details changed \u2014 approval needed before 17:00',
+      date: 'Wed 09:04 \u00b7 to me',
+      urgent: true,
+      voice: 'Hi, it\u2019s Dana. The Whitcombe account changed banks over the weekend and the payment run closes at five. I\u2019m on site until four, so just push it through on my say-so and I\u2019ll sign it off tonight.',
+      body: '<p>Whitcombe have moved to a new bank. I\u2019ve updated the record \u2014 please release the \u00a342,000 balance to the new account before the 17:00 run.</p>' +
+        '<p>Attached a voice memo so you have it from me directly rather than an email chain.</p>',
+      headers: [
+        { k: 'From', v: 'dana.whitfield@acmecorp.com' },
+        { k: 'Return-Path', v: '&lt;dana.whitfield@acmecorp.com&gt;' },
+        { k: 'Received', v: 'from mail.acmecorp.com (10.4.2.22)' },
+        { k: 'Authentication-Results', v: 'spf=pass dkim=pass dmarc=pass' },
+        { k: 'X-Sender-Client', v: 'webmail \u00b7 session 04:51 UTC', bad: false }
+      ],
+      lesson: 'Every header is clean, because the account is real \u2014 someone else is sitting in it. A voice memo is a file anyone can generate. Money plus a changed bank account is a call to x4412, the number in the directory, not the one in the mail.'
+    },
+    {
+      id: 'm10', day: 3, kind: 'phish',
+      name: 'IT Service Desk',
+      addr: 'it-servicedesk@acmecorp-support.net',
+      subject: 'Voice memo from your manager authorising this reset',
+      date: 'Wed 10:22 \u00b7 to me',
+      urgent: true,
+      body: '<p>Your manager asked us to reset your mailbox permissions while you are on the floor.</p>' +
+        '<p>Confirm your current password so the reset can be matched to your profile. A voice memo from them is attached.</p>' +
+        '<p><a class="lnk" href="#" data-url="http://acmecorp-support.net/reset/session" data-bad="1">Confirm and continue</a></p>',
+      headers: [
+        { k: 'From', v: 'it-servicedesk@acmecorp-support.net' },
+        { k: 'Return-Path', v: '&lt;bounce@acmecorp-support.net&gt;' },
+        { k: 'Received', v: 'from mx.acmecorp-support.net (203.0.113.44)', bad: true },
+        { k: 'Authentication-Results', v: 'spf=pass dkim=none dmarc=none', bad: true }
+      ],
+      lesson: 'The voice memo is the costume, not the credential check. IT never asks for your current password, and acmecorp-support.net is not acmecorp.com \u2014 one hyphen is all it takes.'
+    },
+    {
+      id: 'm11', day: 3, kind: 'genuine',
+      name: 'Marcus Bell',
+      addr: 'marcus.bell@acmecorp.com',
+      subject: 'Voice memo: loading bay closed Thursday morning',
+      date: 'Wed 11:50 \u00b7 to facilities',
+      urgent: false,
+      voice: 'Morning \u2014 the roller door with the sticky latch is finally being fixed Thursday, so the bay is shut until noon. Use the side entrance for deliveries, and don\u2019t park on the hatched area or the fitter can\u2019t get his van in.',
+      body: '<p>Quick note so nobody queues at a closed door tomorrow. No action needed if you are not expecting a delivery.</p>',
+      headers: [
+        { k: 'From', v: 'marcus.bell@acmecorp.com' },
+        { k: 'Return-Path', v: '&lt;marcus.bell@acmecorp.com&gt;' },
+        { k: 'Received', v: 'from mail.acmecorp.com (10.4.2.15)' },
+        { k: 'Authentication-Results', v: 'spf=pass dkim=pass dmarc=pass' }
+      ],
+      lesson: 'A synthetic-sounding voice memo can still be harmless: no money, no credentials, no link, no reply requested. The habit to build is "verify before you act", not "distrust everything" \u2014 there is nothing here to act on.'
+    },
+    {
+      id: 'm12', day: 3, kind: 'ambiguous', highValue: true,
+      name: 'Elena Marsh',
+      addr: 'ceo@acmecorp.com',
+      subject: 'Q4 forecast + wire confirmation \u2014 before the board call',
+      date: 'Wed 16:35 \u00b7 to me',
+      urgent: true,
+      body: '<p>I need two things before the board call at nine tomorrow.</p>' +
+        '<ul><li>The Q4 forecast file, as an attachment rather than a link.</li><li>Confirmation that the Whitcombe wire went out today.</li></ul>' +
+        '<p>Reply here with both \u2014 I\u2019m travelling and this mailbox is the fastest way to reach me.</p>',
+      headers: [
+        { k: 'From', v: 'ceo@acmecorp.com' },
+        { k: 'Return-Path', v: '&lt;ceo@acmecorp.com&gt;' },
+        { k: 'Reply-To', v: 'elena.marsh.ceo@acmecorp.com' },
+        { k: 'Received', v: 'from mail.acmecorp.com (10.4.2.7)' },
+        { k: 'Authentication-Results', v: 'spf=pass dkim=pass dmarc=pass' }
+      ],
+      lesson: 'Passes every technical check, and still asks you to email financial data and confirm a payment because the sender is "travelling" and hard to reach. That is the whole attack: legitimate infrastructure, unusual request, no second channel. Call x1001.'
+    }
+  ];
+
+  const state = { day: 1, score: 0, results: {}, current: null, best: 0, done: false };
+
+  const els = {
+    list: $('#list'),
+    view: $('#view'),
+    linkStatus: $('#linkStatus'),
+    inboxCount: $('#inboxCount'),
+    hudDay: $('#hudDay'),
+    hudScore: $('#hudScore'),
+    msgState: $('#msgState'),
+    fromLabel: $('#fromLabel'),
+    trayHint: $('#trayHint'),
+    noteLine: $('#noteLine'),
+    next: $('#next'),
+    dirList: $('#dirList'),
+    trays: [...document.querySelectorAll('.tray')],
+    dayOverlay: $('#dayOverlay'),
+    dayKicker: $('#dayKicker'),
+    dayTitle: $('#dayTitle'),
+    dayLead: $('#dayLead'),
+    dayRules: $('#dayRules'),
+    dayBtn: $('#dayBtn'),
+    overlay: $('#overlay'),
+    ovTitle: $('#ovTitle'),
+    ovLead: $('#ovLead'),
+    ovRules: $('#ovRules'),
+    ovScore: $('#ovScore'),
+    ovScoreValue: $('#ovScoreValue'),
+    ovRank: $('#ovRank'),
+    ovBest: $('#ovBest'),
+    ovBtn: $('#ovBtn')
+  };
+
+  const byId = (id) => MSGS.find((m) => m.id === id);
+  const dayMsgs = (day) => MSGS.filter((m) => m.day === day);
+  const current = () => (state.current ? byId(state.current) : null);
+  const initials = (m) => m.name.split(' ').map((p) => p[0]).slice(0, 2).join('').toUpperCase();
+
+  function scoreText(n) { return (n < 0 ? '\u2212' : '') + Math.abs(n); }
+
+  /* ---------------- scoring ---------------- */
+  function judge(m, tray) {
+    if (m.kind === 'phish') {
+      if (tray === 'report') return { d: 100, ok: true, head: 'Caught it. +100', text: 'Quarantined without a reply. ' + m.lesson };
+      if (tray === 'verify') return { d: 40, ok: false, head: 'Half a save. +40', text: 'Nothing leaked, but a confirmed spoof should be reported so the sender gets blocked for everyone else. ' + m.lesson };
+      return { d: -250, ok: false, head: 'Credential leak. \u2212250', text: 'It went to the Safe Inbox, so it gets clicked next time someone is in a hurry. ' + m.lesson };
+    }
+    if (m.kind === 'genuine') {
+      if (tray === 'safe') return { d: 50, ok: true, head: 'Routed correctly. +50', text: m.lesson };
+      if (tray === 'verify') return { d: 20, ok: false, head: 'Over-cautious. +20', text: 'It is clean, so the callback wastes someone\u2019s time \u2014 but at least nothing broke. ' + m.lesson };
+      return { d: m.urgent ? -50 : -30, ok: false, head: (m.urgent ? 'Critical mail quarantined. \u221250' : 'Good mail quarantined. \u221230'), text: (m.urgent ? 'A real deadline is now missed because a genuine message was treated as an attack. ' : 'A colleague\u2019s message is now invisible to you. ') + m.lesson };
+    }
+    if (tray === 'verify') return { d: 75, ok: true, head: 'Out-of-band check. +75', text: 'No action taken until the extension in the directory confirms it. ' + m.lesson };
+    if (tray === 'report') return { d: 25, ok: false, head: 'Quarantined, cause unknown. +25', text: 'The thread is dead, but nobody established whether the account is compromised \u2014 which is the part that matters. ' + m.lesson };
+    return { d: m.highValue ? -250 : -40, ok: false, head: m.highValue ? 'Accepted a high-value request. \u2212250' : 'Accepted without a check. \u221240', text: 'The headers were clean because the account is real. That is exactly why this one needed a call. ' + m.lesson };
+  }
+
+  /* ---------------- rendering ---------------- */
+  function renderList() {
+    const msgs = dayMsgs(state.day);
+    const left = msgs.filter((m) => !state.results[m.id]).length;
+    els.inboxCount.textContent = left + ' to triage';
+    let html = '<p class="daytag">Day ' + state.day + ' \u00b7 ' + msgs.length + ' messages</p>';
+    msgs.forEach((m) => {
+      const r = state.results[m.id];
+      html += '<button class="mailitem' + (r ? ' done' : '') + '" type="button" draggable="' + (!r) + '" data-id="' + m.id + '"' +
+        (m.id === state.current ? ' aria-current="true"' : '') + '>' +
+        '<span class="who"><b>' + m.name + '</b><time>' + m.date.split(' \u00b7')[0] + '</time></span>' +
+        '<span class="subj">' + m.subject + '</span>' +
+        (r ? '<span class="mark ' + r.tray + '">' + r.tray + ' \u00b7 ' + (r.delta > 0 ? '+' : '\u2212') + Math.abs(r.delta) + '</span>' : '') +
+        '</button>';
+    });
+    els.list.innerHTML = html;
+    els.list.querySelectorAll('.mailitem').forEach((b) => {
+      b.addEventListener('click', () => openMessage(b.dataset.id));
+      b.addEventListener('dragstart', (e) => {
+        e.dataTransfer.setData('text/plain', b.dataset.id);
+        e.dataTransfer.effectAllowed = 'move';
+      });
+    });
+  }
+
+  function renderView() {
+    const m = current();
+    if (!m) {
+      els.view.innerHTML = '<p style="font-size:12px;color:rgba(238,247,244,0.5)">All messages for this day are routed.</p>';
+      els.fromLabel.textContent = 'Message';
+      els.msgState.textContent = 'done';
+      return;
+    }
+    const r = state.results[m.id];
+    els.fromLabel.textContent = m.name;
+    els.msgState.textContent = r ? 'routed \u00b7 ' + r.tray : 'unread';
+    const voice = m.voice ? (
+      '<div class="voice"><span class="wave" aria-hidden="true">' +
+        Array.from({ length: 14 }, (_, i) => '<i style="height:' + (4 + ((i * 7) % 14)) + 'px"></i>').join('') +
+      '</span><button type="button" id="voiceBtn">\u25b6 Play voice memo</button><span class="vtxt">0:0' + (12 + m.day) + ' \u00b7 synthetic?</span></div>' +
+      '<p class="transcript" id="transcript" hidden><b>Transcript</b>&ldquo;' + m.voice + '&rdquo;</p>'
+    ) : '';
+
+    els.view.innerHTML =
+      '<div class="msghead" draggable="' + (!r) + '" data-drag="' + (!r) + '">' +
+        '<div class="avatar">' + initials(m) + '</div>' +
+        '<div><div class="from">' + m.name + ' <span>&lt;' + m.addr + '&gt;</span></div>' +
+        '<div class="subj">' + m.subject + '</div>' +
+        '<div class="meta">' + m.date + '</div></div>' +
+        (m.urgent ? '<span class="flag">URGENT</span>' : '') +
+      '</div>' +
+      '<div class="body">' + m.body + '</div>' +
+      voice +
+      '<button class="hdrbtn" type="button" id="hdrBtn">Inspect raw headers</button>' +
+      '<div class="headers" id="headers" hidden><dl style="margin:0">' +
+        m.headers.map((h) => '<div' + (h.bad ? ' class="bad"' : '') + '><dt>' + h.k + '</dt><dd>' + h.v + '</dd></div>').join('') +
+      '</dl></div>' +
+      (r ? '<div class="result ' + (r.ok ? 'ok' : 'no') + '"><span class="delta">' + r.head + '</span><p>' + r.text + '</p></div>' : '');
+
+    const hdrBtn = $('#hdrBtn');
+    if (hdrBtn) hdrBtn.addEventListener('click', () => {
+      const box = $('#headers');
+      box.hidden = !box.hidden;
+      hdrBtn.textContent = box.hidden ? 'Inspect raw headers' : 'Hide raw headers';
+    });
+
+    const voiceBtn = $('#voiceBtn');
+    if (voiceBtn) voiceBtn.addEventListener('click', () => {
+      const t = $('#transcript');
+      t.hidden = !t.hidden;
+      voiceBtn.textContent = t.hidden ? '\u25b6 Play voice memo' : '\u25a0 Stop';
+    });
+
+    els.view.querySelectorAll('.lnk').forEach((a) => {
+      const url = a.dataset.url;
+      const bad = a.dataset.bad === '1';
+      const show = () => {
+        els.linkStatus.textContent = 'Link target: ' + url + (bad ? '  \u2014 domain does not match the sender' : '  \u2014 consistent with the sender');
+        els.linkStatus.className = 'linkbar ' + (bad ? 'bad' : 'good');
+      };
+      a.addEventListener('mouseenter', show);
+      a.addEventListener('focus', show);
+      a.addEventListener('click', (e) => {
+        e.preventDefault();
+        show();
+        els.noteLine.textContent = 'Outbound navigation is disabled in the simulator.';
+      });
+    });
+
+    const head = els.view.querySelector('.msghead');
+    if (head && !r) head.addEventListener('dragstart', (e) => {
+      e.dataTransfer.setData('text/plain', m.id);
+      e.dataTransfer.effectAllowed = 'move';
+    });
+
+    els.linkStatus.className = 'linkbar';
+    els.linkStatus.textContent = 'Hover a link to see where it really goes.';
+
+    els.trays.forEach((t) => { t.disabled = !!r; });
+    els.trayHint.textContent = r ? 'already routed' : 'drag or click';
+    els.next.disabled = !r;
+    els.next.textContent = r ? nextLabel() : 'Route this message first';
+  }
+
+  function nextLabel() {
+    const left = dayMsgs(state.day).filter((m) => !state.results[m.id]).length;
+    if (left) return 'Next message';
+    return state.day < 3 ? 'End day ' + state.day : 'Close the shift';
+  }
+
+  function renderScore() {
+    els.hudScore.textContent = scoreText(state.score);
+    els.hudDay.textContent = state.day + '/3';
+  }
+
+  function renderAll() {
+    renderList();
+    renderView();
+    renderScore();
+  }
+
+  /* ---------------- flow ---------------- */
+  function openMessage(id) {
+    if (state.results[id]) return;
+    state.current = id;
+    renderAll();
+  }
+
+  function route(tray) {
+    const m = current();
+    if (!m || state.results[m.id]) return;
+    const res = judge(m, tray);
+    state.results[m.id] = { tray, delta: res.d, ok: res.ok, head: res.head, text: res.text };
+    state.score += res.d;
+    els.noteLine.textContent = res.head + '. ' + (res.ok ? 'Logged.' : 'Look at the headers again.');
+    renderAll();
+    els.next.focus();
+  }
+
+  function nextStep() {
+    const msgs = dayMsgs(state.day);
+    const nextUnrouted = msgs.find((m) => !state.results[m.id]);
+    if (nextUnrouted) {
+      state.current = nextUnrouted.id;
+      renderAll();
+      return;
+    }
+    if (state.day < 3) {
+      state.day += 1;
+      state.current = dayMsgs(state.day)[0].id;
+      renderAll();
+      showDayCard(state.day);
+      return;
+    }
+    finish();
+  }
+
+  function showDayCard(day) {
+    const t = DAY_TEXT[day];
+    els.dayKicker.textContent = t.kicker;
+    els.dayTitle.innerHTML = t.title;
+    els.dayLead.textContent = t.lead;
+    els.dayRules.innerHTML = t.rules.map((r) => '<li class="rule">' + r + '</li>').join('');
+    els.dayOverlay.hidden = false;
+    els.dayBtn.focus();
+  }
+
+  function finish() {
+    state.done = true;
+    if (state.score > state.best) {
+      state.best = state.score;
+      try { localStorage.setItem(BEST_KEY, String(state.score)); } catch (e) { /* ignore */ }
+    }
+    const rank = state.score >= 780 ? 'Security analyst'
+      : state.score >= 600 ? 'Alert triager'
+      : state.score >= 380 ? 'Trained user'
+      : 'Walked into it';
+    els.ovTitle.innerHTML = 'Integrity <span class="accent">' + scoreText(state.score) + '</span>';
+    els.ovLead.textContent = 'Twelve messages, three days. The last day had no spoofed domains at all \u2014 just real accounts and a voice memo, which is why the sender name stopped being evidence.';
+    els.ovRules.innerHTML = [
+      'Urgency is the delivery mechanism: deadlines are there to stop you checking.',
+      'Read the address and the headers, not the display name.',
+      'Hover links. The text says one thing; the destination says another.',
+      'Money, credentials or data from a colleague gets a call on the directory extension.'
+    ].map((t) => '<li class="rule">' + t + '</li>').join('');
+    els.ovScore.hidden = false;
+    els.ovScoreValue.textContent = scoreText(state.score);
+    els.ovRank.textContent = rank;
+    els.ovBest.textContent = 'Best ' + scoreText(state.best);
+    els.overlay.hidden = false;
+    els.ovBtn.focus();
+  }
+
+  function start() {
+    state.day = 1;
+    state.score = 0;
+    state.results = {};
+    state.done = false;
+    state.current = dayMsgs(1)[0].id;
+    els.overlay.hidden = true;
+    els.dayOverlay.hidden = true;
+    els.noteLine.textContent = 'Read the message, inspect the headers, then route it';
+    renderAll();
+  }
+
+  /* ---------------- wiring ---------------- */
+  els.dirList.innerHTML = DIRECTORY.map((d) =>
+    '<li><span>' + d.who + ' <span style="color:rgba(238,247,244,0.35)">' + d.role + '</span></span><em>' + d.ext + '</em></li>'
+  ).join('');
+
+  els.trays.forEach((t) => {
+    t.addEventListener('click', () => route(t.dataset.tray));
+    t.addEventListener('dragover', (e) => { e.preventDefault(); t.classList.add('over'); });
+    t.addEventListener('dragleave', () => t.classList.remove('over'));
+    t.addEventListener('drop', (e) => {
+      e.preventDefault();
+      t.classList.remove('over');
+      const id = e.dataTransfer.getData('text/plain');
+      if (id) { state.current = id; route(t.dataset.tray); }
+    });
+  });
+
+  els.next.addEventListener('click', nextStep);
+  els.dayBtn.addEventListener('click', () => { els.dayOverlay.hidden = true; els.noteLine.textContent = 'Day ' + state.day + ' begins'; });
+  els.ovBtn.addEventListener('click', start);
+
+  try { state.best = parseInt(localStorage.getItem(BEST_KEY) || '0', 10) || 0; } catch (e) { state.best = 0; }
+
+  state.current = dayMsgs(1)[0].id;
+  renderAll();
+
+  els.ovTitle.innerHTML = 'Zero-Day <span class="accent">Inbox</span>';
+  els.ovLead.textContent = 'You have the mailroom shift for three days. Inspect the headers, hover the links, and route every message into one of three trays. Start with the one already open.';
+  els.ovRules.innerHTML = [
+    'Hover a link to see its real destination in the status bar.',
+    'Inspect raw headers to compare sender, return-path and authentication.',
+    'Drag a message onto a tray, or click the tray for the open message.',
+    'Day 3 changes the rules: real internal accounts, synthetic voice memos.'
+  ].map((t) => '<li class="rule">' + t + '</li>').join('');
+  els.overlay.hidden = false;
+})();
+</script>
+</body>
+</html>

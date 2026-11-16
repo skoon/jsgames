@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d1520">
+<title>Orbital Scrapper: Zero-G</title>
+<link rel="stylesheet" href="../common.css">
+<style>
+  :root {
+    --bg-top: #1d2a3c;
+    --bg-mid: #070b12;
+    --bg-bottom: #030508;
+    --stage-bg: #060a10;
+    --ink: #eef4fd;
+    --line: rgba(150, 190, 255, 0.2);
+    --teal: #6ef0c8;
+    --amber: #ffc86b;
+    --red: #ff7d86;
+    --blue: #8cc6ff;
+  }
+  body { overflow: hidden; }
+
+  #app {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: 7px;
+    padding: 8px;
+    height: 100%;
+    min-height: 0;
+  }
+  .topbar { margin: 0; }
+
+  .gauges { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .gauge { display: grid; gap: 3px; min-width: 74px; }
+  .gauge span {
+    font-family: var(--font-mono); font-size: 7.5px; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .gauge .track { height: 6px; border-radius: 999px; background: rgba(255,255,255,0.09); overflow: hidden; }
+  .gauge .track i { display: block; height: 100%; border-radius: 999px; transition: width 140ms linear; }
+  .gauge.fuel .track i { background: linear-gradient(90deg, #ffc86b, #ff9d5c); }
+  .gauge.oxy .track i { background: linear-gradient(90deg, #8cc6ff, #6ef0c8); }
+  .gauge.low .track i { background: var(--red); }
+  .polarity {
+    padding: 3px 8px; border-radius: 5px; border: 1px solid rgba(140,198,255,0.4);
+    font-family: var(--font-mono); font-size: 8.5px; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--blue);
+  }
+  .polarity.repel { border-color: rgba(255,125,134,0.5); color: var(--red); }
+
+  .arena {
+    position: relative; border: 1px solid var(--line); border-radius: 12px;
+    background: #05080d; overflow: hidden; min-height: 0;
+  }
+  canvas { display: block; width: 100%; height: 100%; }
+
+  .actionbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 2px; flex-wrap: wrap; }
+  .actionbar .note-line {
+    font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--faint);
+  }
+  .actionbar .btn { margin: 0; }
+  .btn.small { min-height: 30px; padding: 6px 13px; font-size: 9.5px; }
+
+  @media (max-width: 760px) {
+    .gauges { width: 100%; gap: 8px; }
+    .gauge { min-width: 64px; }
+    .topbar { flex-wrap: wrap; row-gap: 6px; }
+    .arena { aspect-ratio: 900 / 560; }
+  }
+</style>
+</head>
+<body>
+<h1 class="sr-only">Orbital Scrapper: salvage a quantum core from a decaying station using a magnetic grapple</h1>
+<div id="stage" class="stage-fluid">
+  <div id="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">OS</span>
+        <span>
+          <b>Orbital Scrapper</b>
+          <small>Zero-G &middot; derelict 7</small>
+        </span>
+      </div>
+      <div class="gauges">
+        <div class="gauge fuel" id="gFuel"><span>Fuel</span><div class="track"><i id="fuelFill"></i></div></div>
+        <div class="gauge oxy" id="gOxy"><span>Oxygen</span><div class="track"><i id="oxyFill"></i></div></div>
+        <div class="gauge"><span>Salvage</span><div class="n" id="hudSalvage">$0</div></div>
+        <div class="gauge"><span>Gravity</span><div class="n" id="hudGrav">0.0 g</div></div>
+        <span class="polarity" id="polarity">Attract</span>
+      </div>
+    </header>
+
+    <main class="arena" id="arena">
+      <canvas id="cv" width="900" height="560"></canvas>
+    </main>
+
+    <footer class="actionbar">
+      <span class="note-line" id="noteLine">WASD thrust &middot; click grapple &middot; wheel reel &middot; right-click polarity &middot; space release</span>
+      <button id="restart" class="btn small" type="button">New wreck</button>
+    </footer>
+  </div>
+
+  <div id="overlay" class="overlay" role="dialog" aria-modal="true" aria-labelledby="ovTitle" hidden>
+    <div class="panel panel-card">
+      <p class="eyebrow" id="ovKicker">Sortie over</p>
+      <h2 id="ovTitle" class="title"></h2>
+      <p id="ovLead" class="lead"></p>
+      <ul id="ovRules" class="rules"></ul>
+      <div id="ovScore" class="final-score" hidden>
+        <span>Salvage bounty</span>
+        <strong id="ovScoreValue">$0</strong>
+        <p id="ovRank" class="rank"></p>
+        <p id="ovBest" class="best"></p>
+      </div>
+      <button id="ovBtn" class="btn" type="button">Dock and retry</button>
+    </div>
+  </div>
+</div>
+<p class="hint">momentum is free &middot; thrusters are not</p>
+
+<script>
+(() => {
+  'use strict';
+
+  const cv = document.getElementById('cv');
+  const ctx = cv.getContext('2d');
+  const $ = (s) => document.querySelector(s);
+  const W = 900, H = 560;
+  const BEST_KEY = 'orbitalScrapper.best.v1';
+
+  const ANCHORS = [
+    { x: 210, y: 120 }, { x: 470, y: 96 }, { x: 700, y: 140 },
+    { x: 330, y: 320 }, { x: 640, y: 330 }
+  ];
+
+  const CONDUITS = [
+    { x: 250, y: 220, w: 420, h: 12 },
+    { x: 250, y: 232, w: 420, h: 12 },
+    { x: 680, y: 200, w: 12, h: 150 }
+  ];
+
+  const DEBRIS = [
+    { x: 150, y: 300, v: 1200, kind: 'titanium', r: 9 },
+    { x: 560, y: 400, v: 2400, kind: 'avionics', r: 10 },
+    { x: 760, y: 90, v: 800, kind: 'coupling', r: 8 }
+  ];
+
+  const AIRLOCK = { x: 855, y: 250, w: 70, h: 110 };
+  const CORE = { x: 500, y: 150, r: 16, value: 24000 };
+
+  const state = {
+    p: { x: 90, y: 470, vx: 0, vy: 0, r: 13 },
+    fuel: 100, oxy: 100, t: 0,
+    tether: null, polarity: 'attract',
+    core: { x: 0, y: 0, vx: 0, vy: 0, held: false, free: false, deposited: false },
+    debris: [], salvage: 0, fuelUsed: 0, oxyLost: 0,
+    running: false, over: false, win: false, msg: '', msgT: 0, links: [],
+    best: 0, pulse: 0
+  };
+
+  const keys = {};
+  let mouse = { x: 450, y: 280 };
+
+  function reset() {
+    state.p = { x: 90, y: 470, vx: 0, vy: 0, r: 13 };
+    state.fuel = 100; state.oxy = 100; state.t = 0;
+    state.tether = null; state.polarity = 'attract';
+    state.core = { x: CORE.x, y: CORE.y, vx: 0, vy: 0, held: false, free: false, deposited: false };
+    state.debris = DEBRIS.map((d) => ({ ...d, taken: false, vx: 0, vy: 0 }));
+    state.salvage = 0; state.fuelUsed = 0; state.oxyLost = 0;
+    state.running = true; state.over = false; state.win = false;
+    state.msg = 'Grab the core, then reach the airlock.'; state.msgT = 3;
+    state.links = [];
+    state.pulse = 0;
+    updateHud();
+  }
+
+  function gravity() {
+    return state.t <= 60 ? 0 : Math.min(120, (state.t - 60) * 1.8);
+  }
+
+  function say(t, s) { state.msg = t; state.msgT = s || 2; }
+
+  /** ray from player toward mouse, returns first hit within 640px */
+  function raycast() {
+    const p = state.p;
+    const dx = mouse.x - p.x, dy = mouse.y - p.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const ux = dx / len, uy = dy / len;
+    const max = 640;
+    let hit = null, bestT = max;
+
+    for (const a of ANCHORS) {
+      const t = (a.x - p.x) * ux + (a.y - p.y) * uy;
+      if (t <= 0 || t > max) continue;
+      const dist = Math.abs(-uy * (a.x - p.x) + ux * (a.y - p.y));
+      if (dist < 24 && t < bestT) { bestT = t; hit = { type: 'anchor', obj: a }; }
+    }
+    if (!state.core.deposited && !state.core.held) {
+      const c = state.core;
+      const t = (c.x - p.x) * ux + (c.y - p.y) * uy;
+      if (t > 0 && t <= max) {
+        const dist = Math.abs(-uy * (c.x - p.x) + ux * (c.y - p.y));
+        if (dist < 26 && t < bestT) { bestT = t; hit = { type: 'core', obj: c }; }
+      }
+    }
+    return hit;
+  }
+
+  function fire() {
+    if (!state.running) return;
+    const hit = raycast();
+    if (!hit) { say('no anchor in that direction', 1.2); return; }
+    if (hit.type === 'anchor') {
+      const d = Math.hypot(hit.obj.x - state.p.x, hit.obj.y - state.p.y);
+      state.tether = { anchor: hit.obj, len: d };
+      say('tethered \u00b7 wheel to reel', 1.4);
+    } else {
+      state.tether = { anchor: hit.obj, len: Math.hypot(hit.obj.x - state.p.x, hit.obj.y - state.p.y), core: true };
+      say(state.polarity === 'attract' ? 'magnetic pull on the core' : 'magnetic push on the core', 1.4);
+    }
+  }
+
+  function release() {
+    if (state.tether) { state.tether = null; say('tether released', 1); }
+  }
+
+  function togglePolarity() {
+    state.polarity = state.polarity === 'attract' ? 'repel' : 'attract';
+    document.getElementById('polarity').textContent = state.polarity === 'attract' ? 'Attract' : 'Repel';
+    document.getElementById('polarity').classList.toggle('repel', state.polarity === 'repel');
+    say('polarity ' + state.polarity, 1);
+  }
+
+  function update(dt) {
+    if (!state.running || state.over) return;
+    state.t += dt;
+    const p = state.p;
+
+    // thrust
+    let ax = 0, ay = 0;
+    if (keys.a || keys.ArrowLeft) ax -= 1;
+    if (keys.d || keys.ArrowRight) ax += 1;
+    if (keys.w || keys.ArrowUp) ay -= 1;
+    if (keys.s || keys.ArrowDown) ay += 1;
+    if (ax || ay) {
+      const len = Math.hypot(ax, ay);
+      const thrust = state.core.held ? 120 : 190;
+      const use = 14 * dt;
+      if (state.fuel > 0) {
+        p.vx += (ax / len) * thrust * dt;
+        p.vy += (ay / len) * thrust * dt;
+        state.fuel = Math.max(0, state.fuel - use);
+        state.fuelUsed += use;
+      }
+    }
+
+    // gravity
+    const g = gravity();
+    p.vy += g * dt;
+
+    // drag
+    p.vx *= 0.995; p.vy *= 0.995;
+    p.x += p.vx * dt; p.y += p.vy * dt;
+
+    // bounds with bounce
+    if (p.x < p.r) { p.x = p.r; p.vx = Math.abs(p.vx) * 0.4; }
+    if (p.x > W - p.r) { p.x = W - p.r; p.vx = -Math.abs(p.vx) * 0.4; }
+    if (p.y < 60 + p.r) { p.y = 60 + p.r; p.vy = Math.abs(p.vy) * 0.4; }
+    if (p.y > H - p.r) { p.y = H - p.r; p.vy = -Math.abs(p.vy) * 0.4; }
+
+    // tether constraint
+    if (state.tether) {
+      const a = state.tether.anchor;
+      const dx = p.x - a.x, dy = p.y - a.y;
+      const d = Math.hypot(dx, dy) || 0.001;
+      const L = state.tether.len;
+      if (state.tether.core) {
+        // magnetic link: pull or push the core
+        const c = state.core;
+        const cdx = c.x - p.x, cdy = c.y - p.y;
+        const cd = Math.hypot(cdx, cdy) || 1;
+        const force = (state.polarity === 'attract' ? 220 : -280) * dt;
+        c.vx += (cdx / cd) * force;
+        c.vy += (cdy / cd) * force;
+        if (state.polarity === 'attract' && cd < 44) { state.core.held = true; state.tether = null; say('core secured', 1.6); }
+        if (cd > 460) { state.tether = null; say('link lost', 1.4); }
+      } else if (d > L) {
+        const nx = dx / d, ny = dy / d;
+        p.x = a.x + nx * L;
+        p.y = a.y + ny * L;
+        const radial = p.vx * nx + p.vy * ny;
+        if (radial > 0) { p.vx -= radial * nx * 1.05; p.vy -= radial * ny * 1.05; }
+      }
+    }
+
+    // core physics
+    const c = state.core;
+    if (c.held) {
+      c.x += (p.x + 30 - c.x) * Math.min(1, dt * 12);
+      c.y += (p.y - c.y) * Math.min(1, dt * 12);
+      c.vx = p.vx; c.vy = p.vy;
+    } else if (!c.deposited) {
+      c.vx *= 0.997; c.vy *= 0.997;
+      c.vy += g * 0.7 * dt;
+      c.x += c.vx * dt; c.y += c.vy * dt;
+      if (c.x < 40 + c.r) { c.x = 40 + c.r; c.vx = Math.abs(c.vx) * 0.5; }
+      if (c.x > W - 90 - c.r) { c.x = W - 90 - c.r; c.vx = -Math.abs(c.vx) * 0.5; }
+      if (c.y < 70 + c.r) { c.y = 70 + c.r; c.vy = Math.abs(c.vy) * 0.5; }
+      if (c.y > H - c.r) { c.y = H - c.r; c.vy = -Math.abs(c.vy) * 0.5; }
+      if (c.x > AIRLOCK.x && c.y > AIRLOCK.y && c.y < AIRLOCK.y + AIRLOCK.h) {
+        c.deposited = true; c.held = false;
+        state.salvage += CORE.value;
+        say('quantum core extracted +$24,000', 2.4);
+        updateHud();
+        setTimeout(() => end(true), 700);
+      }
+    }
+
+    // debris
+    for (const d of state.debris) {
+      if (d.taken) continue;
+      d.vy += g * 0.5 * dt;
+      d.x += d.vx * dt; d.y += d.vy * dt;
+      if (Math.hypot(d.x - p.x, d.y - p.y) < d.r + p.r + 6) {
+        d.taken = true;
+        state.salvage += d.v;
+        say('recovered ' + d.kind + ' +$' + d.v.toLocaleString('en-US'), 1.6);
+        updateHud();
+      }
+    }
+
+    // conduits
+    for (const k of CONDUITS) {
+      if (p.x + p.r > k.x && p.x - p.r < k.x + k.w && p.y + p.r > k.y && p.y - p.r < k.y + k.h) {
+        state.oxy = Math.max(0, state.oxy - 16 * dt);
+        state.oxyLost += 16 * dt;
+        p.vy += 60 * dt;
+        p.vx -= 40 * dt;
+        if (state.msgT <= 0) say('hull contact \u2014 conduit burn', 1.2);
+      }
+    }
+
+    // oxygen
+    const drain = (state.core.held ? 1.9 : 1.2) + (state.t > 60 ? 0.6 : 0);
+    state.oxy = Math.max(0, state.oxy - drain * dt);
+    state.oxyLost += drain * dt;
+
+    if (state.oxy <= 0) { end(false); return; }
+    if (state.msgT > 0) state.msgT -= dt;
+    state.pulse += dt;
+    updateHud();
+  }
+
+  function updateHud() {
+    document.getElementById('fuelFill').style.width = state.fuel + '%';
+    document.getElementById('oxyFill').style.width = state.oxy + '%';
+    document.getElementById('gFuel').classList.toggle('low', state.fuel < 25);
+    document.getElementById('gOxy').classList.toggle('low', state.oxy < 25);
+    document.getElementById('hudSalvage').textContent = '$' + state.salvage.toLocaleString('en-US');
+    document.getElementById('hudGrav').textContent = gravity().toFixed(1) + ' g';
+  }
+
+  function end(win) {
+    if (state.over) return;
+    state.over = true;
+    state.running = false;
+    state.win = win;
+    const penalty = Math.round(state.fuelUsed * 16 + state.oxyLost * 12);
+    const total = Math.max(0, state.salvage - penalty);
+    if (total > state.best) {
+      state.best = total;
+      try { localStorage.setItem(BEST_KEY, String(total)); } catch (e) { /* ignore */ }
+    }
+    const rank = total >= 22000 ? 'Salvage ace'
+      : total >= 12000 ? 'Contract scrapper'
+      : total >= 4000 ? 'Lucky drifter'
+      : 'Debris';
+    document.getElementById('ovKicker').textContent = win ? 'Core docked' : 'Oxygen depleted';
+    document.getElementById('ovTitle').innerHTML = win
+      ? 'Payload <span class="accent">recovered.</span>'
+      : 'Out of <span class="accent">air.</span>';
+    document.getElementById('ovLead').textContent =
+      'Salvage $' + state.salvage.toLocaleString('en-US') + ' minus $' + penalty.toLocaleString('en-US') +
+      ' of fuel and oxygen. Final bounty $' + total.toLocaleString('en-US') + '.';
+    document.getElementById('ovRules').innerHTML = [
+      'The grapple turns drift into a pendulum: free momentum, no fuel.',
+      'Reeling in while swinging is the cheapest way across a gap.',
+      'Repel polarity pushes the core ahead of you instead of into your chest.',
+      'After sixty seconds gravity returns and everything gets heavier.'
+    ].map((t) => '<li class="rule">' + t + '</li>').join('');
+    document.getElementById('ovScore').hidden = false;
+    document.getElementById('ovScoreValue').textContent = '$' + total.toLocaleString('en-US');
+    document.getElementById('ovRank').textContent = rank;
+    document.getElementById('ovBest').textContent = 'Best $' + state.best.toLocaleString('en-US');
+    document.getElementById('overlay').hidden = false;
+    document.getElementById('ovBtn').focus();
+  }
+
+  /* ---------------- draw ---------------- */
+  function draw() {
+    ctx.fillStyle = '#05080d';
+    ctx.fillRect(0, 0, W, H);
+
+    // starfield
+    for (let i = 0; i < 70; i++) {
+      const x = (i * 137) % W, y = (i * 89) % H;
+      ctx.fillStyle = 'rgba(200,225,255,' + (0.06 + (i % 5) * 0.03) + ')';
+      ctx.fillRect(x, y, 1.4, 1.4);
+    }
+
+    // hull frame
+    ctx.strokeStyle = 'rgba(140,198,255,0.14)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(40, 60, W - 130, H - 70);
+    ctx.lineWidth = 1;
+
+    // conduits
+    for (const k of CONDUITS) {
+      ctx.fillStyle = 'rgba(255,125,134,0.18)';
+      ctx.fillRect(k.x, k.y, k.w, k.h);
+      ctx.strokeStyle = 'rgba(255,125,134,0.75)';
+      ctx.strokeRect(k.x, k.y, k.w, k.h);
+      for (let x = k.x + 6; x < k.x + k.w; x += 18) {
+        ctx.beginPath();
+        ctx.moveTo(x, k.y + 2 + Math.sin((x + performance.now() / 90) / 9) * 3);
+        ctx.lineTo(x + 6, k.y + k.h - 2);
+        ctx.strokeStyle = 'rgba(255,180,190,0.5)';
+        ctx.stroke();
+      }
+    }
+
+    // airlock
+    ctx.fillStyle = 'rgba(110,240,200,0.08)';
+    ctx.fillRect(AIRLOCK.x, AIRLOCK.y, AIRLOCK.w, AIRLOCK.h);
+    ctx.setLineDash([6, 5]);
+    ctx.strokeStyle = 'rgba(110,240,200,0.6)';
+    ctx.strokeRect(AIRLOCK.x, AIRLOCK.y, AIRLOCK.w, AIRLOCK.h);
+    ctx.setLineDash([]);
+    ctx.fillStyle = 'rgba(110,240,200,0.7)';
+    ctx.font = '9px ui-monospace, monospace';
+    ctx.fillText('AIRLOCK', AIRLOCK.x + 8, AIRLOCK.y - 6);
+
+    // anchors
+    for (const a of ANCHORS) {
+      const active = state.tether && state.tether.anchor === a && !state.tether.core;
+      ctx.strokeStyle = active ? 'rgba(255,200,107,0.9)' : 'rgba(140,198,255,0.5)';
+      ctx.beginPath();
+      ctx.arc(a.x, a.y, 9, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = active ? '#ffc86b' : 'rgba(140,198,255,0.35)';
+      ctx.beginPath();
+      ctx.arc(a.x, a.y, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // tether line
+    if (state.tether) {
+      const a = state.tether.anchor;
+      ctx.strokeStyle = state.tether.core ? (state.polarity === 'attract' ? 'rgba(110,240,200,0.8)' : 'rgba(255,125,134,0.8)') : 'rgba(255,200,107,0.75)';
+      ctx.setLineDash([7, 5]);
+      ctx.beginPath();
+      ctx.moveTo(state.p.x, state.p.y);
+      ctx.lineTo(a.x, a.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // debris
+    for (const d of state.debris) {
+      if (d.taken) continue;
+      ctx.fillStyle = '#8cc6ff';
+      ctx.beginPath();
+      ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(140,198,255,0.25)';
+      ctx.beginPath();
+      ctx.arc(d.x, d.y, d.r + 6, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // core
+    const c = state.core;
+    if (!c.deposited) {
+      const glow = 0.5 + Math.sin(state.pulse * 4) * 0.2;
+      ctx.save();
+      ctx.shadowColor = '#c1a6ff';
+      ctx.shadowBlur = 22;
+      ctx.fillStyle = 'rgba(193,166,255,' + glow + ')';
+      ctx.beginPath();
+      ctx.arc(c.x, c.y, CORE.r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      ctx.strokeStyle = 'rgba(230,220,255,0.8)';
+      ctx.beginPath();
+      ctx.arc(c.x, c.y, CORE.r + 5, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(230,220,255,0.55)';
+      ctx.font = '9px ui-monospace, monospace';
+      ctx.fillText('QUANTUM CORE', c.x - 34, c.y - CORE.r - 10);
+    }
+
+    // player
+    const p = state.p;
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    const ang = Math.atan2(p.vy, p.vx);
+    ctx.rotate(ang);
+    ctx.fillStyle = '#eef4fd';
+    ctx.beginPath();
+    ctx.moveTo(14, 0);
+    ctx.lineTo(-9, 9);
+    ctx.lineTo(-4, 0);
+    ctx.lineTo(-9, -9);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+    if (keys.w || keys.a || keys.s || keys.d || keys.ArrowUp || keys.ArrowDown || keys.ArrowLeft || keys.ArrowRight) {
+      ctx.fillStyle = 'rgba(255,200,107,0.7)';
+      ctx.beginPath();
+      ctx.arc(p.x - Math.cos(ang) * 14, p.y - Math.sin(ang) * 14, 3 + Math.random() * 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // message
+    if (state.msgT > 0 && state.msg) {
+      ctx.fillStyle = 'rgba(5,8,13,0.8)';
+      ctx.fillRect(W / 2 - 210, H - 52, 420, 28);
+      ctx.fillStyle = '#dbe8ff';
+      ctx.font = '12px ui-monospace, monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(state.msg, W / 2, H - 33);
+      ctx.textAlign = 'left';
+    }
+
+    // reticle
+    ctx.strokeStyle = 'rgba(140,198,255,0.25)';
+    ctx.beginPath();
+    ctx.arc(mouse.x, mouse.y, 8, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  /* ---------------- input ---------------- */
+  function toLocal(e) {
+    const r = cv.getBoundingClientRect();
+    return { x: (e.clientX - r.left) / r.width * W, y: (e.clientY - r.top) / r.height * H };
+  }
+  cv.addEventListener('mousemove', (e) => { mouse = toLocal(e); });
+  cv.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    mouse = toLocal(e);
+    if (e.button === 2) { togglePolarity(); return; }
+    fire();
+  });
+  cv.addEventListener('contextmenu', (e) => e.preventDefault());
+  cv.addEventListener('wheel', (e) => {
+    if (!state.tether || state.tether.core) return;
+    e.preventDefault();
+    state.tether.len = Math.max(40, Math.min(620, state.tether.len + Math.sign(e.deltaY) * 26));
+  }, { passive: false });
+
+  window.addEventListener('keydown', (e) => {
+    keys[e.key] = true;
+    if (e.key === ' ') { e.preventDefault(); release(); }
+    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].indexOf(e.key) !== -1) e.preventDefault();
+  });
+  window.addEventListener('keyup', (e) => { keys[e.key] = false; });
+
+  document.getElementById('ovBtn').addEventListener('click', () => {
+    document.getElementById('overlay').hidden = true;
+    reset();
+  });
+  document.getElementById('restart').addEventListener('click', () => {
+    document.getElementById('overlay').hidden = true;
+    reset();
+  });
+
+  try { state.best = parseInt(localStorage.getItem(BEST_KEY) || '0', 10) || 0; } catch (e) { state.best = 0; }
+
+  state.running = false;
+  state.core = { x: CORE.x, y: CORE.y, vx: 0, vy: 0, held: false, free: false, deposited: false };
+  state.debris = DEBRIS.map((d) => ({ ...d, taken: false, vx: 0, vy: 0 }));
+
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.033, (now - last) / 1000);
+    last = now;
+    if (state.running) update(dt);
+    draw();
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  document.getElementById('ovTitle').innerHTML = 'Orbital <span class="accent">Scrapper</span>';
+  document.getElementById('ovLead').textContent = 'A quantum core is lodged behind a bank of live conduits in a station that is starting to fall. You have one grapple, limited fuel and about two minutes of air.';
+  document.getElementById('ovRules').innerHTML = [
+    'WASD thrusts and burns fuel; the grapple costs nothing.',
+    'Click to latch a beam or the core; the wheel reels the cable in.',
+    'Right-click flips polarity: pull the core, or push it ahead of you.',
+    'At sixty seconds gravity returns and everything gets heavier.'
+  ].map((t) => '<li class="rule">' + t + '</li>').join('');
+  document.getElementById('ovScore').hidden = true;
+  document.getElementById('ovBtn').textContent = 'Undock';
+  document.getElementById('overlay').hidden = false;
+})();
+</script>
+</body>
+</html>

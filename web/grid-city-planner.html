@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0e1a">
+<title>Grid City Planner</title>
+<link rel="stylesheet" href="../common.css">
+<style>
+  :root {
+    --bg-top: #232a4d;
+    --bg-mid: #0a0e1a;
+    --bg-bottom: #04060b;
+    --stage-bg: #070b14;
+    --ink: #eef2ff;
+    --line: rgba(136, 202, 255, 0.2);
+    --teal: #70e7c8;
+    --amber: #ffc86b;
+    --blue: #88caff;
+    --violet: #c1a6ff;
+    --red: #ff8474;
+  }
+  body { overflow-y: auto; }
+
+  #app {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: 8px;
+    padding: 8px;
+    height: 100%;
+    min-height: 0;
+  }
+  .topbar { margin: 0; }
+
+  .workspace {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 0.6fr);
+    gap: 9px;
+    min-height: 0;
+  }
+
+  .pane {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: rgba(6, 10, 18, 0.78);
+    overflow: hidden;
+  }
+  .pane-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--line);
+    background: rgba(255, 255, 255, 0.02);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .pane-head b { color: var(--blue); font-weight: 700; }
+
+  .city-pane-body { flex: 1; min-height: 0; padding: 9px; display: flex; }
+
+  .city-wrap {
+    position: relative;
+    flex: 1;
+    min-height: 300px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 11px;
+    background:
+      radial-gradient(120% 120% at 50% 0%, rgba(136, 202, 255, 0.08), transparent 60%),
+      #070d15;
+    overflow: hidden;
+  }
+
+  #city, .cell-layer {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    gap: 10px;
+    padding: 9px;
+  }
+  .cell-layer { pointer-events: none; }
+  .cell-layer.active { pointer-events: auto; }
+
+  .district {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    min-width: 0;
+    min-height: 0;
+    padding: 6px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    background: linear-gradient(180deg, rgba(30, 42, 62, 0.95), rgba(12, 18, 28, 0.96));
+    color: #e8f1ff;
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    text-align: center;
+    cursor: pointer;
+    overflow: hidden;
+    transition: border-color 120ms ease;
+  }
+  .district span { font-size: 15px; line-height: 1; }
+  .district small {
+    font-size: 8px;
+    letter-spacing: 0.1em;
+    color: rgba(232, 241, 255, 0.45);
+  }
+  .district[data-id="header"] { border-color: rgba(255, 200, 107, 0.45); background: linear-gradient(180deg, rgba(60, 47, 22, 0.95), rgba(24, 19, 9, 0.96)); color: #ffe3b0; }
+  .district[data-id="nav"] { border-color: rgba(136, 202, 255, 0.45); background: linear-gradient(180deg, rgba(20, 42, 62, 0.95), rgba(9, 18, 28, 0.96)); color: #cfe9ff; }
+  .district[data-id="main"] { border-color: rgba(112, 231, 200, 0.45); background: linear-gradient(180deg, rgba(19, 50, 46, 0.95), rgba(8, 22, 21, 0.96)); color: #c6ffef; }
+  .district[data-id="aside"] { border-color: rgba(193, 166, 255, 0.45); background: linear-gradient(180deg, rgba(42, 32, 66, 0.95), rgba(18, 13, 30, 0.96)); color: #e0d3ff; }
+  .district[data-id="footer"] { border-color: rgba(255, 132, 116, 0.45); background: linear-gradient(180deg, rgba(62, 30, 27, 0.95), rgba(26, 12, 10, 0.96)); color: #ffd3cc; }
+  .district.selected { outline: 2px solid var(--amber); outline-offset: -3px; }
+
+  .cell {
+    border: 1px dashed rgba(136, 202, 255, 0.16);
+    border-radius: 6px;
+    background: transparent;
+    padding: 0;
+    cursor: cell;
+  }
+  .cell:hover, .cell:focus-visible {
+    border-color: rgba(255, 200, 107, 0.7);
+    background: rgba(255, 200, 107, 0.09);
+    outline: none;
+  }
+
+  /* ---------- controls ---------- */
+  .controls {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 10px;
+    scrollbar-width: thin;
+  }
+
+  .group { display: grid; gap: 4px; }
+  .group > span {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px; }
+  .chip {
+    min-height: 25px;
+    padding: 4px 8px;
+    border: 1px solid rgba(255, 255, 255, 0.11);
+    border-radius: 5px;
+    background: rgba(255, 255, 255, 0.03);
+    color: rgba(238, 242, 255, 0.74);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    cursor: pointer;
+  }
+  .chip:hover { border-color: rgba(136, 202, 255, 0.45); color: #fff; }
+  .chip[aria-checked="true"] { border-color: rgba(112, 231, 200, 0.6); background: rgba(112, 231, 200, 0.14); color: #d6fff4; }
+
+  .stepper { display: flex; align-items: center; gap: 5px; }
+  .stepper button {
+    width: 26px;
+    height: 26px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 5px;
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--ink);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .stepper button:hover { border-color: rgba(136, 202, 255, 0.5); }
+  .stepper output {
+    min-width: 26px;
+    text-align: center;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--teal);
+  }
+
+  .specs { display: grid; gap: 5px; margin: 0; padding: 0; list-style: none; }
+  .specs li {
+    display: grid;
+    grid-template-columns: 13px 1fr;
+    gap: 5px;
+    align-items: start;
+    font-size: 11px;
+    line-height: 1.42;
+    color: rgba(238, 242, 255, 0.6);
+  }
+  .specs li i {
+    display: grid;
+    place-items: center;
+    width: 13px;
+    height: 13px;
+    margin-top: 1px;
+    border-radius: 3px;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    font-style: normal;
+    font-size: 9px;
+    color: transparent;
+  }
+  .specs li.met { color: #c8fdec; }
+  .specs li.met i { border-color: rgba(112, 231, 200, 0.7); background: rgba(112, 231, 200, 0.22); color: #06211c; }
+
+  .hintbox {
+    padding: 8px 9px;
+    border: 1px dashed rgba(255, 255, 255, 0.14);
+    border-radius: 8px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    line-height: 1.5;
+    color: var(--muted);
+  }
+
+  .actionbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 0 2px;
+  }
+  .actionbar .note {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+  .actionbar .row { display: flex; gap: 7px; }
+  .actionbar .btn { margin: 0; }
+  .btn.small { min-height: 34px; padding: 8px 16px; font-size: 10.5px; }
+
+  @media (max-width: 880px) {
+    .workspace { grid-template-columns: minmax(0, 1fr); }
+    #app { height: auto; }
+    #stage.stage-fluid { height: auto; }
+  }
+</style>
+</head>
+<body>
+<h1 class="sr-only">Grid City Planner: a CSS Grid layout puzzle</h1>
+<div id="stage" class="stage-fluid">
+  <div id="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">GC</span>
+        <span>
+          <b>Grid City Planner</b>
+          <small>District layout office</small>
+        </span>
+      </div>
+      <div class="hud">
+        <div class="stat"><span>Plan</span><strong id="hudPlan">1/4</strong></div>
+        <div class="stat"><span>Score</span><strong id="hudScore">0000</strong></div>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <section class="pane" aria-label="City grid">
+        <div class="pane-head">
+          <span>City block</span>
+          <b id="planName">PLAN 01</b>
+        </div>
+        <div class="city-pane-body">
+          <div class="city-wrap">
+            <div id="city"></div>
+            <div id="cells" class="cell-layer" aria-label="Grid cells"></div>
+          </div>
+        </div>
+      </section>
+
+      <aside class="pane" aria-label="Planning controls">
+        <div class="pane-head">
+          <span>Layout settings</span>
+          <b id="placeState">idle</b>
+        </div>
+        <div class="controls">
+          <div class="group">
+            <span>Districts</span>
+            <div id="districts" class="chips"></div>
+          </div>
+          <div class="group">
+            <span>Columns</span>
+            <div class="stepper">
+              <button id="colDown" type="button" aria-label="One fewer column">&minus;</button>
+              <output id="colOut" aria-live="polite">3</output>
+              <button id="colUp" type="button" aria-label="One more column">+</button>
+            </div>
+          </div>
+          <div class="group">
+            <span>Rows</span>
+            <div class="stepper">
+              <button id="rowDown" type="button" aria-label="One fewer row">&minus;</button>
+              <output id="rowOut" aria-live="polite">3</output>
+              <button id="rowUp" type="button" aria-label="One more row">+</button>
+            </div>
+          </div>
+          <div class="group">
+            <span>Gap</span>
+            <div id="gaps" class="chips"></div>
+          </div>
+          <div class="group">
+            <span>Specification</span>
+            <ul id="specs" class="specs"></ul>
+          </div>
+          <p class="hintbox">Pick a district, then click one cell for its corner and another to set its span. <b>Esc</b> cancels.</p>
+        </div>
+      </aside>
+    </main>
+
+    <footer class="actionbar">
+      <span class="note" id="noteLine">Same content, different city</span>
+      <div class="row">
+        <button id="clear" class="btn small btn-secondary" type="button">Clear placements</button>
+        <button id="inspect" class="btn small" type="button">Inspect plan</button>
+      </div>
+    </footer>
+  </div>
+
+  <div id="overlay" class="overlay" role="dialog" aria-modal="true" aria-labelledby="ovTitle" hidden>
+    <div class="panel panel-card">
+      <p id="ovKicker" class="eyebrow"></p>
+      <h2 id="ovTitle" class="title"></h2>
+      <p id="ovLead" class="lead"></p>
+      <ul id="ovRules" class="rules"></ul>
+      <div id="ovScore" class="final-score" hidden>
+        <span>Planning score</span>
+        <strong id="ovScoreValue">0</strong>
+        <p id="ovRank" class="rank"></p>
+        <p id="ovBest" class="best"></p>
+      </div>
+      <button id="ovBtn" class="btn" type="button">Open plan one</button>
+    </div>
+  </div>
+</div>
+<p class="hint">select district &middot; click cell, click again to span &middot; inspect against the specs</p>
+
+<script>
+(() => {
+  'use strict';
+
+  const $ = (s) => document.querySelector(s);
+  const BEST_KEY = 'gridcity.best.v1';
+
+  const DISTRICTS = [
+    { id: 'header', label: 'Header', glyph: '\u25AC' },
+    { id: 'nav', label: 'Navigation', glyph: '\u2261' },
+    { id: 'main', label: 'Main content', glyph: '\u25A3' },
+    { id: 'aside', label: 'Aside', glyph: '\u25A4' },
+    { id: 'footer', label: 'Footer', glyph: '\u25AD' }
+  ];
+
+  const is = (a, r, c, rs, cs) => !!a && a.r === r && a.c === c && a.rs === rs && a.cs === cs;
+
+  const PLANS = [
+    {
+      name: 'PLAN 01 \u00b7 Homepage',
+      brief: 'A classic homepage: full-width header and footer, three columns in between.',
+      cols: 3, rows: 3, gap: 10,
+      specs: [
+        { t: 'Header spans all 3 columns on row 1', ok: (a) => is(a.header, 1, 1, 1, 3) },
+        { t: 'Navigation takes the left column of row 2', ok: (a) => is(a.nav, 2, 1, 1, 1) },
+        { t: 'Main content sits in the middle column', ok: (a) => is(a.main, 2, 2, 1, 1) },
+        { t: 'Aside takes the right column', ok: (a) => is(a.aside, 2, 3, 1, 1) },
+        { t: 'Footer spans all 3 columns on row 3', ok: (a) => is(a.footer, 3, 1, 1, 3) },
+        { t: 'Grid is 3 columns, 3 rows, 10px gap', ok: (a, p) => p.cols === 3 && p.rows === 3 && p.gap === 10 }
+      ]
+    },
+    {
+      name: 'PLAN 02 \u00b7 Dashboard',
+      brief: 'A wide dashboard: the nav runs down the whole side, main gets two columns.',
+      cols: 4, rows: 3, gap: 6,
+      specs: [
+        { t: 'Header spans all 4 columns on row 1', ok: (a) => is(a.header, 1, 1, 1, 4) },
+        { t: 'Navigation runs rows 2\u20133 in column 1', ok: (a) => is(a.nav, 2, 1, 2, 1) },
+        { t: 'Main content spans columns 2\u20133 on row 2', ok: (a) => is(a.main, 2, 2, 1, 2) },
+        { t: 'Aside sits in column 4 on row 2', ok: (a) => is(a.aside, 2, 4, 1, 1) },
+        { t: 'Footer spans columns 2\u20134 on row 3', ok: (a) => is(a.footer, 3, 2, 1, 3) },
+        { t: 'Grid is 4 columns, 3 rows, 6px gap', ok: (a, p) => p.cols === 4 && p.rows === 3 && p.gap === 6 }
+      ]
+    },
+    {
+      name: 'PLAN 03 \u00b7 Article page',
+      brief: 'Long-form reading: the nav becomes a horizontal bar under the header.',
+      cols: 3, rows: 4, gap: 14,
+      specs: [
+        { t: 'Header spans all 3 columns on row 1', ok: (a) => is(a.header, 1, 1, 1, 3) },
+        { t: 'Navigation spans all 3 columns on row 2', ok: (a) => is(a.nav, 2, 1, 1, 3) },
+        { t: 'Main content spans columns 1\u20132 on row 3', ok: (a) => is(a.main, 3, 1, 1, 2) },
+        { t: 'Aside sits in column 3 on row 3', ok: (a) => is(a.aside, 3, 3, 1, 1) },
+        { t: 'Footer spans all 3 columns on row 4', ok: (a) => is(a.footer, 4, 1, 1, 3) },
+        { t: 'Grid is 3 columns, 4 rows, 14px gap', ok: (a, p) => p.cols === 3 && p.rows === 4 && p.gap === 14 }
+      ]
+    },
+    {
+      name: 'PLAN 04 \u00b7 Mobile',
+      brief: 'The same five districts reorganized for a phone. One column, and the aside must come after the main content even though it comes first in the markup.',
+      cols: 1, rows: 5, gap: 6,
+      specs: [
+        { t: 'Header takes row 1', ok: (a) => is(a.header, 1, 1, 1, 1) },
+        { t: 'Navigation takes row 2', ok: (a) => is(a.nav, 2, 1, 1, 1) },
+        { t: 'Main content takes row 3', ok: (a) => is(a.main, 3, 1, 1, 1) },
+        { t: 'Aside takes row 4 \u2014 below main', ok: (a) => is(a.aside, 4, 1, 1, 1) },
+        { t: 'Footer takes row 5', ok: (a) => is(a.footer, 5, 1, 1, 1) },
+        { t: 'Grid is 1 column, 5 rows, 6px gap', ok: (a, p) => p.cols === 1 && p.rows === 5 && p.gap === 6 }
+      ]
+    }
+  ];
+
+  const state = {
+    plan: 0,
+    score: 0,
+    best: 0,
+    cols: 3,
+    rows: 3,
+    gap: 10,
+    areas: {},
+    selected: null,
+    pending: null,
+    fails: 0,
+    solved: false
+  };
+
+  const els = {
+    city: $('#city'),
+    cells: $('#cells'),
+    districts: $('#districts'),
+    gaps: $('#gaps'),
+    specs: $('#specs'),
+    planName: $('#planName'),
+    placeState: $('#placeState'),
+    noteLine: $('#noteLine'),
+    colOut: $('#colOut'),
+    rowOut: $('#rowOut'),
+    colUp: $('#colUp'),
+    colDown: $('#colDown'),
+    rowUp: $('#rowUp'),
+    rowDown: $('#rowDown'),
+    hudPlan: $('#hudPlan'),
+    hudScore: $('#hudScore'),
+    inspect: $('#inspect'),
+    clear: $('#clear'),
+    overlay: $('#overlay'),
+    ovKicker: $('#ovKicker'),
+    ovTitle: $('#ovTitle'),
+    ovLead: $('#ovLead'),
+    ovRules: $('#ovRules'),
+    ovScore: $('#ovScore'),
+    ovScoreValue: $('#ovScoreValue'),
+    ovRank: $('#ovRank'),
+    ovBest: $('#ovBest'),
+    ovBtn: $('#ovBtn')
+  };
+
+  const plan = () => PLANS[state.plan];
+  const pad = (n) => String(n).padStart(4, '0');
+
+  function buildDistrictChips() {
+    els.districts.innerHTML = '';
+    DISTRICTS.forEach((d) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'chip';
+      b.textContent = d.label;
+      b.setAttribute('role', 'radio');
+      b.dataset.id = d.id;
+      b.addEventListener('click', () => selectDistrict(d.id));
+      els.districts.appendChild(b);
+    });
+    syncChips();
+  }
+
+  function syncChips() {
+    els.districts.querySelectorAll('.chip').forEach((b) => {
+      b.setAttribute('aria-checked', String(state.selected === b.dataset.id));
+    });
+    els.gaps.querySelectorAll('.chip').forEach((b) => {
+      b.setAttribute('aria-checked', String(Number(b.dataset.gap) === state.gap));
+    });
+  }
+
+  function buildGapChips() {
+    els.gaps.innerHTML = '';
+    [0, 6, 10, 14].forEach((g) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'chip';
+      b.textContent = g + 'px';
+      b.setAttribute('role', 'radio');
+      b.dataset.gap = String(g);
+      b.addEventListener('click', () => {
+        state.gap = g;
+        layout();
+        syncChips();
+      });
+      els.gaps.appendChild(b);
+    });
+  }
+
+  function selectDistrict(id) {
+    state.selected = id;
+    state.pending = null;
+    els.placeState.textContent = 'placing ' + id;
+    els.cells.classList.add('active');
+    els.noteLine.textContent = 'Click a cell for ' + id + '\u2019s corner, then another to set its span';
+    syncChips();
+    buildCells();
+  }
+
+  function clampAreas() {
+    Object.keys(state.areas).forEach((id) => {
+      const a = state.areas[id];
+      if (!a) return;
+      a.c = Math.min(a.c, state.cols);
+      a.r = Math.min(a.r, state.rows);
+      a.cs = Math.max(1, Math.min(a.cs, state.cols - a.c + 1));
+      a.rs = Math.max(1, Math.min(a.rs, state.rows - a.r + 1));
+    });
+  }
+
+  function layout() {
+    els.city.style.gridTemplateColumns = 'repeat(' + state.cols + ', minmax(0, 1fr))';
+    els.city.style.gridTemplateRows = 'repeat(' + state.rows + ', minmax(0, 1fr))';
+    els.city.style.gap = state.gap + 'px';
+    els.cells.style.gridTemplateColumns = 'repeat(' + state.cols + ', minmax(0, 1fr))';
+    els.cells.style.gridTemplateRows = 'repeat(' + state.rows + ', minmax(0, 1fr))';
+    els.cells.style.gap = state.gap + 'px';
+    els.colOut.textContent = String(state.cols);
+    els.rowOut.textContent = String(state.rows);
+    renderDistricts();
+    buildCells();
+    renderSpecs();
+  }
+
+  function renderDistricts() {
+    els.city.innerHTML = '';
+    DISTRICTS.forEach((d) => {
+      const el = document.createElement('div');
+      el.className = 'district';
+      el.dataset.id = d.id;
+      el.innerHTML = '<span aria-hidden="true">' + d.glyph + '</span>' + d.label + '<small>' + areaLabel(d.id) + '</small>';
+      const a = state.areas[d.id];
+      if (a) el.style.gridArea = a.r + ' / ' + a.c + ' / span ' + a.rs + ' / span ' + a.cs;
+      if (state.selected === d.id) el.classList.add('selected');
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        selectDistrict(d.id);
+      });
+      els.city.appendChild(el);
+    });
+  }
+
+  function areaLabel(id) {
+    const a = state.areas[id];
+    if (!a) return 'auto';
+    return 'r' + a.r + 'c' + a.c + ' ' + a.rs + '\u00d7' + a.cs;
+  }
+
+  function buildCells() {
+    els.cells.innerHTML = '';
+    const total = state.cols * state.rows;
+    for (let i = 0; i < total; i += 1) {
+      const r = Math.floor(i / state.cols) + 1;
+      const c = (i % state.cols) + 1;
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'cell';
+      b.dataset.r = String(r);
+      b.dataset.c = String(c);
+      b.setAttribute('aria-label', 'Row ' + r + ', column ' + c);
+      b.addEventListener('click', () => cellClick(r, c));
+      els.cells.appendChild(b);
+    }
+  }
+
+  function cellClick(r, c) {
+    if (!state.selected) return;
+    const id = state.selected;
+    if (!state.pending) {
+      state.pending = { r: r, c: c };
+      els.noteLine.textContent = 'Corner set at row ' + r + ', column ' + c + ' \u2014 click again to stretch, or the same cell to keep 1\u00d71';
+      return;
+    }
+    const a = state.pending;
+    state.areas[id] = {
+      r: Math.min(a.r, r),
+      c: Math.min(a.c, c),
+      rs: Math.abs(r - a.r) + 1,
+      cs: Math.abs(c - a.c) + 1
+    };
+    state.pending = null;
+    els.placeState.textContent = 'placed ' + id;
+    els.noteLine.textContent = id + ' placed at row ' + state.areas[id].r + ', column ' + state.areas[id].c;
+    renderDistricts();
+    renderSpecs();
+  }
+
+  function renderSpecs() {
+    const p = plan();
+    els.specs.innerHTML = '';
+    p.specs.forEach((s) => {
+      const met = s.ok(state.areas, { cols: state.cols, rows: state.rows, gap: state.gap });
+      const li = document.createElement('li');
+      if (met) li.className = 'met';
+      li.innerHTML = '<i aria-hidden="true">\u2713</i><span>' + s.t + '</span>';
+      els.specs.appendChild(li);
+    });
+  }
+
+  function allMet() {
+    return plan().specs.every((s) => s.ok(state.areas, { cols: state.cols, rows: state.rows, gap: state.gap }));
+  }
+
+  function inspect() {
+    if (allMet()) {
+      state.solved = true;
+      const earned = 120 + (state.fails === 0 ? 30 : 0);
+      state.score += earned;
+      els.hudScore.textContent = pad(state.score);
+      els.placeState.textContent = 'approved';
+      els.noteLine.textContent = 'Plan approved +' + earned + '. Move to the next block.';
+      els.inspect.textContent = state.plan === PLANS.length - 1 ? 'Finish plans' : 'Next plan';
+      els.inspect.dataset.mode = 'next';
+    } else {
+      state.fails += 1;
+      els.noteLine.textContent = 'Inspection failed: the unmet specs are still open.';
+    }
+  }
+
+  function nextPlan() {
+    if (state.plan === PLANS.length - 1) {
+      finish();
+      return;
+    }
+    state.plan += 1;
+    loadPlan();
+  }
+
+  function loadPlan() {
+    const p = plan();
+    state.cols = p.cols;
+    state.rows = p.rows;
+    state.gap = p.gap;
+    state.areas = {};
+    state.selected = null;
+    state.pending = null;
+    state.fails = 0;
+    state.solved = false;
+    els.planName.textContent = p.name;
+    els.hudPlan.textContent = (state.plan + 1) + '/' + PLANS.length;
+    els.hudScore.textContent = pad(state.score);
+    els.placeState.textContent = 'idle';
+    els.noteLine.textContent = p.brief;
+    els.cells.classList.remove('active');
+    els.inspect.textContent = 'Inspect plan';
+    els.inspect.dataset.mode = 'inspect';
+    state.cols = p.cols;
+    state.rows = p.rows;
+    layout();
+    syncChips();
+  }
+
+  function finish() {
+    if (state.score > state.best) {
+      state.best = state.score;
+      try { localStorage.setItem(BEST_KEY, String(state.score)); } catch (e) { /* ignore */ }
+    }
+    const rank = state.score >= 540 ? 'City architect'
+      : state.score >= 420 ? 'Lead planner'
+      : state.score >= 300 ? 'Junior planner'
+      : 'Surveyor';
+    els.ovKicker.textContent = 'All plans approved';
+    els.ovTitle.innerHTML = 'The city <span class="accent">fits.</span>';
+    els.ovLead.textContent = 'Four blocks planned, including the mobile reorganization where the aside moved below main without touching the markup.';
+    els.ovRules.innerHTML = '';
+    els.ovScore.hidden = false;
+    els.ovScoreValue.textContent = String(state.score);
+    els.ovRank.textContent = rank;
+    els.ovBest.textContent = 'Best ' + pad(state.best);
+    els.overlay.hidden = false;
+    els.ovBtn.focus();
+  }
+
+  function start() {
+    state.plan = 0;
+    state.score = 0;
+    els.overlay.hidden = true;
+    loadPlan();
+    buildDistrictChips();
+  }
+
+  els.inspect.addEventListener('click', () => {
+    if (els.inspect.dataset.mode === 'next') nextPlan();
+    else inspect();
+  });
+
+  els.clear.addEventListener('click', () => {
+    state.areas = {};
+    state.selected = null;
+    state.pending = null;
+    els.cells.classList.remove('active');
+    els.placeState.textContent = 'idle';
+    renderDistricts();
+    renderSpecs();
+    syncChips();
+  });
+
+  els.colUp.addEventListener('click', () => {
+    state.cols = Math.min(4, state.cols + 1);
+    clampAreas();
+    layout();
+    syncChips();
+  });
+  els.colDown.addEventListener('click', () => {
+    state.cols = Math.max(1, state.cols - 1);
+    clampAreas();
+    layout();
+    syncChips();
+  });
+  els.rowUp.addEventListener('click', () => {
+    state.rows = Math.min(5, state.rows + 1);
+    clampAreas();
+    layout();
+    syncChips();
+  });
+  els.rowDown.addEventListener('click', () => {
+    state.rows = Math.max(1, state.rows - 1);
+    clampAreas();
+    layout();
+    syncChips();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      state.selected = null;
+      state.pending = null;
+      els.cells.classList.remove('active');
+      els.placeState.textContent = 'idle';
+      renderDistricts();
+      syncChips();
+    }
+  });
+
+  els.ovBtn.addEventListener('click', start);
+
+  try { state.best = parseInt(localStorage.getItem(BEST_KEY) || '0', 10) || 0; } catch (e) { state.best = 0; }
+
+  buildGapChips();
+  buildDistrictChips();
+  loadPlan();
+
+  els.ovKicker.textContent = 'District layout office';
+  els.ovTitle.innerHTML = 'Grid City <span class="accent">Planner</span>';
+  els.ovLead.textContent = 'Five districts, four blueprints. Place header, nav, main, aside and footer with CSS Grid, then inspect the block against the spec. The last plan is a phone.';
+  els.ovRules.innerHTML = [
+    'Choose columns, rows and a gap for each blueprint.',
+    'Pick a district, click a cell for its corner, click again for its span.',
+    'The spec list updates live: every line must be met.',
+    'Inspect to submit. A failed inspection costs you the first-try bonus.'
+  ].map((t) => '<li class="rule">' + t + '</li>').join('');
+  els.ovBtn.textContent = 'Open plan one';
+  els.overlay.hidden = false;
+})();
+</script>
+</body>
+</html>

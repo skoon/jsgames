@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#160f1e">
+<title>Midnight Brew</title>
+<link rel="stylesheet" href="../common.css">
+<style>
+  :root {
+    --bg-top: #2a1b33;
+    --bg-mid: #0d0812;
+    --bg-bottom: #050307;
+    --stage-bg: #0b0710;
+    --ink: #f7eefb;
+    --line: rgba(200, 160, 255, 0.2);
+    --teal: #6ef0c8;
+    --amber: #ffc86b;
+    --red: #ff7d86;
+    --blue: #8cc6ff;
+    --plum: #d59bff;
+  }
+  body { overflow-y: auto; }
+
+  #app {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: 8px;
+    padding: 8px;
+    height: 100%;
+    min-height: 0;
+  }
+  .topbar { margin: 0; }
+
+  .meters { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .m { display: grid; gap: 3px; min-width: 100px; }
+  .m span {
+    font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .m b { font-family: var(--font-mono); font-size: 13px; color: #fff; }
+  .m .track { height: 6px; border-radius: 999px; background: rgba(255,255,255,0.09); overflow: hidden; }
+  .m .track i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #b06fd6, var(--plum)); transition: width 260ms ease; }
+
+  .board {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+    gap: 9px;
+    min-height: 0;
+  }
+  .pane {
+    display: flex; flex-direction: column; min-height: 0;
+    border: 1px solid var(--line); border-radius: 12px;
+    background: rgba(8, 5, 11, 0.84); overflow: hidden;
+  }
+  .pane-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 7px 10px; border-bottom: 1px solid var(--line);
+    background: rgba(255, 255, 255, 0.02);
+    font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .pane-head b { color: var(--plum); font-weight: 700; }
+  .pane-body {
+    flex: 1; min-height: 0; overflow-y: auto; padding: 11px;
+    scrollbar-width: thin;
+  }
+
+  /* patron */
+  .patronhead { display: flex; gap: 10px; align-items: center; }
+  .face {
+    display: grid; place-items: center; width: 46px; height: 46px; border-radius: 50%;
+    background: linear-gradient(180deg, #4a2b58, #22142b);
+    border: 1px solid rgba(213,155,255,0.35);
+    font-family: var(--font-mono); font-size: 14px; color: #f0dcff;
+  }
+  .pname { display: grid; gap: 2px; }
+  .pname b { font-size: 14px; color: #fff; }
+  .pname span { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--plum); }
+  .claim {
+    margin-left: auto; padding: 4px 8px; border-radius: 999px;
+    border: 1px solid rgba(213,155,255,0.4);
+    font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--plum);
+  }
+  .order {
+    margin: 10px 0 8px; padding: 9px 11px;
+    border-left: 2px solid rgba(213,155,255,0.6);
+    background: rgba(213,155,255,0.06);
+    font-size: 12px; line-height: 1.5; color: #f0dcff;
+  }
+  .order b { color: #fff; }
+  .lines { display: grid; gap: 5px; }
+  .say {
+    padding: 7px 9px; border-radius: 8px; background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.07);
+    font-size: 11.5px; line-height: 1.5; color: rgba(247,238,251,0.85);
+  }
+  .say.new { border-color: rgba(213,155,255,0.35); background: rgba(213,155,255,0.07); }
+  .ask {
+    margin-top: 8px; padding: 6px 10px;
+    border: 1px solid rgba(140,198,255,0.35); border-radius: 6px;
+    background: rgba(140,198,255,0.07); color: #d6ecff;
+    font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.06em;
+    cursor: pointer;
+  }
+  .ask:disabled { opacity: 0.4; cursor: default; }
+
+  /* glass + shelf */
+  .glass {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;
+    margin-bottom: 10px;
+  }
+  .slot {
+    min-height: 46px; display: grid; place-items: center;
+    border: 1px dashed rgba(255,255,255,0.18); border-radius: 8px;
+    background: rgba(255,255,255,0.02);
+    font-size: 10px; line-height: 1.3; text-align: center; color: rgba(247,238,251,0.4);
+    cursor: pointer; padding: 4px;
+  }
+  .slot.filled {
+    border-style: solid; border-color: rgba(213,155,255,0.5);
+    background: rgba(213,155,255,0.1); color: #f0dcff;
+    font-family: var(--font-mono); font-size: 9px;
+  }
+  .slot.super.filled { border-color: rgba(255,125,134,0.55); background: rgba(255,125,134,0.1); color: #ffc3c8; }
+
+  .shelf { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; }
+  .ing {
+    display: grid; gap: 1px; padding: 7px 8px;
+    border: 1px solid rgba(255,255,255,0.11); border-radius: 7px;
+    background: rgba(255,255,255,0.03); color: rgba(247,238,251,0.88);
+    text-align: left; font: inherit; font-size: 10.5px; line-height: 1.3; cursor: pointer;
+  }
+  .ing:hover { border-color: rgba(213,155,255,0.55); background: rgba(213,155,255,0.07); }
+  .ing:disabled { opacity: 0.35; cursor: default; }
+  .ing em {
+    font-style: normal; font-family: var(--font-mono); font-size: 7.5px;
+    letter-spacing: 0.1em; text-transform: uppercase; color: rgba(247,238,251,0.4);
+  }
+  .ing.super em { color: #ff9aa2; }
+  .ing.lethal em { color: var(--amber); }
+
+  /* bestiary */
+  .beast { display: grid; gap: 4px; }
+  .brow {
+    display: grid; grid-template-columns: 64px 1fr; gap: 8px;
+    padding: 6px 8px; border-radius: 7px;
+    background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.07);
+    font-size: 10px; line-height: 1.4;
+  }
+  .brow b { font-family: var(--font-mono); font-size: 8.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--plum); }
+  .brow span { color: rgba(247,238,251,0.72); }
+  .brow i { font-style: normal; color: var(--amber); }
+
+  .verdict {
+    margin-top: 10px; padding: 9px 11px; border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.03);
+    font-size: 11px; line-height: 1.5; color: rgba(247,238,251,0.82);
+  }
+  .verdict[hidden] { display: none; }
+  .verdict.ok { border-color: rgba(110,240,200,0.45); background: rgba(110,240,200,0.06); color: #c9fdec; }
+  .verdict.no { border-color: rgba(255,125,134,0.45); background: rgba(255,125,134,0.06); color: #ffc3c8; }
+
+  .actionbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 2px; flex-wrap: wrap; }
+  .actionbar .note-line { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint); }
+  .actionbar .btn { margin: 0; }
+  .btn.small { min-height: 32px; padding: 7px 14px; font-size: 10px; }
+  .btn[disabled] { opacity: 0.4; cursor: default; }
+
+  @media (max-width: 900px) {
+    .board { grid-template-columns: minmax(0, 1fr); }
+    #app { height: auto; }
+    #stage.stage-fluid { height: auto; }
+    .pane-body { overflow: visible; }
+    .topbar { flex-wrap: wrap; row-gap: 6px; }
+    .meters { width: 100%; }
+  }
+</style>
+</head>
+<body>
+<h1 class="sr-only">Midnight Brew: mix cocktails for supernatural patrons and spot the disguised witch hunter</h1>
+<div id="stage" class="stage-fluid">
+  <div id="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">MB</span>
+        <span>
+          <b>Midnight Brew</b>
+          <small>Speakeasy &middot; night 1</small>
+        </span>
+      </div>
+      <div class="meters">
+        <div class="m"><span>Patron</span><b id="hudVisitor">1 / 6</b></div>
+        <div class="m"><span>Tips</span><b id="hudTips">$0</b></div>
+        <div class="m" style="min-width:130px">
+          <span>Trust</span>
+          <div class="track"><i id="trustFill" style="width:100%"></i></div>
+        </div>
+      </div>
+    </header>
+
+    <main class="board">
+      <section class="pane" aria-label="Patron">
+        <div class="pane-head"><span>The bar</span><b id="patronState">seated</b></div>
+        <div class="pane-body" id="patronBody"></div>
+      </section>
+
+      <section class="pane" aria-label="Mix and serve">
+        <div class="pane-head"><span>Mix</span><b id="glassState">empty</b></div>
+        <div class="pane-body">
+          <div class="glass" id="glass"></div>
+          <div class="shelf" id="shelf"></div>
+          <div class="verdict" id="verdict" hidden></div>
+          <details style="margin-top:10px">
+            <summary style="font-family:var(--font-mono);font-size:9px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);cursor:pointer">Bestiary notes</summary>
+            <div class="beast" id="bestiary" style="margin-top:7px"></div>
+          </details>
+        </div>
+      </section>
+    </main>
+
+    <footer class="actionbar">
+      <span class="note-line" id="noteLine">Pick three ingredients, then serve</span>
+      <button id="serve" class="btn small" type="button" disabled>Serve</button>
+    </footer>
+  </div>
+
+  <div id="overlay" class="overlay" role="dialog" aria-modal="true" aria-labelledby="ovTitle" hidden>
+    <div class="panel panel-card">
+      <p class="eyebrow" id="ovKicker">Night over</p>
+      <h2 id="ovTitle" class="title"></h2>
+      <p id="ovLead" class="lead"></p>
+      <ul id="ovRules" class="rules"></ul>
+      <div id="ovScore" class="final-score" hidden>
+        <span>Night's take</span>
+        <strong id="ovScoreValue">$0</strong>
+        <p id="ovRank" class="rank"></p>
+        <p id="ovBest" class="best"></p>
+      </div>
+      <button id="ovBtn" class="btn" type="button">Open another night</button>
+    </div>
+  </div>
+</div>
+<p class="hint">a glamour hides a face &middot; it does not hide a pocket watch</p>
+
+<script>
+(() => {
+  'use strict';
+
+  const $ = (s) => document.querySelector(s);
+  const BEST_KEY = 'midnightBrew.best.v1';
+
+  const INGREDIENTS = [
+    { id: 'blood', name: 'O-Negative blood', note: 'supernatural base', type: 'super' },
+    { id: 'moonwater', name: 'Moonwater', note: 'supernatural base', type: 'super' },
+    { id: 'ecto', name: 'Ectoplasm', note: 'supernatural base', type: 'super' },
+    { id: 'brim', name: 'Brimstone draught', note: 'supernatural base', type: 'super' },
+    { id: 'cherry', name: 'Cherry cordial', note: 'mortal base', type: 'mortal' },
+    { id: 'sleep', name: 'Sleep draught', note: 'knocks out mortals', type: 'mortal' },
+    { id: 'silver', name: 'Silver leaf', note: 'lethal to werewolves', type: 'lethal', lethal: 'Werewolf' },
+    { id: 'nightshade', name: 'Nightshade syrup', note: 'lethal to vampires', type: 'lethal', lethal: 'Vampire' },
+    { id: 'salt', name: 'Sea salt', note: 'lethal to ghosts', type: 'lethal', lethal: 'Ghost' },
+    { id: 'holy', name: 'Holy water', note: 'lethal to demons', type: 'lethal', lethal: 'Demon' }
+  ];
+
+  const SPECIES = {
+    Vampire: { base: 'blood', avoid: 'nightshade', tell: 'no reflection, no pulse, and a taste for blood' },
+    Werewolf: { base: 'moonwater', avoid: 'silver', tell: 'silver burns them; moonwater steadies them' },
+    Ghost: { base: 'ecto', avoid: 'salt', tell: 'cannot hold a glass; salt unmakes them' },
+    Demon: { base: 'brim', avoid: 'holy', tell: 'brimstone feeds them; holy water burns' }
+  };
+
+  const VISITORS = [
+    {
+      name: 'Vladira', claims: 'Vampire', order: 'Crimson Nightcap',
+      lines: [
+        'Crimson Nightcap. Blood, obviously, and none of your ice.',
+        'I have not cast a reflection since the last duke was crowned.',
+        'Leave the nightshade out. It gives me a headache I cannot describe.'
+      ],
+      hunterLines: [
+        'Crimson Nightcap, please. Blood, obviously. I am a vampire.',
+        'Of course I am. I just \u2014 the light changes and I blink, that is all.',
+        'What time do you close? And is the cellar locked at night?'
+      ]
+    },
+    {
+      name: 'Marrow', claims: 'Werewolf', order: 'Moonwater Sling',
+      lines: [
+        'Moonwater sling, no garnish, no straw.',
+        'Silver anything and I will be chewing the bar before midnight.',
+        'I can smell your barrels from here. Three years old, the lot of them.'
+      ],
+      hunterLines: [
+        'Moonwater sling, please. I am a werewolf, so, you know. Moonwater.',
+        'Silver leaf? Barely notice it. My tolerance is legendary.',
+        'Sorry \u2014 what time is it? I have an appointment at dawn. A human one.'
+      ]
+    },
+    {
+      name: 'Whisper', claims: 'Ghost', order: 'Ectoplasm Fizz',
+      lines: [
+        'Ectoplasm fizz. And a straw, unless you want it on the floor.',
+        'Salt on the rim would be a cruel joke, and I have had enough of those.',
+        'Your cellar door opened twice tonight. You may want to check it.'
+      ],
+      hunterLines: [
+        'Ectoplasm fizz, please. I am a ghost, so I will not be drinking much.',
+        'I am not cold. Ghosts are not cold. That is a myth people repeat.',
+        'What time is it? You have a clock, do you not? What does it say?'
+      ]
+    },
+    {
+      name: 'Cinder', claims: 'Demon', order: 'Brimstone Old Fashioned',
+      lines: [
+        'Brimstone old fashioned, and make it smoke.',
+        'Holy water? Try it and see what happens to your floorboards.',
+        'I have been drinking here since before this building had a name.'
+      ],
+      hunterLines: [
+        'Brimstone old fashioned, please. I am a demon. Obviously.',
+        'Holy water does not bother me at all. Why would it? I am a demon.',
+        'What time do you shut? My superiors expect a report by six.'
+      ]
+    },
+    {
+      name: 'Sister Wren', claims: 'Vampire', order: 'Crimson Nightcap',
+      lines: [
+        'Crimson Nightcap, if you would. I am parched.',
+        'No reflection worth mentioning, and no interest in your mirrors.',
+        'I have not slept in a bed since the reign of the last duke.'
+      ],
+      hunterLines: [
+        'Crimson Nightcap, please. I am a vampire, as you can see.',
+        'I do blink. Everyone blinks. That is not a thing you can hold against me.',
+        'I have a pocket watch because I like punctuality. What time do you close?'
+      ]
+    },
+    {
+      name: 'Mr Taverner', claims: 'Werewolf', order: 'Moonwater Sling',
+      lines: [
+        'Moonwater sling. Heavy on the moonwater.',
+        'Silver leaf on the rim is traditional, and I am a traditionalist.',
+        'The moon is doing something strange to my shoulders tonight.'
+      ],
+      hunterLines: [
+        'Moonwater sling, please. Werewolf, yes, that is me.',
+        'Silver? I hardly feel it. Barely a tingle. Not that I would know.',
+        'What is the closing time? I have to be at work in the morning.'
+      ]
+    }
+  ];
+
+  const state = {
+    visitors: [], idx: 0, glass: [], tips: 0, trust: 100,
+    served: 0, caught: 0, over: false, best: 0, asked: false, resolving: false
+  };
+
+  const els = {
+    patronBody: $('#patronBody'),
+    glass: $('#glass'),
+    shelf: $('#shelf'),
+    bestiary: $('#bestiary'),
+    verdict: $('#verdict'),
+    serve: $('#serve'),
+    noteLine: $('#noteLine'),
+    hudVisitor: $('#hudVisitor'),
+    hudTips: $('#hudTips'),
+    trustFill: $('#trustFill'),
+    patronState: $('#patronState'),
+    glassState: $('#glassState'),
+    overlay: $('#overlay'),
+    ovKicker: $('#ovKicker'),
+    ovTitle: $('#ovTitle'),
+    ovLead: $('#ovLead'),
+    ovRules: $('#ovRules'),
+    ovScore: $('#ovScore'),
+    ovScoreValue: $('#ovScoreValue'),
+    ovRank: $('#ovRank'),
+    ovBest: $('#ovBest'),
+    ovBtn: $('#ovBtn')
+  };
+
+  const visitor = () => state.visitors[state.idx];
+  const ing = (id) => INGREDIENTS.find((i) => i.id === id);
+
+  function buildNight() {
+    const picks = VISITORS.map((v) => ({ ...v, hunter: false }));
+    // two of the six are hunters
+    const a = Math.floor(Math.random() * picks.length);
+    let b = Math.floor(Math.random() * picks.length);
+    while (b === a) b = Math.floor(Math.random() * picks.length);
+    picks[a].hunter = true;
+    picks[b].hunter = true;
+    picks.forEach((p) => { p.revealed = 2; p.asked = false; });
+    return picks;
+  }
+
+  function renderPatron() {
+    const v = visitor();
+    if (!v) return;
+    const script = v.hunter ? v.hunterLines : v.lines;
+    const lines = script.slice(0, v.revealed);
+    els.patronBody.innerHTML =
+      '<div class="patronhead">' +
+        '<div class="face">' + v.name.split(' ').map((s) => s[0]).join('').slice(0, 2) + '</div>' +
+        '<div class="pname"><b>' + v.name + '</b><span>claims: ' + v.claims + '</span></div>' +
+        '<span class="claim">' + v.claims + '</span>' +
+      '</div>' +
+      '<div class="order"><b>Order:</b> ' + v.order + '</div>' +
+      '<div class="lines">' + lines.map((l, i) =>
+        '<div class="say' + (i === lines.length - 1 && v.asked ? ' new' : '') + '">\u201c' + l + '\u201d</div>').join('') +
+      '</div>' +
+      (v.revealed < 3
+        ? '<button class="ask" id="askBtn" type="button">Ask one more question</button>'
+        : '<p style="margin:8px 0 0;font-family:var(--font-mono);font-size:8.5px;letter-spacing:0.08em;text-transform:uppercase;color:var(--faint)">They have said all they are going to say.</p>');
+
+    const ask = document.getElementById('askBtn');
+    if (ask) ask.addEventListener('click', () => {
+      if (v.revealed >= 3) return;
+      v.revealed += 1;
+      v.asked = true;
+      els.noteLine.textContent = 'Watch what they do with their hands while they talk.';
+      renderPatron();
+    });
+
+    els.hudVisitor.textContent = (state.idx + 1) + ' / ' + state.visitors.length;
+    els.hudTips.textContent = '$' + state.tips;
+    els.trustFill.style.width = state.trust + '%';
+    els.patronState.textContent = state.over ? 'closed' : 'seated';
+  }
+
+  function renderGlass() {
+    els.glass.innerHTML = '';
+    for (let i = 0; i < 3; i++) {
+      const id = state.glass[i];
+      const item = id ? ing(id) : null;
+      const slot = document.createElement('button');
+      slot.type = 'button';
+      slot.className = 'slot' + (item ? ' filled' : '') + (item && item.type === 'super' ? ' super' : '');
+      slot.textContent = item ? item.name : 'drop an ingredient';
+      slot.disabled = !item;
+      if (item) slot.addEventListener('click', () => {
+        state.glass.splice(i, 1);
+        renderGlass();
+      });
+      els.glass.appendChild(slot);
+    }
+    els.glassState.textContent = state.glass.length ? state.glass.length + ' / 3' : 'empty';
+    els.serve.disabled = state.glass.length === 0 || state.over || state.resolving;
+  }
+
+  function renderShelf() {
+    els.shelf.innerHTML = '';
+    INGREDIENTS.forEach((i) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'ing ' + i.type;
+      b.innerHTML = '<span>' + i.name + '</span><em>' + i.note + '</em>';
+      b.disabled = state.glass.length >= 3 || state.glass.indexOf(i.id) !== -1 || state.over || state.resolving;
+      b.addEventListener('click', () => {
+        if (state.glass.length >= 3) return;
+        state.glass.push(i.id);
+        renderGlass();
+        renderShelf();
+      });
+      els.shelf.appendChild(b);
+    });
+  }
+
+  function renderBestiary() {
+    els.bestiary.innerHTML = Object.keys(SPECIES).map((s) =>
+      '<div class="brow"><b>' + s + '</b><span>needs <i>' + ing(SPECIES[s].base).name + '</i> \u00b7 avoid <i>' +
+        ing(SPECIES[s].avoid).name + '</i></span></div>').join('') +
+      '<div class="brow"><b>Human</b><span>never serve a supernatural base \u2014 <i>Cherry cordial</i> plus <i>Sleep draught</i> takes them out quietly.</span></div>';
+  }
+
+  function judge() {
+    const v = visitor();
+    const has = (id) => state.glass.indexOf(id) !== -1;
+    const kinds = state.glass.map((id) => ing(id));
+    const supers = kinds.filter((k) => k.type === 'super');
+    const lethal = kinds.filter((k) => k.type === 'lethal');
+
+    // disguised human
+    if (v.hunter) {
+      if (supers.length) {
+        return {
+          ok: false, fatal: true,
+          text: 'The patron drinks, convulses, and stops breathing. The glamour drops: this was a witch hunter, and now a body is on your floor and the watch-house is already at the door.'
+        };
+      }
+      if (has('sleep') && has('cherry')) {
+        return {
+          ok: true, fatal: false, caught: true,
+          text: 'They drink, compliment the cordial, and slide gently off the stool. The glamour fades on the way down. You roll them into the private room before the next patron notices.'
+        };
+      }
+      if (has('sleep')) {
+        return { ok: false, fatal: false, text: 'A sleep draught on its own tastes like medicine. They push it away, pay, and leave \u2014 still suspicious, and now certain the bar is hiding something.' };
+      }
+      return { ok: false, fatal: false, text: 'A harmless mocktail. They sip it, watch the room, and leave without a word. They will be back tomorrow with a warrant.' };
+    }
+
+    const species = v.claims;
+    const spec = SPECIES[species];
+    const lethalForThem = lethal.find((l) => l.lethal === species);
+    if (lethalForThem) {
+      return { ok: false, fatal: true, text: 'The ' + species.toLowerCase() + ' takes one sip and the bar turns into a brawl. ' + lethalForThem.name + ' was never going to be a garnish for them.' };
+    }
+    if (has(spec.base)) {
+      return { ok: true, fatal: false, text: 'They drain the glass and set down a generous tip. ' + ing(spec.base).name + ' was exactly right.' };
+    }
+    if (supers.length) {
+      return { ok: false, fatal: false, text: 'Wrong base. They grimace, overpay out of embarrassment, and leave with their trust in you dented.' };
+    }
+    return { ok: false, fatal: false, text: 'A mortal drink for an immortal customer. They push it back across the bar without a word.' };
+  }
+
+  function serve() {
+    if (state.over || state.resolving || !state.glass.length) return;
+    state.resolving = true;
+    const v = visitor();
+    const result = judge();
+    const box = els.verdict;
+    box.hidden = false;
+    box.className = 'verdict ' + (result.ok ? 'ok' : 'no');
+    box.textContent = result.text;
+
+    if (result.fatal) {
+      state.trust = 0;
+      state.over = true;
+      renderGlass();
+      renderShelf();
+      setTimeout(() => end(false, result), 900);
+      return;
+    }
+
+    if (result.ok && result.caught) {
+      state.tips += 400;
+      state.caught += 1;
+      state.trust = Math.min(100, state.trust + 8);
+      state.served += 1;
+    } else if (result.ok) {
+      state.tips += 120;
+      state.served += 1;
+      state.trust = Math.min(100, state.trust + 4);
+    } else {
+      state.trust = Math.max(0, state.trust - 12);
+    }
+
+    els.hudTips.textContent = '$' + state.tips;
+    els.trustFill.style.width = state.trust + '%';
+    els.noteLine.textContent = result.ok ? 'Served. +' + (result.caught ? '$400' : '$120') : 'They noticed. Trust down.';
+    renderGlass();
+    renderShelf();
+
+    setTimeout(() => {
+      state.glass = [];
+      state.resolving = false;
+      box.hidden = true;
+      if (state.trust <= 0) { state.over = true; end(false, { text: 'The room turned on you.' }); return; }
+      state.idx += 1;
+      if (state.idx >= state.visitors.length) { end(true, {}); return; }
+      renderPatron();
+      renderGlass();
+      renderShelf();
+      els.noteLine.textContent = 'Pick three ingredients, then serve';
+    }, 1500);
+  }
+
+  function end(won, result) {
+    if (state.over && state.won) return;
+    state.won = won;
+    const score = state.tips + state.trust * 4;
+    if (won && score > state.best) {
+      state.best = score;
+      try { localStorage.setItem(BEST_KEY, String(score)); } catch (e) { /* ignore */ }
+    }
+    const rank = won && state.trust >= 85 && state.caught === 2 ? 'Keeper of the door'
+      : won ? 'Trusted barkeep'
+      : state.trust >= 40 ? 'Under investigation'
+      : 'Bar closed by morning';
+    els.ovKicker.textContent = won ? 'Last call' : 'Night ended early';
+    els.ovTitle.innerHTML = won ? 'The bar <span class="accent">survived.</span>' : 'The bar is <span class="accent">finished.</span>';
+    els.ovLead.textContent = (result.text ? result.text + ' ' : '') +
+      '$' + state.tips + ' in tips, ' + state.caught + ' hunter(s) removed, trust at ' + state.trust + '%.';
+    els.ovRules.innerHTML = [
+      'Mortals cannot suppress blinking, watches, or questions about closing time.',
+      'Silver, nightshade, salt and holy water are lethal to exactly one species each.',
+      'Serving a hunter a real supernatural base kills them and ends the night.',
+      'Cherry cordial plus sleep draught removes a hunter without a body.'
+    ].map((t) => '<li class="rule">' + t + '</li>').join('');
+    els.ovScore.hidden = false;
+    els.ovScoreValue.textContent = '$' + score;
+    els.ovRank.textContent = rank;
+    els.ovBest.textContent = 'Best ' + state.best;
+    els.overlay.hidden = false;
+    els.ovBtn.focus();
+  }
+
+  function start() {
+    state.visitors = buildNight();
+    state.idx = 0;
+    state.glass = [];
+    state.tips = 0;
+    state.trust = 100;
+    state.served = 0;
+    state.caught = 0;
+    state.over = false;
+    state.won = false;
+    state.resolving = false;
+    els.overlay.hidden = true;
+    els.verdict.hidden = true;
+    els.noteLine.textContent = 'Pick three ingredients, then serve';
+    renderBestiary();
+    renderPatron();
+    renderGlass();
+    renderShelf();
+  }
+
+  els.serve.addEventListener('click', serve);
+  els.ovBtn.addEventListener('click', start);
+
+  try { state.best = parseInt(localStorage.getItem(BEST_KEY) || '0', 10) || 0; } catch (e) { state.best = 0; }
+
+  renderBestiary();
+  state.visitors = buildNight();
+  renderPatron();
+  renderGlass();
+  renderShelf();
+
+  els.ovTitle.innerHTML = 'Midnight <span class="accent">Brew</span>';
+  els.ovLead.textContent = 'Six patrons, one night, and two of them are not what they claim. Mix three ingredients per order, and watch for the tells a glamour cannot hide.';
+  els.ovRules.innerHTML = [
+    'Click ingredients to fill the glass, click a slot to take one back.',
+    'Each species needs its own base \u2014 the bestiary lists which.',
+    'Serving a human a supernatural base kills them and ends the night.',
+    'Two in six are hunters. Blinking, watches and closing time give them away.'
+  ].map((t) => '<li class="rule">' + t + '</li>').join('');
+  els.ovScore.hidden = true;
+  els.ovBtn.textContent = 'Open the bar';
+  els.overlay.hidden = false;
+})();
+</script>
+</body>
+</html>

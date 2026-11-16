@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b1318">
+<title>Responsive Rescue</title>
+<link rel="stylesheet" href="../common.css">
+<style>
+  :root {
+    --bg-top: #1d3340;
+    --bg-mid: #0a1218;
+    --bg-bottom: #05090c;
+    --stage-bg: #081116;
+    --ink: #edf6fa;
+    --line: rgba(136, 202, 255, 0.18);
+    --teal: #70e7c8;
+    --amber: #ffc86b;
+    --blue: #88caff;
+  }
+  body { overflow-y: auto; }
+
+  #app {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: 8px;
+    padding: 8px;
+    height: 100%;
+    min-height: 0;
+  }
+
+  .topbar { margin: 0; }
+
+  .workspace {
+    display: grid;
+    grid-template-columns: 244px minmax(0, 1fr);
+    gap: 9px;
+    min-height: 0;
+  }
+
+  .controls {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    min-height: 0;
+    overflow-y: auto;
+    padding-right: 2px;
+    scrollbar-width: thin;
+  }
+
+  .brief {
+    padding: 10px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: rgba(136, 202, 255, 0.045);
+  }
+  .brief h2 {
+    margin: 0 0 4px;
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--blue);
+  }
+  .brief p {
+    margin: 0;
+    font-size: 11.5px;
+    line-height: 1.5;
+    color: rgba(237, 246, 250, 0.72);
+  }
+
+  .group { display: grid; gap: 5px; }
+  .group > span {
+    font-size: 9.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px; }
+  .chip {
+    min-height: 27px;
+    padding: 5px 9px;
+    border: 1px solid rgba(255, 255, 255, 0.11);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.03);
+    color: rgba(237, 246, 250, 0.72);
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.02em;
+    cursor: pointer;
+  }
+  .chip:hover { border-color: rgba(136, 202, 255, 0.4); color: #fff; }
+  .chip[aria-checked="true"] {
+    border-color: rgba(112, 231, 200, 0.65);
+    background: rgba(112, 231, 200, 0.14);
+    color: #d6fff4;
+  }
+
+  /* ---------- viewport ---------- */
+  .viewport-pane {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    overflow: hidden;
+    background: rgba(5, 12, 16, 0.6);
+  }
+
+  .viewport-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--line);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .viewport-head b { color: var(--blue); font-weight: 700; }
+
+  .viewport-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    padding: 14px 18px 16px;
+    scrollbar-width: thin;
+  }
+
+  .device-wrap { position: relative; width: fit-content; }
+
+  .device {
+    width: 720px;
+    max-width: none;
+    container-type: inline-size;
+    padding: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 13px;
+    background: #0c1419;
+    overflow: auto;
+    box-shadow: 0 20px 60px -30px rgba(0, 0, 0, 0.95);
+  }
+
+  .grab {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: -8px;
+    width: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: ew-resize;
+    border-radius: 8px;
+    touch-action: none;
+  }
+  .grab::before {
+    content: "";
+    width: 3px;
+    height: 46px;
+    border-radius: 2px;
+    background: rgba(136, 202, 255, 0.55);
+    box-shadow: 0 0 0 3px rgba(136, 202, 255, 0.1);
+  }
+  .grab:hover::before, .grab:focus-visible::before { background: var(--teal); }
+
+  /* ---------- simulated school site ---------- */
+  .site {
+    display: grid;
+    gap: 12px;
+    font-family: var(--font-sans);
+    color: #d8e4ea;
+  }
+  .site h2 {
+    margin: 0;
+    font-size: 15px;
+    letter-spacing: 0.01em;
+    color: #f1f8fb;
+  }
+  .site a { color: #9ad4f5; }
+  .site p, .site li { margin: 0; font-size: 14px; line-height: 1.55; }
+
+  .site-nav { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+  .site-nav a {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 1px;
+    font-size: 13px;
+    text-decoration: none;
+    border-bottom: 1px solid rgba(154, 212, 245, 0.24);
+  }
+
+  .site-title {
+    margin: 0;
+    line-height: 1.12;
+    font-size: 30px;
+    color: #f4fafd;
+  }
+
+  .site-hero {
+    height: 132px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    background:
+      radial-gradient(120% 140% at 12% 0%, rgba(136, 202, 255, 0.32), transparent 60%),
+      linear-gradient(135deg, #17323f, #2b7a86 58%, #77d3bd);
+  }
+
+  .site-cols { display: grid; grid-template-columns: 1.45fr 0.9fr; gap: 12px; }
+  .site-article { display: grid; gap: 8px; min-width: 0; }
+  .site-card {
+    display: grid;
+    gap: 7px;
+    align-content: start;
+    padding: 11px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.035);
+    min-width: 0;
+  }
+  .site-card ul { display: grid; gap: 4px; margin: 0; padding-left: 16px; }
+  .site-body { }
+
+  /* layout settings */
+  .device[data-nav="inline"] .site-nav { display: flex; flex-wrap: wrap; }
+  .device[data-nav="stacked"] .site-nav { display: grid; gap: 6px; }
+  .device[data-nav="stacked"] .site-nav a { padding: 9px 11px; border-radius: 6px; background: rgba(255, 255, 255, 0.04); }
+  .device[data-nav="hidden"] .site-nav { display: none; }
+  .device[data-nav="auto"] .site-nav { display: flex; flex-wrap: wrap; }
+
+  @container (max-width: 699px) {
+    .device[data-nav="auto"] .site-nav { display: grid; gap: 6px; }
+    .device[data-nav="auto"] .site-nav a { padding: 9px 11px; border-radius: 6px; background: rgba(255, 255, 255, 0.04); }
+  }
+
+  .device[data-cols="2"] .site-cols { grid-template-columns: 1.45fr 0.9fr; }
+  .device[data-cols="1"] .site-cols { grid-template-columns: 1fr; }
+  .device[data-cols="auto"] .site-cols { grid-template-columns: 1fr; }
+  @container (min-width: 700px) {
+    .device[data-cols="auto"] .site-cols { grid-template-columns: 1.45fr 0.9fr; }
+  }
+
+  .device[data-heading="fixed"] .site-title { font-size: 42px; white-space: nowrap; }
+  .device[data-heading="clamp"] .site-title {
+    font-size: clamp(21px, 7cqi, 44px);
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+
+  .device[data-images="fixed"] .site-hero { width: 880px; }
+  .device[data-images="fluid"] .site-hero { width: 100%; }
+
+  .device[data-text="fixed"] .site-body { font-size: 12px; }
+  .device[data-text="fluid"] .site-body { font-size: clamp(15px, 3.6cqi, 18px); }
+  .device.large-text[data-text="fluid"] .site-body { font-size: clamp(18px, 4.7cqi, 24px); }
+
+  /* ---------- live metrics ---------- */
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+    padding: 8px 10px;
+    border-top: 1px solid var(--line);
+    background: rgba(255, 255, 255, 0.015);
+  }
+  .metric {
+    padding: 6px 8px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+  }
+  .metric span {
+    display: block;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .metric strong {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: 2px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+  .metric strong::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--faint);
+  }
+  .metric.pass strong::before { background: var(--teal); box-shadow: 0 0 7px rgba(112, 231, 200, 0.8); }
+  .metric.fail strong::before { background: var(--red); box-shadow: 0 0 7px rgba(255, 132, 116, 0.7); }
+
+  .actionbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 0 2px;
+  }
+  .actionbar .hintline {
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+  .actionbar .btn { margin: 0; }
+
+  /* report inside overlay */
+  .report { display: grid; gap: 5px; margin-top: 10px; text-align: left; }
+  .report-row {
+    display: grid;
+    grid-template-columns: 58px repeat(3, 1fr);
+    gap: 4px;
+    align-items: center;
+    font-family: var(--font-mono);
+    font-size: 10px;
+  }
+  .report-row > span:first-child { color: var(--muted); letter-spacing: 0.08em; }
+  .flag {
+    padding: 3px 5px;
+    border-radius: 4px;
+    text-align: center;
+    letter-spacing: 0.04em;
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--muted);
+  }
+  .flag.ok { background: rgba(112, 231, 200, 0.14); color: #b6fdec; }
+  .flag.no { background: rgba(255, 132, 116, 0.16); color: #ffc9c2; }
+
+  .legend {
+    display: grid;
+    grid-template-columns: 58px repeat(3, 1fr);
+    gap: 4px;
+    margin-top: 8px;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+
+  @media (max-width: 880px) {
+    .workspace { grid-template-columns: minmax(0, 1fr); }
+    .controls { flex-direction: row; flex-wrap: wrap; overflow: visible; }
+    .brief { flex: 1 1 100%; }
+    .group { flex: 1 1 140px; }
+    #app { height: auto; }
+    #stage.stage-fluid { height: auto; }
+  }
+</style>
+</head>
+<body>
+<h1 class="sr-only">Responsive Rescue: a layout repair simulation</h1>
+<div id="stage" class="stage-fluid">
+  <div id="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">RV</span>
+        <span>
+          <b>Responsive Rescue</b>
+          <small>School site repair team</small>
+        </span>
+      </div>
+      <div class="hud">
+        <div class="stat"><span>Job</span><strong id="hudLevel">1/3</strong></div>
+        <div class="stat"><span>Score</span><strong id="hudScore">0000</strong></div>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <section class="controls" aria-label="Layout settings">
+        <div class="brief">
+          <h2 id="briefName">Homepage</h2>
+          <p id="briefText">A phone visitor and a laptop visitor, same page.</p>
+        </div>
+        <div id="groups"></div>
+      </section>
+
+      <section class="viewport-pane" aria-label="Site preview">
+        <div class="viewport-head">
+          <span>Northside School</span>
+          <span><b id="widthLabel">720</b> px wide</span>
+        </div>
+        <div class="viewport-scroll">
+          <div class="device-wrap">
+            <div id="device" class="device" data-nav="inline" data-cols="2" data-heading="fixed" data-images="fixed" data-text="fixed">
+              <div class="site">
+                <nav class="site-nav" id="siteNav" aria-label="Site preview navigation"></nav>
+                <h1 class="site-title" id="siteTitle">Northside School</h1>
+                <div class="site-hero" role="img" aria-label="The school assembly hall"></div>
+                <div class="site-cols">
+                  <article class="site-article">
+                    <h2>Autumn term update</h2>
+                    <p class="site-body">Term starts on the fifth with a shortened timetable. Families can collect printed schedules from the front office, and the bus routes stay the same through October.</p>
+                    <p class="site-body">Our library is open late on Wednesdays, the kitchen has a new allergy-aware menu, and the enrollment desk answers questions at the main entrance every morning.</p>
+                  </article>
+                  <aside class="site-card">
+                    <h2>Coming up</h2>
+                    <ul>
+                      <li>Photo day &middot; Tuesday</li>
+                      <li>Science fair &middot; Friday</li>
+                      <li>Parent evening &middot; next week</li>
+                      <li>Half term &middot; end of month</li>
+                    </ul>
+                  </aside>
+                </div>
+              </div>
+            </div>
+            <div id="grab" class="grab" role="slider" tabindex="0" aria-label="Viewport width"
+                 aria-valuemin="320" aria-valuemax="1200" aria-valuenow="720"></div>
+          </div>
+        </div>
+        <div class="metrics" aria-live="polite">
+          <div class="metric" id="mOverflow"><span>No overflow</span><strong id="mOverflowText">–</strong></div>
+          <div class="metric" id="mRead"><span>Readable</span><strong id="mReadText">–</strong></div>
+          <div class="metric" id="mNav"><span>Navigation</span><strong id="mNavText">–</strong></div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="actionbar">
+      <span class="hintline">Drag the right handle or use arrow keys</span>
+      <button id="ship" class="btn" type="button">Run audit</button>
+    </footer>
+  </div>
+
+  <div id="overlay" class="overlay" role="dialog" aria-modal="true" aria-labelledby="ovTitle" hidden>
+    <div class="panel panel-card">
+      <p id="ovKicker" class="eyebrow"></p>
+      <h2 id="ovTitle" class="title"></h2>
+      <p id="ovLead" class="lead"></p>
+      <ul id="ovRules" class="rules"></ul>
+      <div id="ovBody" hidden></div>
+      <div id="ovScore" class="final-score" hidden>
+        <span>Responsive score</span>
+        <strong id="ovScoreValue">0</strong>
+        <p id="ovRank" class="rank"></p>
+        <p id="ovBest" class="best"></p>
+      </div>
+      <button id="ovBtn" class="btn" type="button">Start the shift</button>
+    </div>
+  </div>
+</div>
+<p class="hint">drag viewport &middot; choose layout settings &middot; audit at every width</p>
+
+<script>
+(() => {
+  'use strict';
+
+  const $ = (s) => document.querySelector(s);
+  const BEST_KEY = 'responsiverescue.best.v1';
+
+  const NAV_POOL = ['About', 'Classes', 'Calendar', 'Contact', 'Enroll', 'Lunch menu'];
+  const LONG_TITLE = 'Welcome back to Northside: everything families need for the autumn term';
+
+  const GROUPS = [
+    {
+      key: 'nav', label: 'Navigation',
+      opts: [
+        { v: 'inline', t: 'Inline row' },
+        { v: 'auto', t: 'Auto-wrapping' },
+        { v: 'stacked', t: 'Stacked' },
+        { v: 'hidden', t: 'Hidden' }
+      ]
+    },
+    {
+      key: 'cols', label: 'Content columns',
+      opts: [
+        { v: '2', t: 'Two columns' },
+        { v: '1', t: 'One column' },
+        { v: 'auto', t: 'Auto-stacking' }
+      ]
+    },
+    {
+      key: 'heading', label: 'Heading size',
+      opts: [
+        { v: 'fixed', t: 'Fixed 42px' },
+        { v: 'clamp', t: 'Fluid clamp()' }
+      ]
+    },
+    {
+      key: 'images', label: 'Hero width',
+      opts: [
+        { v: 'fixed', t: 'Fixed 880px' },
+        { v: 'fluid', t: 'Fluid 100%' }
+      ]
+    },
+    {
+      key: 'text', label: 'Body text',
+      opts: [
+        { v: 'fixed', t: 'Fixed 12px' },
+        { v: 'fluid', t: 'Fluid clamp()' }
+      ]
+    }
+  ];
+
+  const LEVELS = [
+    {
+      name: 'Homepage',
+      brief: 'One page, two visitors: someone on a 360px phone and someone on a 1100px laptop. Every setting has to survive both.',
+      widths: [360, 1100],
+      longHeading: false,
+      largeText: false,
+      links: 4,
+      start: 720
+    },
+    {
+      name: 'Newsletter',
+      brief: 'The term newsletter lands on a phone, a tablet and a desktop. Halfway through the term, long headlines arrive and readers turn on large text.',
+      widths: [360, 768, 1200],
+      hardened: true,
+      links: 5,
+      start: 680
+    },
+    {
+      name: 'Enrollment page',
+      brief: 'The busiest page on the site, with six nav links. It has to hold up from a 320px phone to a 1200px desktop while large text is on.',
+      widths: [320, 640, 1200],
+      hardened: true,
+      links: 6,
+      start: 600
+    }
+  ];
+
+  const state = {
+    level: 0,
+    score: 0,
+    best: 0,
+    width: 720,
+    settings: { nav: 'inline', cols: '2', heading: 'fixed', images: 'fixed', text: 'fixed' },
+    attempts: 0,
+    done: false,
+    hardened: false
+  };
+
+  const els = {
+    device: $('#device'),
+    nav: $('#siteNav'),
+    title: $('#siteTitle'),
+    grab: $('#grab'),
+    widthLabel: $('#widthLabel'),
+    groups: $('#groups'),
+    briefName: $('#briefName'),
+    briefText: $('#briefText'),
+    hudLevel: $('#hudLevel'),
+    hudScore: $('#hudScore'),
+    ship: $('#ship'),
+    overlay: $('#overlay'),
+    ovKicker: $('#ovKicker'),
+    ovTitle: $('#ovTitle'),
+    ovLead: $('#ovLead'),
+    ovRules: $('#ovRules'),
+    ovBody: $('#ovBody'),
+    ovScore: $('#ovScore'),
+    ovScoreValue: $('#ovScoreValue'),
+    ovRank: $('#ovRank'),
+    ovBest: $('#ovBest'),
+    ovBtn: $('#ovBtn'),
+    mOverflow: $('#mOverflow'), mOverflowText: $('#mOverflowText'),
+    mRead: $('#mRead'), mReadText: $('#mReadText'),
+    mNav: $('#mNav'), mNavText: $('#mNavText')
+  };
+
+  const level = () => LEVELS[state.level];
+  const pad = (n) => String(n).padStart(4, '0');
+
+  function buildGroups() {
+    els.groups.innerHTML = '';
+    GROUPS.forEach((g) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'group';
+      const label = document.createElement('span');
+      label.textContent = g.label;
+      const chips = document.createElement('div');
+      chips.className = 'chips';
+      g.opts.forEach((o) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'chip';
+        b.textContent = o.t;
+        b.setAttribute('role', 'radio');
+        b.dataset.key = g.key;
+        b.dataset.value = o.v;
+        b.addEventListener('click', () => {
+          state.settings[g.key] = o.v;
+          applySettings();
+          liveMetrics();
+          syncChips();
+        });
+        chips.appendChild(b);
+      });
+      wrap.appendChild(label);
+      wrap.appendChild(chips);
+      els.groups.appendChild(wrap);
+    });
+  }
+
+  function syncChips() {
+    els.groups.querySelectorAll('.chip').forEach((b) => {
+      b.setAttribute('aria-checked', String(state.settings[b.dataset.key] === b.dataset.value));
+    });
+  }
+
+  function applySettings() {
+    const s = state.settings;
+    els.device.dataset.nav = s.nav;
+    els.device.dataset.cols = s.cols;
+    els.device.dataset.heading = s.heading;
+    els.device.dataset.images = s.images;
+    els.device.dataset.text = s.text;
+  }
+
+  function renderSite() {
+    const lv = level();
+    els.title.textContent = state.hardened ? LONG_TITLE : 'Northside School';
+    els.device.classList.toggle('large-text', state.hardened);
+    els.nav.innerHTML = '';
+    NAV_POOL.slice(0, lv.links).forEach((name) => {
+      const a = document.createElement('a');
+      a.href = '#';
+      a.textContent = name;
+      a.tabIndex = -1;
+      a.addEventListener('click', (e) => e.preventDefault());
+      els.nav.appendChild(a);
+    });
+  }
+
+  function setWidth(px) {
+    state.width = Math.max(320, Math.min(1200, Math.round(px)));
+    els.device.style.width = state.width + 'px';
+    els.widthLabel.textContent = String(state.width);
+    els.grab.setAttribute('aria-valuenow', String(state.width));
+  }
+
+  function measure() {
+    const wide = els.device.clientWidth;
+    const overflow = els.device.scrollWidth > wide + 1;
+    const titleOver = els.title.scrollWidth > els.title.clientWidth + 1;
+    const body = els.device.querySelector('.site-body');
+    const bodyFont = parseFloat(getComputedStyle(body).fontSize);
+    const readable = bodyFont >= 15 && !titleOver;
+    const navStyle = getComputedStyle(els.nav);
+    const navVisible = navStyle.display !== 'none' && els.nav.getBoundingClientRect().height > 4;
+    const touch = wide < 720;
+    const taps = [...els.nav.querySelectorAll('a')].map((a) => a.getBoundingClientRect().height);
+    const tapOK = !touch || (taps.length > 0 && taps.every((h) => h >= 34));
+    return {
+      width: wide,
+      overflow,
+      readable,
+      navOK: navVisible && tapOK,
+      bodyFont,
+      navVisible,
+      tapOK,
+      titleOver
+    };
+  }
+
+  function paintMetrics(m) {
+    els.mOverflow.className = 'metric ' + (m.overflow ? 'fail' : 'pass');
+    els.mOverflowText.textContent = m.overflow ? 'Yes' : 'None';
+    els.mOverflow.parentElement.querySelector('span').textContent = 'Overflow';
+    els.mRead.className = 'metric ' + (m.readable ? 'pass' : 'fail');
+    els.mReadText.textContent = Math.round(m.bodyFont) + 'px';
+    els.mNav.className = 'metric ' + (m.navOK ? 'pass' : 'fail');
+    els.mNavText.textContent = !m.navVisible ? 'Gone' : (m.tapOK ? 'Usable' : 'Tiny');
+  }
+
+  function liveMetrics() {
+    paintMetrics(measure());
+  }
+
+  function audit() {
+    const previous = els.device.style.width;
+    const rows = [];
+    level().widths.forEach((w) => {
+      els.device.style.width = w + 'px';
+      void els.device.offsetWidth;
+      rows.push(measure());
+    });
+    els.device.style.width = previous;
+    void els.device.offsetWidth;
+    return rows;
+  }
+
+  function runAudit() {
+    const rows = audit();
+    const checks = {
+      overflow: rows.every((r) => !r.overflow),
+      readable: rows.every((r) => r.readable),
+      navOK: rows.every((r) => r.navOK)
+    };
+    const wins = Object.values(checks).filter(Boolean).length;
+
+    if (wins === 3 && level().hardened && !state.hardened) {
+      state.hardened = true;
+      renderSite();
+      liveMetrics();
+      showHardening();
+      return;
+    }
+
+    if (wins === 3) {
+      const gained = 300;
+      state.score += gained;
+      els.hudScore.textContent = pad(state.score);
+      state.level += 1;
+      state.attempts = 0;
+      if (state.level >= LEVELS.length) {
+        finish();
+      } else {
+        showReport(true, rows, gained);
+      }
+    } else {
+      state.attempts += 1;
+      const penalty = Math.min(state.score, 15);
+      state.score -= penalty;
+      els.hudScore.textContent = pad(state.score);
+      showReport(false, rows, 0, checks);
+    }
+  }
+
+  function reportMarkup(rows) {
+    const head = '<div class="legend"><span>Width</span><span>Overflow</span><span>Readable</span><span>Nav</span></div>';
+    const body = rows.map((r) => (
+      '<div class="report-row"><span>' + r.width + 'px</span>' +
+      '<span class="flag ' + (r.overflow ? 'no' : 'ok') + '">' + (r.overflow ? 'scrolls' : 'fits') + '</span>' +
+      '<span class="flag ' + (r.readable ? 'ok' : 'no') + '">' + Math.round(r.bodyFont) + 'px</span>' +
+      '<span class="flag ' + (r.navOK ? 'ok' : 'no') + '">' + (r.navOK ? 'usable' : 'broken') + '</span></div>'
+    )).join('');
+    return head + '<div class="report">' + body + '</div>';
+  }
+
+  function showReport(cleared, rows, gained, checks) {
+    els.ovKicker.textContent = cleared ? 'Job signed off' : 'Audit found problems';
+    els.ovTitle.innerHTML = cleared
+      ? 'Shipped <span class="accent">clean.</span>'
+      : 'Not yet <span class="accent">responsive.</span>';
+    els.ovLead.textContent = cleared
+      ? 'Every audited width passes. +' + gained + ' points.'
+      : 'One or more widths still fail. Fix the settings and audit again — a failed audit costs 15 points.';
+    els.ovRules.innerHTML = '';
+    els.ovBody.hidden = false;
+    els.ovBody.innerHTML = reportMarkup(rows);
+    els.ovScore.hidden = true;
+    els.ovBtn.textContent = cleared ? 'Next job' : 'Back to the build';
+    els.ovBtn.dataset.action = cleared ? 'next' : 'retry';
+    els.overlay.hidden = false;
+    els.ovBtn.focus();
+  }
+
+  function showHardening() {
+    els.ovKicker.textContent = 'Content update';
+    els.ovTitle.innerHTML = 'The page <span class="accent">grew.</span>';
+    els.ovLead.textContent = 'A long headline just landed, and a reader switched on large text. The build that passed a minute ago may not survive it — audit again.';
+    els.ovRules.innerHTML = '';
+    els.ovBody.hidden = true;
+    els.ovScore.hidden = true;
+    els.ovBtn.textContent = 'Back to the build';
+    els.ovBtn.dataset.action = 'retry';
+    els.overlay.hidden = false;
+    els.ovBtn.focus();
+  }
+
+  function finish() {
+    if (state.score > state.best) {
+      state.best = state.score;
+      try { localStorage.setItem(BEST_KEY, String(state.score)); } catch (e) { /* ignore */ }
+    }
+    const rank = state.score >= 850 ? 'Rescue lead'
+      : state.score >= 650 ? 'Layout engineer'
+      : state.score >= 450 ? 'Junior repairer'
+      : 'Trainee';
+    els.ovKicker.textContent = 'Shift complete';
+    els.ovTitle.innerHTML = 'Every screen <span class="accent">holds up.</span>';
+    els.ovLead.textContent = 'Three jobs shipped across every width. Fluid type, wrapping navigation and fluid media are what keep the layout alive.';
+    els.ovRules.innerHTML = '';
+    els.ovBody.hidden = false;
+    els.ovBody.innerHTML = '';
+    els.ovScore.hidden = false;
+    els.ovScoreValue.textContent = String(state.score);
+    els.ovRank.textContent = rank;
+    els.ovBest.textContent = 'Best ' + pad(state.best);
+    els.ovBtn.textContent = 'Start a new shift';
+    els.ovBtn.dataset.action = 'restart';
+    els.overlay.hidden = false;
+    els.ovBtn.focus();
+  }
+
+  function loadLevel() {
+    const lv = level();
+    state.settings = { nav: 'inline', cols: '2', heading: 'fixed', images: 'fixed', text: 'fixed' };
+    state.attempts = 0;
+    state.done = false;
+    state.hardened = false;
+    els.briefName.textContent = lv.name;
+    els.briefText.textContent = lv.brief;
+    els.hudLevel.textContent = (state.level + 1) + '/' + LEVELS.length;
+    els.hudScore.textContent = pad(state.score);
+    syncChips();
+    applySettings();
+    renderSite();
+    setWidth(lv.start);
+    liveMetrics();
+  }
+
+  function restart() {
+    state.score = 0;
+    state.level = 0;
+    els.overlay.hidden = true;
+    buildGroups();
+    loadLevel();
+  }
+
+  els.ovBtn.addEventListener('click', () => {
+    const action = els.ovBtn.dataset.action;
+    if (action === 'retry') {
+      els.overlay.hidden = true;
+      liveMetrics();
+      els.ship.focus();
+    } else if (action === 'next') {
+      els.overlay.hidden = true;
+      loadLevel();
+    } else {
+      restart();
+    }
+  });
+
+  els.ship.addEventListener('click', runAudit);
+
+  /* drag handle */
+  let dragging = false;
+  let startX = 0;
+  let startWidth = 0;
+
+  els.grab.addEventListener('pointerdown', (e) => {
+    dragging = true;
+    startX = e.clientX;
+    startWidth = state.width;
+    els.grab.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+  els.grab.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    setWidth(startWidth + (e.clientX - startX));
+    liveMetrics();
+  });
+  const endDrag = (e) => {
+    if (!dragging) return;
+    dragging = false;
+    try { els.grab.releasePointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+    liveMetrics();
+  };
+  els.grab.addEventListener('pointerup', endDrag);
+  els.grab.addEventListener('pointercancel', endDrag);
+
+  els.grab.addEventListener('keydown', (e) => {
+    const step = e.shiftKey ? 100 : 20;
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      setWidth(state.width - step);
+      liveMetrics();
+    } else if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      setWidth(state.width + step);
+      liveMetrics();
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      setWidth(320);
+      liveMetrics();
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      setWidth(1200);
+      liveMetrics();
+    }
+  });
+
+  try { state.best = parseInt(localStorage.getItem(BEST_KEY) || '0', 10) || 0; } catch (e) { state.best = 0; }
+
+  buildGroups();
+  loadLevel();
+
+  els.ovKicker.textContent = 'Repair team';
+  els.ovTitle.innerHTML = 'Responsive <span class="accent">Rescue</span>';
+  els.ovLead.textContent = 'Northside School\'s site breaks on half the devices in the building. Drag the viewport, choose layout settings, and audit until one build survives every width.';
+  els.ovRules.innerHTML = [
+    'Drag the right handle (or use arrow keys) to resize the viewport.',
+    'Pick navigation, column, heading, image and text settings.',
+    'Run the audit: it tests every width in the job brief.',
+    'Overflow, unreadable text and unusable navigation each cost the job.'
+  ].map((t) => '<li class="rule">' + t + '</li>').join('');
+  els.ovBtn.textContent = 'Start the shift';
+  els.ovBtn.dataset.action = 'restart';
+  els.overlay.hidden = false;
+})();
+</script>
+</body>
+</html>
