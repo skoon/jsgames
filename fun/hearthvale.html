@@ -1,0 +1,2280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#101c14">
+<title>Hearthvale</title>
+<link rel="stylesheet" href="../common.css">
+<style>
+  :root {
+    --bg-top: #33452c;
+    --bg-mid: #142016;
+    --bg-bottom: #080d09;
+    --stage-bg: #0d1710;
+    --ink: #f3ecd8;
+    --stage-offset: 150px;
+  }
+  .controls {
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+    width: min(100%, 480px);
+  }
+  .pad {
+    flex: 1 1 0;
+    height: 50px;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(210, 230, 180, 0.18);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.04);
+    color: #eef4dd;
+    cursor: pointer;
+    font: inherit;
+    font-size: 16px;
+    line-height: 1;
+    touch-action: none;
+    transition: background 120ms ease, border-color 120ms ease, transform 100ms ease;
+  }
+  .pad:hover { background: rgba(255, 255, 255, 0.09); border-color: rgba(210, 230, 180, 0.38); }
+  .pad.is-down,
+  .pad:active {
+    transform: translateY(1px);
+    background: rgba(214, 178, 96, 0.18);
+    border-color: rgba(214, 178, 96, 0.55);
+  }
+  .pad-col {
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .pad-col .pad {
+    flex: 1 1 0;
+    height: auto;
+    min-height: 22px;
+    font-size: 11px;
+  }
+  .pad-act {
+    flex: 1.6 1 0;
+    border: 0;
+    color: #25190a;
+    background: linear-gradient(180deg, #f2d79a, #d3a75a);
+    box-shadow: 0 10px 22px -12px rgba(214, 178, 96, 0.8), inset 0 -2px 0 rgba(0, 0, 0, 0.16);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+  .pad-act:hover { filter: brightness(1.05); }
+  .pad-act.is-down,
+  .pad-act:active { background: linear-gradient(180deg, #ffe6b0, #e0b568); }
+  .panel { max-width: 400px; }
+  .title {
+    margin-bottom: 13px;
+    color: #f7f0da;
+    font-family: Georgia, "Iowan Old Style", serif;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    text-shadow: 0 0 34px rgba(214, 178, 96, 0.22);
+  }
+  .title .accent { color: #e0b568; }
+  .score {
+    font-size: 52px;
+    line-height: 1;
+    font-weight: 700;
+    color: #e8cd8a;
+    text-shadow: 0 0 30px rgba(214, 178, 96, 0.28);
+  }
+  .best { margin-top: 9px; font-size: 12.5px; letter-spacing: 0.16em; }
+  .run-line {
+    margin: 6px 0 0;
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    text-transform: none;
+    color: rgba(243, 236, 216, 0.66);
+  }
+  .breakdown .row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 12.5px;
+  }
+  .breakdown .row span { color: rgba(243, 236, 216, 0.62); }
+  .breakdown .row strong { color: #f3ecd8; font-variant-numeric: tabular-nums; }
+  .rules { margin-top: 13px; }
+  .rule { font-size: 12.5px; }
+  .rule::before { background: #d3a75a; }
+  .btn { margin-top: 19px; padding: 13px 28px; font-size: 12.5px; font-weight: 700; letter-spacing: 0.16em; }
+  .lead { color: rgba(243, 236, 216, 0.82); }
+</style>
+</head>
+<body>
+  <div id="stage">
+    <canvas id="game" width="480" height="640" aria-label="Hearthvale. A village and forest role-playing game: take quests from villagers, open treasure chests, fight monsters in the Bramblewood, and defeat the Rotwarden in the Hollow Grove."></canvas>
+    <div id="overlay" class="overlay">
+      <div id="introPanel" class="panel panel-card">
+        <p class="eyebrow">Village RPG &middot; Adventure</p>
+        <h1 class="title">Hearth<span class="accent">vale</span></h1>
+        <p class="lead">The lantern over the square has gone grey. Elder Maren says the Emberheart was carried into the Bramblewood, and that the thing which took it is starting to wake.</p>
+        <div class="rules">
+          <p class="rule">WASD or arrows walk. E, space, or the ACT pad talks, opens chests and picks things up. Touch pads sit below the screen.</p>
+          <p class="rule">Take Maren's quest and Pip's errand, then head north through the village gate into the forest.</p>
+          <p class="rule">Walk into a monster to fight it. In battle, choose Attack, Guard, Potion or Flee with the arrows and ACT, or keys 1 to 4.</p>
+          <p class="rule">Chests hold coin and potions. Torval sharpens your blade, Isolde mends wounds. Defeat the Rotwarden to save the vale.</p>
+        </div>
+        <button type="button" id="startBtn" class="btn">Leave the inn</button>
+      </div>
+      <div id="resultPanel" class="panel panel-card" hidden>
+        <p class="eyebrow" id="finalKicker">The grove falls quiet</p>
+        <h1 class="title" id="finalTitle">Hearthvale <span class="accent">saved</span></h1>
+        <p class="label">Score</p>
+        <p class="score" id="finalScore">0</p>
+        <p class="best" id="bestLine">Best 00000</p>
+        <div class="breakdown" id="finalBreakdown"></div>
+        <p class="rank" id="finalRank">Rank B</p>
+        <p class="run-line" id="runLine">0 monsters &middot; 0 chests</p>
+        <button type="button" id="againBtn" class="btn">Walk it again</button>
+      </div>
+    </div>
+  </div>
+  <div class="controls">
+    <button type="button" class="pad" id="btnLeft" aria-label="Walk left">&#9664;</button>
+    <div class="pad-col">
+      <button type="button" class="pad" id="btnUp" aria-label="Walk up">&#9650;</button>
+      <button type="button" class="pad" id="btnDown" aria-label="Walk down">&#9660;</button>
+    </div>
+    <button type="button" class="pad" id="btnRight" aria-label="Walk right">&#9654;</button>
+    <button type="button" class="pad pad-act" id="btnAct" aria-label="Interact">Act</button>
+  </div>
+  <p class="hint">WASD / arrows walk &middot; E or space acts &middot; 1-4 in battle &middot; chests and monsters wait in the wood</p>
+  <div id="srStatus" class="sr-only" aria-live="polite"></div>
+
+<script>
+(() => {
+  'use strict';
+
+  const W = 480;
+  const H = 640;
+  const TOP = 88;
+  const TAU = Math.PI * 2;
+  const FONT = 'ui-monospace, "SF Mono", Menlo, Consolas, monospace';
+  const SERIF = 'Georgia, "Iowan Old Style", serif';
+  const STORAGE_KEY = 'hearthvale.best.v1';
+
+  const SPEED = 132;
+  const PLAYER_R = 10;
+  const BRAMBLE = { x: 148, y: 96, w: 184, h: 28, kind: 'bramble' };
+
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d', { alpha: false });
+  const overlay = document.getElementById('overlay');
+  const introPanel = document.getElementById('introPanel');
+  const resultPanel = document.getElementById('resultPanel');
+  const startBtn = document.getElementById('startBtn');
+  const againBtn = document.getElementById('againBtn');
+  const leftBtn = document.getElementById('btnLeft');
+  const rightBtn = document.getElementById('btnRight');
+  const upBtn = document.getElementById('btnUp');
+  const downBtn = document.getElementById('btnDown');
+  const actBtn = document.getElementById('btnAct');
+  const finalKicker = document.getElementById('finalKicker');
+  const finalTitle = document.getElementById('finalTitle');
+  const finalScoreEl = document.getElementById('finalScore');
+  const bestLineEl = document.getElementById('bestLine');
+  const finalBreakdown = document.getElementById('finalBreakdown');
+  const finalRank = document.getElementById('finalRank');
+  const runLineEl = document.getElementById('runLine');
+  const srStatus = document.getElementById('srStatus');
+
+  const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const randInt = (a, b) => Math.floor(rand(a, b + 1));
+  const dist = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
+  const pad5 = (n) => String(Math.max(0, Math.floor(n))).padStart(5, '0');
+  const hash = (n) => {
+    const s = Math.sin(n * 127.1) * 43758.5453;
+    return s - Math.floor(s);
+  };
+
+  const input = { left: false, right: false, up: false, down: false };
+
+  const state = {
+    mode: 'menu',
+    scene: 'village',
+    t: 0,
+    px: 240,
+    py: 480,
+    face: 1,
+    walk: 0,
+    moving: false,
+    hp: 34,
+    maxHp: 34,
+    atk: 7,
+    gold: 0,
+    potions: 2,
+    upgraded: false,
+    stage: 0,
+    hasHeart: false,
+    hasCharm: false,
+    bramblesOpen: false,
+    bossDead: false,
+    kills: 0,
+    chestsOpened: 0,
+    flags: {},
+    scenes: null,
+    dlg: null,
+    battle: null,
+    battleCd: 0,
+    warpCd: 0,
+    toast: '',
+    toastT: 0,
+    flash: 0,
+    flashColor: '#e0b568',
+    shake: 0,
+    best: 0,
+    result: null
+  };
+
+  function readBest() {
+    try {
+      const n = parseInt(window.localStorage.getItem(STORAGE_KEY), 10);
+      return Number.isFinite(n) && n > 0 ? n : 0;
+    } catch (err) {
+      return 0;
+    }
+  }
+
+  function writeBest(value) {
+    try {
+      window.localStorage.setItem(STORAGE_KEY, String(value));
+    } catch (err) {
+      /* storage may be unavailable on file:// */
+    }
+  }
+
+  function announce(msg) {
+    if (srStatus) srStatus.textContent = msg;
+  }
+
+  function toast(msg) {
+    state.toast = msg;
+    state.toastT = 3.2;
+  }
+
+  function roundRect(x, y, w, h, r) {
+    const rr = Math.min(r, Math.abs(w) / 2, Math.abs(h) / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + rr, y);
+    ctx.lineTo(x + w - rr, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + rr);
+    ctx.lineTo(x + w, y + h - rr);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - rr, y + h);
+    ctx.lineTo(x + rr, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - rr);
+    ctx.lineTo(x, y + rr);
+    ctx.quadraticCurveTo(x, y, x + rr, y);
+    ctx.closePath();
+  }
+
+  function wrapText(text, maxWidth, font) {
+    ctx.font = font;
+    const words = String(text).split(' ');
+    const lines = [];
+    let line = '';
+    for (const word of words) {
+      const test = line ? line + ' ' + word : word;
+      if (ctx.measureText(test).width > maxWidth && line) {
+        lines.push(line);
+        line = word;
+      } else {
+        line = test;
+      }
+    }
+    if (line) lines.push(line);
+    return lines;
+  }
+
+  function circleHitsRect(cx, cy, r, rect) {
+    const nx = clamp(cx, rect.x, rect.x + rect.w);
+    const ny = clamp(cy, rect.y, rect.y + rect.h);
+    const dx = cx - nx;
+    const dy = cy - ny;
+    return dx * dx + dy * dy < r * r;
+  }
+
+  function objectiveText() {
+    if (state.stage >= 4) return 'The lantern burns. Hearthvale is safe.';
+    if (state.scene === 'grove') return 'The Rotwarden waits in the stone circle. End it.';
+    if (state.stage >= 3) return 'The brambles are open. North through the forest, into the grove.';
+    if (state.hasHeart) return 'Bring the Emberheart back to Elder Maren by the well.';
+    if (state.stage >= 1) return 'Hunt the Mossback in the Bramblewood and take back the Emberheart.';
+    return 'Talk to Elder Maren by the well in Hearthvale.';
+  }
+
+  const SCENE_DEFS = {
+    village: {
+      label: 'HEARTHVALE',
+      spawn: { x: 240, y: 480 },
+      npcs: ['maren', 'torval', 'isolde', 'pip'],
+      exits: [{ x: 190, y: 88, w: 100, h: 24, to: 'forest', arrive: { x: 240, y: 592 } }],
+      solids: [
+        { x: 20, y: 104, w: 148, h: 104, kind: 'house', name: 'THE SLEEPING STAG', roof: '#8c4038', wall: '#e0cba1' },
+        { x: 312, y: 104, w: 148, h: 104, kind: 'house', name: 'TORVAL & SON', roof: '#6b4a35', wall: '#d4bd90' },
+        { x: 18, y: 318, w: 128, h: 96, kind: 'house', name: 'COTTAGE', roof: '#7a5340', wall: '#dcc79e' },
+        { x: 334, y: 318, w: 128, h: 96, kind: 'house', name: 'COTTAGE', roof: '#6f4a4a', wall: '#d7c197' },
+        { x: 206, y: 286, w: 68, h: 54, kind: 'well' },
+        { x: 14, y: 214, w: 44, h: 36, kind: 'tree' },
+        { x: 422, y: 212, w: 44, h: 36, kind: 'tree' },
+        { x: 16, y: 452, w: 52, h: 42, kind: 'tree' },
+        { x: 412, y: 452, w: 52, h: 42, kind: 'tree' },
+        { x: 60, y: 556, w: 48, h: 40, kind: 'tree' },
+        { x: 372, y: 556, w: 48, h: 40, kind: 'tree' }
+      ]
+    },
+    forest: {
+      label: 'THE BRAMBLEWOOD',
+      spawn: { x: 240, y: 592 },
+      npcs: [],
+      exits: [
+        { x: 190, y: 88, w: 100, h: 24, to: 'grove', arrive: { x: 240, y: 584 } },
+        { x: 186, y: 606, w: 108, h: 34, to: 'village', arrive: { x: 240, y: 140 } }
+      ],
+      solids: [
+        { x: 26, y: 118, w: 56, h: 40, kind: 'tree' },
+        { x: 118, y: 108, w: 52, h: 38, kind: 'tree' },
+        { x: 330, y: 116, w: 56, h: 40, kind: 'tree' },
+        { x: 398, y: 178, w: 52, h: 38, kind: 'tree' },
+        { x: 34, y: 236, w: 56, h: 40, kind: 'tree' },
+        { x: 396, y: 300, w: 52, h: 38, kind: 'tree' },
+        { x: 52, y: 330, w: 120, h: 72, kind: 'pond' },
+        { x: 30, y: 430, w: 60, h: 42, kind: 'tree' },
+        { x: 402, y: 430, w: 56, h: 40, kind: 'tree' },
+        { x: 104, y: 540, w: 52, h: 38, kind: 'tree' },
+        { x: 336, y: 556, w: 56, h: 40, kind: 'tree' },
+        { x: 300, y: 470, w: 44, h: 32, kind: 'rock' },
+        { x: 176, y: 300, w: 40, h: 30, kind: 'rock' },
+        { x: 368, y: 236, w: 44, h: 34, kind: 'stump' }
+      ]
+    },
+    grove: {
+      label: 'THE HOLLOW GROVE',
+      spawn: { x: 240, y: 584 },
+      npcs: [],
+      exits: [{ x: 186, y: 606, w: 108, h: 34, to: 'forest', arrive: { x: 240, y: 150 } }],
+      solids: [
+        { x: 38, y: 138, w: 58, h: 76, kind: 'root' },
+        { x: 384, y: 138, w: 58, h: 76, kind: 'root' },
+        { x: 38, y: 428, w: 58, h: 66, kind: 'root' },
+        { x: 384, y: 428, w: 58, h: 66, kind: 'root' },
+        { x: 148, y: 470, w: 48, h: 38, kind: 'stump' },
+        { x: 284, y: 470, w: 48, h: 38, kind: 'stump' }
+      ]
+    }
+  };
+
+  const NPCS = {
+    maren: { x: 240, y: 372, robe: '#7b4b3a', trim: '#d8b06a', name: 'ELDER MAREN' },
+    torval: { x: 386, y: 250, robe: '#54483a', trim: '#c08a4a', name: 'TORVAL' },
+    isolde: { x: 82, y: 456, robe: '#40665a', trim: '#a8cbb2', name: 'ISOLDE' },
+    pip: { x: 268, y: 200, robe: '#9a5f38', trim: '#e0b568', name: 'PIP' }
+  };
+
+  const ENEMY_INFO = {
+    slime: { name: 'Bramble Slime', hp: 14, atk: 3, gold: 8, intro: 'A wet green lump heaves itself off the path.' },
+    wolf: { name: 'Bramble Wolf', hp: 20, atk: 5, gold: 14, intro: 'A grey shape detaches from the bracken, growling.' },
+    mossback: { name: 'Mossback', hp: 44, atk: 6, gold: 30, intro: 'The moss heaps up into a body. Something bright is caught in it.' },
+    rotwarden: { name: 'The Rotwarden', hp: 100, atk: 8, gold: 0, boss: true, intro: 'Roots peel away from a throne of old wood. Two amber eyes open.' }
+  };
+
+  function buildScenes() {
+    return {
+      village: {
+        chests: [{ id: 'inn', x: 96, y: 248, gold: 25, potions: 1, opened: false }]
+      },
+      forest: {
+        chests: [
+          { id: 'hollow', x: 72, y: 212, gold: 30, potions: 0, opened: false },
+          { id: 'ridge', x: 404, y: 520, gold: 35, potions: 1, opened: false }
+        ],
+        charm: { x: 348, y: 296, taken: false },
+        enemies: [
+          makeEnemy('slime', 150, 500),
+          makeEnemy('slime', 330, 380),
+          makeEnemy('wolf', 250, 430),
+          makeEnemy('wolf', 352, 200),
+          makeEnemy('mossback', 292, 196)
+        ]
+      },
+      grove: {
+        enemies: [makeEnemy('rotwarden', 240, 260)]
+      }
+    };
+  }
+
+  function makeEnemy(kind, x, y) {
+    const info = ENEMY_INFO[kind];
+    return {
+      kind,
+      x,
+      y,
+      name: info.name,
+      hp: info.hp,
+      maxHp: info.hp,
+      atk: info.atk,
+      gold: info.gold,
+      boss: !!info.boss,
+      dead: false,
+      enraged: false,
+      phase: hash(x + y) * TAU
+    };
+  }
+
+  function resetWorld() {
+    state.scene = 'village';
+    state.px = SCENE_DEFS.village.spawn.x;
+    state.py = SCENE_DEFS.village.spawn.y;
+    state.face = 1;
+    state.walk = 0;
+    state.moving = false;
+    state.hp = 34;
+    state.maxHp = 34;
+    state.atk = 7;
+    state.gold = 0;
+    state.potions = 2;
+    state.upgraded = false;
+    state.stage = 0;
+    state.hasHeart = false;
+    state.hasCharm = false;
+    state.bramblesOpen = false;
+    state.bossDead = false;
+    state.kills = 0;
+    state.chestsOpened = 0;
+    state.flags = { charmQuest: false, charmDone: false };
+    state.scenes = buildScenes();
+    state.dlg = null;
+    state.battle = null;
+    state.battleCd = 0;
+    state.warpCd = 0;
+    state.toast = '';
+    state.toastT = 0;
+    state.flash = 0;
+    state.shake = 0;
+    state.result = null;
+    state.best = readBest();
+  }
+
+  function startRun() {
+    resetWorld();
+    state.mode = 'playing';
+    input.left = false;
+    input.right = false;
+    input.up = false;
+    input.down = false;
+    introPanel.hidden = true;
+    resultPanel.hidden = true;
+    overlay.hidden = true;
+    toast('HEARTHVALE \u2014 ELDER MAREN WAITS BY THE WELL');
+    announce('Hearthvale. Walk to Elder Maren by the well in the square and press E to talk.');
+  }
+
+  const EFFECTS = {
+    acceptMain() {
+      if (state.stage >= 1) return;
+      state.stage = 1;
+      toast('QUEST TAKEN \u2014 THE LANTERN\u2019S LAST LIGHT');
+      announce('Quest taken. Hunt the Mossback in the Bramblewood and bring back the Emberheart.');
+    },
+    lightLantern() {
+      if (!state.hasHeart) return;
+      state.hasHeart = false;
+      state.bramblesOpen = true;
+      state.stage = 3;
+      state.gold += 80;
+      state.hp = state.maxHp;
+      toast('THE LANTERN BURNS \u2014 +80 GOLD \u2014 THE BRAMBLES PART');
+      announce('The lantern is lit. Eighty gold earned. The brambles have parted and the grove gate is open.');
+    },
+    acceptCharm() {
+      if (state.flags.charmDone) return;
+      state.flags.charmQuest = true;
+      toast('SIDE QUEST \u2014 PIP\u2019S FOX CHARM');
+      announce('Side quest accepted. Find Pip\u2019s fox charm by the old stump in the Bramblewood.');
+    },
+    turnInCharm() {
+      if (!state.hasCharm) return;
+      state.hasCharm = false;
+      state.flags.charmDone = true;
+      state.gold += 30;
+      toast('+30 GOLD \u2014 CHARM RETURNED');
+      announce('Pip\u2019s fox charm returned. Thirty gold earned.');
+    },
+    sharpen() {
+      if (state.upgraded) return;
+      if (state.gold < 60) {
+        toast('NOT ENOUGH GOLD \u2014 TORVAL WANTS 60');
+        return;
+      }
+      state.gold -= 60;
+      state.upgraded = true;
+      state.atk += 4;
+      toast('BLADE SHARPENED \u2014 ATTACK +4');
+      announce('Blade sharpened. Attack is now ' + state.atk + '.');
+    },
+    buyPotion() {
+      if (state.gold < 15) {
+        toast('NOT ENOUGH GOLD \u2014 A POTION COSTS 15');
+        return;
+      }
+      state.gold -= 15;
+      state.potions += 1;
+      toast('POTION BOUGHT \u2014 ' + state.potions + ' IN THE PACK');
+      announce('Potion bought. ' + state.potions + ' potions in the pack.');
+    },
+    heal() {
+      if (state.hp >= state.maxHp) {
+        toast('YOU ARE ALREADY WHOLE');
+        return;
+      }
+      if (state.gold < 10) {
+        toast('NOT ENOUGH GOLD \u2014 ISOLDE ASKS 10');
+        return;
+      }
+      state.gold -= 10;
+      state.hp = state.maxHp;
+      toast('WOUNDS MENDED \u2014 +10 GOLD SPENT');
+      announce('Wounds mended. Health restored to ' + state.maxHp + '.');
+    }
+  };
+
+  const DIALOGUE = {
+    maren: {
+      start() {
+        if (state.hasHeart) return 'm_heart';
+        if (state.stage >= 3) return 'm_after';
+        if (state.stage >= 1) return 'm_wait';
+        return 'm_intro';
+      },
+      nodes: {
+        m_intro: {
+          who: 'maren',
+          text: 'The lantern over the square has gone grey. When it gutters, the wood walks in. I have kept it lit for forty years, and I am out of wicks.',
+          choices: [
+            { text: 'What do you need from me?', next: 'm_ask' },
+            { text: 'What happened to the last light?', next: 'm_lore' },
+            { text: 'Not today.', next: null }
+          ]
+        },
+        m_lore: {
+          who: 'maren',
+          text: 'The Rotwarden took the Emberheart from the shrine a season ago. Its servants carried it into the Bramblewood. The lantern has been drinking shadows ever since.',
+          choices: [
+            { text: 'What do you need from me?', next: 'm_ask' },
+            { text: 'I\u2019ll come back.', next: null }
+          ]
+        },
+        m_ask: {
+          who: 'maren',
+          text: 'The Mossback nests where the north path forks. Kill it, take back the Emberheart, and I will set the lantern burning. Eighty gold, and the road north opens.',
+          choices: [
+            { text: 'I\u2019ll bring the heart back.', next: 'm_go', effect: 'acceptMain' },
+            { text: 'Not yet.', next: null }
+          ]
+        },
+        m_go: {
+          who: 'maren',
+          text: 'Take the north gate. Torval can sharpen that blade, and Isolde patches wounds for coin. The forest does not forgive a dull edge.',
+          choices: [{ text: 'On my way.', next: null }]
+        },
+        m_wait: {
+          who: 'maren',
+          text: 'The Mossback still has the Emberheart. Follow the north path until the brambles close in. It nests just short of the grove gate.',
+          choices: [
+            { text: 'I\u2019ll keep looking.', next: null },
+            { text: 'Where exactly?', next: 'm_hint' }
+          ]
+        },
+        m_hint: {
+          who: 'maren',
+          text: 'North gate, then the fork. Keep to the path past the old stump on the east side. You will smell the moss before you see it.',
+          choices: [{ text: 'Got it.', next: null }]
+        },
+        m_heart: {
+          who: 'maren',
+          text: 'That light in your pack. I can feel it from here. Set it in the lantern and the brambles will part like a curtain.',
+          choices: [
+            { text: 'Light the lantern.', next: 'm_lit', effect: 'lightLantern' },
+            { text: 'Let me hold it a moment longer.', next: null }
+          ]
+        },
+        m_lit: {
+          who: 'maren',
+          text: 'Look at that. Forty years, and I still forget how warm it is. The grove gate is open. The Rotwarden will know it. End this.',
+          choices: [{ text: 'I\u2019m going.', next: null }]
+        },
+        m_after: {
+          who: 'maren',
+          text: 'The Rotwarden sits at the heart of the grove. It will not let the light spread. Whatever it offers you, do not listen.',
+          choices: [
+            { text: 'Any advice?', next: 'm_advice' },
+            { text: 'I\u2019m ready.', next: null }
+          ]
+        },
+        m_advice: {
+          who: 'maren',
+          text: 'Guard when it rears back. Drink a potion before you think you need one. And do not stand still in the stone circle.',
+          choices: [{ text: 'Thank you, Maren.', next: null }]
+        }
+      }
+    },
+    pip: {
+      start() {
+        if (state.flags.charmDone) return 'p_done';
+        if (state.hasCharm) return 'p_found';
+        return 'p_intro';
+      },
+      nodes: {
+        p_intro: {
+          who: 'pip',
+          text: 'Mister? Mister! I dropped my fox charm in the forest and Mum says I can\u2019t go past the gate. It\u2019s got a little red tail and it jingles.',
+          choices: [
+            { text: 'I\u2019ll find it.', next: 'p_thanks', effect: 'acceptCharm' },
+            { text: 'What does it look like?', next: 'p_look' },
+            { text: 'Maybe later.', next: null }
+          ]
+        },
+        p_look: {
+          who: 'pip',
+          text: 'Gold, with a red tail. I was by the old stump on the east side when I dropped it. Please don\u2019t let a wolf eat it.',
+          choices: [
+            { text: 'I\u2019ll look for it.', next: 'p_thanks', effect: 'acceptCharm' },
+            { text: 'Later, Pip.', next: null }
+          ]
+        },
+        p_thanks: {
+          who: 'pip',
+          text: 'Really? You\u2019re the best! I\u2019ll be by the well. Mum says I have to stay where she can see me.',
+          choices: [{ text: 'Stay out of the forest.', next: null }]
+        },
+        p_found: {
+          who: 'pip',
+          text: 'You found it! You found it! Is the tail still on? Is it?',
+          choices: [
+            { text: 'Here you go.', next: 'p_reward', effect: 'turnInCharm' },
+            { text: 'Not yet \u2014 hold on.', next: null }
+          ]
+        },
+        p_reward: {
+          who: 'pip',
+          text: 'Mum gave me thirty coins for the fair, but you should have them. Don\u2019t tell her. Thank you, mister!',
+          choices: [{ text: 'Keep out of the wood, Pip.', next: null }]
+        },
+        p_done: {
+          who: 'pip',
+          text: 'I tied it to my satchel so it can\u2019t run off again. Mum says you\u2019re a hero. I say you\u2019re a hero with a nice cloak.',
+          choices: [{ text: 'Both are true.', next: null }]
+        }
+      }
+    },
+    torval: {
+      start() { return 't_main'; },
+      nodes: {
+        t_main: {
+          who: 'torval',
+          text: () => 'Steel\u2019s hot and I\u2019m bored. Sixty gold puts a proper edge on that blade. Potions are fifteen. You\u2019re carrying ' + state.gold + ' gold.',
+          choices: [
+            { text: 'Sharpen my blade. (60 gold)', show: () => !state.upgraded, next: 't_done', effect: 'sharpen' },
+            { text: 'Buy a potion. (15 gold)', next: 't_done', effect: 'buyPotion' },
+            { text: 'Just looking.', next: null }
+          ]
+        },
+        t_done: {
+          who: 'torval',
+          text: () => (state.upgraded ? 'That edge will hold. ' : '') + 'Anything else? You\u2019ve got ' + state.gold + ' gold.',
+          choices: [
+            { text: 'Sharpen my blade. (60 gold)', show: () => !state.upgraded, next: 't_done', effect: 'sharpen' },
+            { text: 'Buy another potion. (15 gold)', next: 't_done', effect: 'buyPotion' },
+            { text: 'That\u2019s all.', next: null }
+          ]
+        }
+      }
+    },
+    isolde: {
+      start() { return 'i_main'; },
+      nodes: {
+        i_main: {
+          who: 'isolde',
+          text: () => 'You look like you\u2019ve been wrestling a hedge. Ten gold and I\u2019ll have you whole. Potions are fifteen.',
+          choices: [
+            { text: 'Mend my wounds. (10 gold)', next: 'i_done', effect: 'heal' },
+            { text: 'Buy a potion. (15 gold)', next: 'i_done', effect: 'buyPotion' },
+            { text: 'Who is the Rotwarden?', next: 'i_lore' },
+            { text: 'I\u2019m fine.', next: null }
+          ]
+        },
+        i_lore: {
+          who: 'isolde',
+          text: 'An old thing that grew around a grudge. The lantern kept it asleep for years. Now that the heart is gone, it is dreaming awake.',
+          choices: [
+            { text: 'Mend my wounds. (10 gold)', next: 'i_done', effect: 'heal' },
+            { text: 'I\u2019ll be back.', next: null }
+          ]
+        },
+        i_done: {
+          who: 'isolde',
+          text: () => 'There. Anything else? You\u2019ve got ' + state.gold + ' gold.',
+          choices: [
+            { text: 'Mend my wounds again. (10 gold)', next: 'i_done', effect: 'heal' },
+            { text: 'Buy a potion. (15 gold)', next: 'i_done', effect: 'buyPotion' },
+            { text: 'That\u2019s all.', next: null }
+          ]
+        }
+      }
+    }
+  };
+
+  function nodeText(node) {
+    return typeof node.text === 'function' ? node.text() : node.text;
+  }
+
+  function visibleChoices(node) {
+    return node.choices.filter((c) => !c.show || c.show());
+  }
+
+  function openDialogue(npcId) {
+    const table = DIALOGUE[npcId];
+    if (!table) return;
+    const startId = table.start();
+    state.dlg = { npc: npcId, nodeId: startId, sel: 0 };
+    state.mode = 'dialogue';
+    input.left = false;
+    input.right = false;
+    input.up = false;
+    input.down = false;
+    announce(NPCS[npcId].name + ': ' + nodeText(table.nodes[startId]));
+  }
+
+  function moveChoice(dir) {
+    const node = currentDialogueNode();
+    if (!node) return;
+    const list = visibleChoices(node);
+    if (!list.length) return;
+    state.dlg.sel = (state.dlg.sel + dir + list.length) % list.length;
+  }
+
+  function currentDialogueNode() {
+    if (!state.dlg) return null;
+    const table = DIALOGUE[state.dlg.npc];
+    return table ? table.nodes[state.dlg.nodeId] : null;
+  }
+
+  function choose(index) {
+    const node = currentDialogueNode();
+    if (!node) return;
+    const list = visibleChoices(node);
+    const choice = list[index];
+    if (!choice) return;
+    if (choice.effect && EFFECTS[choice.effect]) EFFECTS[choice.effect]();
+    if (choice.next) {
+      state.dlg.nodeId = choice.next;
+      state.dlg.sel = 0;
+      const next = currentDialogueNode();
+      if (next) announce(NPCS[state.dlg.npc].name + ': ' + nodeText(next));
+    } else {
+      closeDialogue();
+    }
+  }
+
+  function closeDialogue() {
+    state.dlg = null;
+    if (state.mode === 'dialogue') state.mode = 'playing';
+    input.left = false;
+    input.right = false;
+    input.up = false;
+    input.down = false;
+  }
+
+  /* ---------------- world, movement, quests ---------------- */
+
+  function solidsFor() {
+    const base = SCENE_DEFS[state.scene].solids;
+    if (state.scene === 'forest' && !state.bramblesOpen) return base.concat([BRAMBLE]);
+    return base;
+  }
+
+  function blocked(x, y, r) {
+    for (const s of solidsFor()) {
+      if (circleHitsRect(x, y, r, s)) return true;
+    }
+    return false;
+  }
+
+  function warp(to, arrive) {
+    state.scene = to;
+    const dest = arrive || SCENE_DEFS[to].spawn;
+    state.px = dest.x;
+    state.py = dest.y;
+    state.warpCd = 0.45;
+    state.face = 1;
+    state.walk = 0;
+    toast(SCENE_DEFS[to].label);
+    announce('Entered ' + (to === 'village' ? 'Hearthvale village' : to === 'forest' ? 'the Bramblewood' : 'the Hollow Grove') + '.');
+  }
+
+  function checkExit() {
+    if (state.warpCd > 0) return;
+    for (const e of SCENE_DEFS[state.scene].exits) {
+      if (state.px > e.x && state.px < e.x + e.w && state.py > e.y && state.py < e.y + e.h) {
+        warp(e.to, e.arrive);
+        return;
+      }
+    }
+  }
+
+  function currentEnemies() {
+    const dyn = state.scenes[state.scene];
+    return dyn && dyn.enemies ? dyn.enemies : [];
+  }
+
+  function nearestInteract() {
+    const list = [];
+    for (const id of SCENE_DEFS[state.scene].npcs) {
+      const npc = NPCS[id];
+      const d = dist(state.px, state.py, npc.x, npc.y);
+      if (d < 54) list.push({ kind: 'npc', id, x: npc.x, y: npc.y, d });
+    }
+    const dyn = state.scenes[state.scene];
+    if (dyn && dyn.chests) {
+      for (const c of dyn.chests) {
+        if (c.opened) continue;
+        const d = dist(state.px, state.py, c.x, c.y);
+        if (d < 46) list.push({ kind: 'chest', chest: c, x: c.x, y: c.y, d });
+      }
+    }
+    if (state.scene === 'forest' && dyn && dyn.charm && !dyn.charm.taken) {
+      const d = dist(state.px, state.py, dyn.charm.x, dyn.charm.y);
+      if (d < 46) list.push({ kind: 'charm', x: dyn.charm.x, y: dyn.charm.y, d });
+    }
+    if (state.scene === 'forest' && !state.bramblesOpen) {
+      const d = dist(state.px, state.py, 240, 110);
+      if (d < 86) list.push({ kind: 'bramble', x: 240, y: 110, d });
+    }
+    list.sort((a, b) => a.d - b.d);
+    return list[0] || null;
+  }
+
+  function promptFor(it) {
+    if (!it) return '';
+    if (it.kind === 'npc') return 'Talk to ' + NPCS[it.id].name;
+    if (it.kind === 'chest') return 'Open the chest';
+    if (it.kind === 'charm') return 'Pick up Pip\u2019s charm';
+    if (it.kind === 'bramble') return 'The brambles are shut';
+    return '';
+  }
+
+  function interact() {
+    if (state.mode !== 'playing') return;
+    const it = nearestInteract();
+    if (!it) return;
+    if (it.kind === 'npc') {
+      openDialogue(it.id);
+    } else if (it.kind === 'chest') {
+      openChest(it.chest);
+    } else if (it.kind === 'charm') {
+      const charm = state.scenes.forest.charm;
+      charm.taken = true;
+      state.hasCharm = true;
+      if (!state.flags.charmQuest) state.flags.charmQuest = true;
+      toast('FOUND PIP\u2019S FOX CHARM');
+      announce('Pip\u2019s fox charm found. Return it to Pip in Hearthvale.');
+    } else if (it.kind === 'bramble') {
+      toast('THE BRAMBLES ARE CLOSED \u2014 LIGHT THE LANTERN');
+      announce('The brambles are closed. Light the village lantern first.');
+    }
+  }
+
+  function openChest(chest) {
+    if (chest.opened) return;
+    chest.opened = true;
+    state.chestsOpened += 1;
+    state.gold += chest.gold;
+    state.potions += chest.potions;
+    state.flash = 0.5;
+    state.flashColor = '#e0b568';
+    let msg = 'CHEST \u2014 +' + chest.gold + ' GOLD';
+    if (chest.potions) msg += ' \u00b7 +' + chest.potions + ' POTION' + (chest.potions > 1 ? 'S' : '');
+    toast(msg);
+    announce('Chest opened. ' + chest.gold + ' gold' + (chest.potions ? ' and ' + chest.potions + ' potion' : '') + '.');
+  }
+
+  /* ---------------- battle ---------------- */
+
+  function startBattle(enemy) {
+    if (enemy.dead) return;
+    state.battle = {
+      enemy,
+      log: [ENEMY_INFO[enemy.kind].intro],
+      sel: 0,
+      guard: false,
+      shake: 0,
+      flash: 0
+    };
+    state.mode = 'battle';
+    input.left = false;
+    input.right = false;
+    input.up = false;
+    input.down = false;
+    announce('Battle with ' + enemy.name + '. ' + enemy.hp + ' health. Choose: attack, guard, potion or flee.');
+  }
+
+  function battleActions() {
+    const b = state.battle;
+    return [
+      { id: 'attack', label: 'Attack', note: 'Strike for about ' + state.atk + '.' },
+      { id: 'guard', label: 'Guard', note: 'Halve the next hit, recover 2.' },
+      { id: 'potion', label: 'Potion (' + state.potions + ')', note: state.potions > 0 ? 'Heal 14 health.' : 'None left.' },
+      { id: 'flee', label: 'Flee', note: b && b.enemy.boss ? 'The grove has no exit.' : 'Back out of the fight.' }
+    ];
+  }
+
+  function battleSelect(dir) {
+    const b = state.battle;
+    if (!b) return;
+    b.sel = (b.sel + dir + 4) % 4;
+  }
+
+  function battleChoose(index) {
+    const list = battleActions();
+    const pick = list[index];
+    if (!pick) return;
+    battleAct(pick.id);
+  }
+
+  function battleAct(action) {
+    const b = state.battle;
+    if (!b) return;
+    const e = b.enemy;
+    if (action === 'attack') {
+      const dmg = Math.max(1, state.atk + randInt(-1, 2));
+      e.hp = Math.max(0, e.hp - dmg);
+      b.log.push('You hit ' + e.name + ' for ' + dmg + '.');
+      b.flash = 0.5;
+      if (e.hp <= 0) {
+        winBattle();
+        return;
+      }
+    } else if (action === 'guard') {
+      b.guard = true;
+      state.hp = Math.min(state.maxHp, state.hp + 2);
+      b.log.push('You set your feet and catch your breath.');
+    } else if (action === 'potion') {
+      if (state.potions <= 0) {
+        b.log.push('Your pack is out of potions.');
+        return;
+      }
+      state.potions -= 1;
+      const healed = Math.min(14, state.maxHp - state.hp);
+      state.hp += healed;
+      b.log.push('You drink a potion. +' + healed + ' health.');
+    } else if (action === 'flee') {
+      if (e.boss) {
+        b.log.push('The grove has no exit. It notices you trying.');
+      } else {
+        fleeBattle();
+        return;
+      }
+    }
+    enemyTurn();
+  }
+
+  function enemyTurn() {
+    const b = state.battle;
+    if (!b) return;
+    const e = b.enemy;
+    if (e.kind === 'rotwarden' && !e.enraged && e.hp <= e.maxHp / 2) {
+      e.enraged = true;
+      e.atk += 3;
+      b.log.push('The Rotwarden tears its roots free. Its eyes burn brighter.');
+    }
+    let dmg = Math.max(1, e.atk + randInt(-1, 1));
+    if (b.guard) dmg = Math.max(1, Math.round(dmg / 2));
+    state.hp = Math.max(0, state.hp - dmg);
+    b.log.push(e.name + ' strikes you for ' + dmg + '.');
+    b.guard = false;
+    b.shake = 0.6;
+    if (b.log.length > 6) b.log = b.log.slice(-6);
+    if (state.hp <= 0) defeat();
+  }
+
+  function winBattle() {
+    const b = state.battle;
+    const e = b.enemy;
+    e.dead = true;
+    state.kills += 1;
+    state.gold += e.gold;
+    let extra = '';
+    if (e.kind === 'mossback') {
+      state.hasHeart = true;
+      if (state.stage < 2) state.stage = 2;
+      extra = ' \u2014 THE EMBERHEART IS YOURS';
+    }
+    if (e.kind === 'rotwarden') {
+      state.bossDead = true;
+      state.stage = 4;
+      state.battle = null;
+      state.mode = 'done';
+      state.flash = 1;
+      state.flashColor = '#e0b568';
+      paintResult(true);
+      announce('The Rotwarden falls. Hearthvale is saved. Total score ' + state.result.total + '.');
+      return;
+    }
+    state.battle = null;
+    state.mode = 'playing';
+    state.battleCd = 1.4;
+    toast(e.name.toUpperCase() + ' FALLS \u2014 +' + e.gold + ' GOLD' + extra);
+    announce(e.name + ' defeated. ' + e.gold + ' gold earned.' + (e.kind === 'mossback' ? ' The Emberheart is yours. Return it to Elder Maren.' : ''));
+  }
+
+  function fleeBattle() {
+    const b = state.battle;
+    if (!b) return;
+    const e = b.enemy;
+    state.battle = null;
+    state.mode = 'playing';
+    state.battleCd = 1.6;
+    let dx = state.px - e.x;
+    let dy = state.py - e.y;
+    const len = Math.hypot(dx, dy);
+    if (len < 1) {
+      dx = 0;
+      dy = 1;
+    } else {
+      dx /= len;
+      dy /= len;
+    }
+    let nx = clamp(state.px + dx * 54, 18, W - 18);
+    let ny = clamp(state.py + dy * 54, TOP + 18, H - 18);
+    if (blocked(nx, ny, PLAYER_R)) {
+      nx = clamp(state.px, 18, W - 18);
+      ny = clamp(state.py + 58, TOP + 18, H - 18);
+    }
+    if (!blocked(nx, ny, PLAYER_R)) {
+      state.px = nx;
+      state.py = ny;
+    }
+    toast('YOU SLIP AWAY');
+    announce('You flee from ' + e.name + '.');
+  }
+
+  function defeat() {
+    state.hp = 0;
+    state.battle = null;
+    state.mode = 'failed';
+    state.flash = 1;
+    state.flashColor = '#c05a4a';
+    paintResult(false);
+    announce('You fall in the wood. Total score ' + state.result.total + '.');
+  }
+
+  function checkEnemies() {
+    for (const e of currentEnemies()) {
+      if (e.dead) continue;
+      const reach = e.boss ? 48 : 28;
+      if (dist(state.px, state.py, e.x, e.y) < reach) {
+        startBattle(e);
+        return;
+      }
+    }
+  }
+
+  function update(dt) {
+    state.battleCd = Math.max(0, state.battleCd - dt);
+    state.warpCd = Math.max(0, state.warpCd - dt);
+    let dx = (input.right ? 1 : 0) - (input.left ? 1 : 0);
+    let dy = (input.down ? 1 : 0) - (input.up ? 1 : 0);
+    state.moving = !!(dx || dy);
+    if (dx && dy) {
+      dx *= Math.SQRT1_2;
+      dy *= Math.SQRT1_2;
+    }
+    if (dx) state.face = dx > 0 ? 1 : -1;
+    const nx = state.px + dx * SPEED * dt;
+    if (!blocked(nx, state.py, PLAYER_R)) state.px = nx;
+    const ny = state.py + dy * SPEED * dt;
+    if (!blocked(state.px, ny, PLAYER_R)) state.py = ny;
+    state.px = clamp(state.px, 18, W - 18);
+    state.py = clamp(state.py, TOP + 18, H - 18);
+    if (state.moving) state.walk += dt * 9;
+    checkExit();
+    if (state.mode === 'playing' && state.battleCd <= 0) checkEnemies();
+  }
+
+  /* ---------------- results ---------------- */
+
+  function scoreRows() {
+    return [
+      ['Gold carried', state.gold * 2],
+      ['The lantern lit', state.bramblesOpen ? 300 : 0],
+      ['Pip\u2019s fox charm', state.flags.charmDone ? 150 : 0],
+      ['Treasure chests', state.chestsOpened * 60],
+      ['Monsters felled', state.kills * 50],
+      ['The Rotwarden', state.bossDead ? 800 : 0],
+      ['Health remaining', state.hp * 10]
+    ].filter((row) => row[1] > 0);
+  }
+
+  function rankFor(score) {
+    if (score >= 2700) return 'Rank S \u2014 the vale remembers';
+    if (score >= 2100) return 'Rank A \u2014 a clean ending';
+    if (score >= 1500) return 'Rank B \u2014 bloodied but standing';
+    return 'Rank C \u2014 the long way round';
+  }
+
+  function paintResult(success) {
+    const rows = scoreRows();
+    const total = rows.reduce((sum, row) => sum + row[1], 0);
+    state.best = Math.max(readBest(), success ? total : 0);
+    if (success) writeBest(state.best);
+
+    if (success) {
+      finalKicker.textContent = 'The grove falls quiet';
+      finalTitle.innerHTML = 'Hearthvale <span class="accent">saved</span>';
+      finalRank.hidden = false;
+      finalRank.textContent = rankFor(total);
+      runLineEl.textContent = state.kills + ' monsters felled \u00b7 ' + state.chestsOpened + ' chests opened \u00b7 ' + (state.flags.charmDone ? 'charm returned' : 'charm lost');
+    } else {
+      finalKicker.textContent = 'The lantern gutters';
+      finalTitle.innerHTML = 'The wood <span class="accent">keeps you</span>';
+      finalRank.hidden = true;
+      runLineEl.textContent = state.kills + ' monsters felled \u00b7 ' + state.chestsOpened + ' chests opened \u00b7 the lantern is still dark';
+    }
+
+    finalScoreEl.textContent = String(total);
+    bestLineEl.textContent = 'Best ' + pad5(state.best);
+    finalBreakdown.innerHTML = rows.map((row) => '<div class="row"><span>' + row[0] + '</span><strong>' + row[1] + '</strong></div>').join('');
+    state.result = { total, rows, success };
+    resultPanel.hidden = false;
+    overlay.hidden = false;
+    input.left = false;
+    input.right = false;
+    input.up = false;
+    input.down = false;
+  }
+
+  /* ---------------- scenery ---------------- */
+
+  function speckle(base, count, light, dark) {
+    for (let i = 0; i < count; i++) {
+      const x = hash(i + base) * W;
+      const y = TOP + hash(i + base + 5.3) * (H - TOP);
+      ctx.fillStyle = i % 3 ? light : dark;
+      ctx.fillRect(x, y, 3, 2);
+    }
+  }
+
+  function drawVillageGround() {
+    ctx.fillStyle = '#33512f';
+    ctx.fillRect(0, TOP, W, H - TOP);
+    speckle(2, 150, 'rgba(139, 186, 116, 0.10)', 'rgba(22, 44, 28, 0.22)');
+
+    ctx.fillStyle = '#8a7d5f';
+    ctx.fillRect(196, TOP, 88, 262);
+    ctx.fillRect(0, 336, W, 66);
+
+    ctx.fillStyle = '#8d8670';
+    ctx.beginPath();
+    ctx.ellipse(240, 368, 150, 118, 0, 0, TAU);
+    ctx.fill();
+
+    ctx.strokeStyle = 'rgba(64, 58, 42, 0.22)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 48; i++) {
+      const a = hash(i + 11) * TAU;
+      const rr = 0.2 + hash(i + 3) * 0.74;
+      const x = 240 + Math.cos(a) * 146 * rr;
+      const y = 368 + Math.sin(a) * 114 * rr;
+      ctx.beginPath();
+      ctx.ellipse(x, y, 10, 6, 0, 0, TAU);
+      ctx.stroke();
+    }
+
+    for (let i = 0; i < 26; i++) {
+      const x = 24 + hash(i + 31) * (W - 48);
+      const y = TOP + 40 + hash(i + 41) * 500;
+      if (x > 180 && x < 300) continue;
+      ctx.fillStyle = ['#e0b568', '#d98a8a', '#c9d88a'][i % 3];
+      ctx.fillRect(x, y, 2, 2);
+    }
+  }
+
+  function drawForestGround() {
+    ctx.fillStyle = '#243a29';
+    ctx.fillRect(0, TOP, W, H - TOP);
+    speckle(17, 160, 'rgba(112, 158, 104, 0.09)', 'rgba(10, 24, 16, 0.26)');
+
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#5d5138';
+    ctx.lineWidth = 78;
+    ctx.beginPath();
+    ctx.moveTo(250, H);
+    ctx.quadraticCurveTo(196, 430, 236, 330);
+    ctx.quadraticCurveTo(272, 200, 240, TOP);
+    ctx.stroke();
+    ctx.strokeStyle = '#77684a';
+    ctx.lineWidth = 62;
+    ctx.beginPath();
+    ctx.moveTo(250, H);
+    ctx.quadraticCurveTo(200, 430, 238, 330);
+    ctx.quadraticCurveTo(272, 200, 240, TOP);
+    ctx.stroke();
+
+    ctx.strokeStyle = 'rgba(224, 181, 104, 0.10)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([8, 16]);
+    ctx.beginPath();
+    ctx.moveTo(250, H);
+    ctx.quadraticCurveTo(200, 430, 238, 330);
+    ctx.quadraticCurveTo(272, 200, 240, TOP);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    const px = 112;
+    const py = 366;
+    ctx.fillStyle = '#29494a';
+    ctx.beginPath();
+    ctx.ellipse(px, py, 58, 33, 0, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = '#38605f';
+    ctx.beginPath();
+    ctx.ellipse(px, py - 3, 50, 27, 0, 0, TAU);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(190, 230, 215, 0.22)';
+    ctx.lineWidth = 1.5;
+    for (let i = 0; i < 3; i++) {
+      ctx.beginPath();
+      ctx.ellipse(px - 8 + i * 9, py - 6 + i * 5, 16, 5, 0, 0, TAU);
+      ctx.stroke();
+    }
+
+    for (let i = 0; i < 18; i++) {
+      const x = 24 + hash(i + 61) * (W - 48);
+      const y = TOP + 30 + hash(i + 71) * 490;
+      if (x > 170 && x < 305) continue;
+      ctx.fillStyle = i % 2 ? '#c9785f' : '#d8c27a';
+      ctx.beginPath();
+      ctx.ellipse(x, y, 4, 2.4, 0, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = '#e6dcc0';
+      ctx.fillRect(x - 1, y - 1, 2, 2);
+    }
+  }
+
+  function drawGroveGround() {
+    ctx.fillStyle = '#1b2a22';
+    ctx.fillRect(0, TOP, W, H - TOP);
+    speckle(91, 120, 'rgba(120, 160, 120, 0.07)', 'rgba(4, 12, 8, 0.3)');
+
+    ctx.fillStyle = '#3e4640';
+    ctx.beginPath();
+    ctx.ellipse(240, 300, 156, 146, 0, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = '#49524a';
+    ctx.beginPath();
+    ctx.ellipse(240, 300, 136, 126, 0, 0, TAU);
+    ctx.fill();
+
+    ctx.strokeStyle = 'rgba(224, 181, 104, 0.32)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 12]);
+    ctx.beginPath();
+    ctx.ellipse(240, 300, 104, 96, 0, 0, TAU);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.strokeStyle = 'rgba(20, 30, 22, 0.55)';
+    ctx.lineWidth = 3;
+    for (let i = 0; i < 9; i++) {
+      const a = hash(i + 121) * TAU;
+      ctx.beginPath();
+      ctx.moveTo(240 + Math.cos(a) * 30, 300 + Math.sin(a) * 26);
+      ctx.lineTo(240 + Math.cos(a) * (86 + hash(i) * 34), 300 + Math.sin(a) * (78 + hash(i) * 30));
+      ctx.stroke();
+    }
+
+    const pulse = 0.16 + Math.sin(state.t * 1.6) * 0.05;
+    ctx.fillStyle = 'rgba(224, 181, 104, ' + pulse.toFixed(3) + ')';
+    ctx.beginPath();
+    ctx.ellipse(240, 300, 66, 60, 0, 0, TAU);
+    ctx.fill();
+  }
+
+  function drawGround() {
+    if (state.scene === 'village') drawVillageGround();
+    else if (state.scene === 'forest') drawForestGround();
+    else drawGroveGround();
+    drawVignette();
+  }
+
+  function drawVignette() {
+    const g = ctx.createRadialGradient(240, 360, 120, 240, 360, 380);
+    g.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    g.addColorStop(1, 'rgba(3, 8, 5, 0.42)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, TOP, W, H - TOP);
+  }
+
+  function drawTree(s) {
+    const cx = s.x + s.w / 2;
+    const base = s.y + s.h;
+    const sway = Math.sin(state.t * 1.2 + cx * 0.05) * 2;
+    ctx.fillStyle = '#3a2a1b';
+    ctx.fillRect(cx - 4, base - 28, 8, 28);
+    ctx.fillStyle = '#2d573a';
+    ctx.beginPath();
+    ctx.ellipse(cx + sway, base - 44, 25, 21, 0, 0, TAU);
+    ctx.ellipse(cx - 15 + sway, base - 32, 17, 14, 0, 0, TAU);
+    ctx.ellipse(cx + 15 + sway, base - 34, 18, 15, 0, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = '#3f7149';
+    ctx.beginPath();
+    ctx.ellipse(cx - 4 + sway, base - 50, 14, 11, -0.4, 0, TAU);
+    ctx.ellipse(cx + 13 + sway, base - 38, 9, 7, 0.3, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(180, 220, 150, 0.18)';
+    ctx.beginPath();
+    ctx.ellipse(cx - 8 + sway, base - 54, 7, 5, -0.4, 0, TAU);
+    ctx.fill();
+  }
+
+  function drawHouse(s) {
+    const x = s.x;
+    const y = s.y;
+    const w = s.w;
+    const h = s.h;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+    ctx.fillRect(x + 6, y + h - 6, w - 8, 8);
+    ctx.fillStyle = s.wall;
+    ctx.fillRect(x + 4, y + 28, w - 8, h - 28);
+
+    ctx.strokeStyle = 'rgba(80, 54, 32, 0.4)';
+    ctx.lineWidth = 2;
+    for (let i = 1; i < 4; i++) {
+      const bx = x + 4 + ((w - 8) / 4) * i;
+      ctx.beginPath();
+      ctx.moveTo(bx, y + 30);
+      ctx.lineTo(bx, y + h - 4);
+      ctx.stroke();
+    }
+    ctx.beginPath();
+    ctx.moveTo(x + 6, y + 58);
+    ctx.lineTo(x + w - 6, y + 58);
+    ctx.stroke();
+
+    ctx.fillStyle = s.roof;
+    ctx.beginPath();
+    ctx.moveTo(x - 10, y + 32);
+    ctx.lineTo(x + w / 2, y - 16);
+    ctx.lineTo(x + w + 10, y + 32);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(38, 24, 16, 0.4)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(255, 220, 160, 0.09)';
+    ctx.beginPath();
+    ctx.moveTo(x + 8, y + 30);
+    ctx.lineTo(x + w / 2, y - 8);
+    ctx.lineTo(x + w / 2 + 12, y + 30);
+    ctx.closePath();
+    ctx.fill();
+
+    for (const wx of [0.2, 0.62]) {
+      ctx.fillStyle = '#f2cc7a';
+      ctx.fillRect(x + w * wx, y + 66, 20, 16);
+      ctx.strokeStyle = '#4a3624';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x + w * wx, y + 66, 20, 16);
+    }
+
+    ctx.fillStyle = '#4b3222';
+    ctx.fillRect(x + w / 2 - 13, y + h - 32, 26, 32);
+    ctx.fillStyle = '#d8b06a';
+    ctx.fillRect(x + w / 2 + 6, y + h - 18, 3, 3);
+
+    ctx.fillStyle = 'rgba(62, 44, 28, 0.86)';
+    ctx.font = '7px ' + FONT;
+    ctx.textAlign = 'center';
+    ctx.fillText(s.name, x + w / 2, y + h - 38);
+  }
+
+  function drawWell(s) {
+    const cx = s.x + s.w / 2;
+    const cy = s.y + s.h / 2 + 8;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + 8, 38, 12, 0, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = '#7f8172';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, 36, 24, 0, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = '#2a2c25';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy - 2, 27, 17, 0, 0, TAU);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(220, 230, 210, 0.2)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, 30, 19, 0, 0.2, Math.PI - 0.2);
+    ctx.stroke();
+    ctx.fillStyle = '#6b4c2f';
+    ctx.fillRect(cx - 27, cy - 38, 5, 36);
+    ctx.fillRect(cx + 22, cy - 38, 5, 36);
+    ctx.fillStyle = '#8c4038';
+    ctx.beginPath();
+    ctx.moveTo(cx - 38, cy - 36);
+    ctx.lineTo(cx, cy - 62);
+    ctx.lineTo(cx + 38, cy - 36);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#4a3222';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - 58);
+    ctx.lineTo(cx, cy - 40);
+    ctx.stroke();
+  }
+
+  function drawRock(s) {
+    const cx = s.x + s.w / 2;
+    const base = s.y + s.h;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.24)';
+    ctx.beginPath();
+    ctx.ellipse(cx, base, s.w / 2, 6, 0, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = '#6b7066';
+    ctx.beginPath();
+    ctx.moveTo(s.x + 4, base);
+    ctx.lineTo(s.x + 10, s.y + 10);
+    ctx.lineTo(cx, s.y + 2);
+    ctx.lineTo(s.x + s.w - 8, s.y + 12);
+    ctx.lineTo(s.x + s.w - 2, base);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = 'rgba(220, 230, 215, 0.16)';
+    ctx.beginPath();
+    ctx.moveTo(s.x + 12, s.y + 12);
+    ctx.lineTo(cx, s.y + 4);
+    ctx.lineTo(cx + 8, base - 6);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  function drawStump(s) {
+    const cx = s.x + s.w / 2;
+    const cy = s.y + s.h / 2;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + 14, 22, 7, 0, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = '#5b4229';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, 22, 15, 0, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = '#c9a978';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy - 3, 18, 11, 0, 0, TAU);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(90, 62, 36, 0.6)';
+    ctx.lineWidth = 1;
+    for (let i = 1; i <= 3; i++) {
+      ctx.beginPath();
+      ctx.ellipse(cx, cy - 3, 18 - i * 4, 11 - i * 2.4, 0, 0, TAU);
+      ctx.stroke();
+    }
+    ctx.fillStyle = '#3f7149';
+    ctx.beginPath();
+    ctx.ellipse(cx + 14, cy - 10, 6, 4, 0.4, 0, TAU);
+    ctx.fill();
+  }
+
+  function drawRoot(s) {
+    const cx = s.x + s.w / 2;
+    const base = s.y + s.h;
+    ctx.fillStyle = '#2c2119';
+    ctx.beginPath();
+    ctx.moveTo(s.x + 8, base);
+    ctx.quadraticCurveTo(s.x + 2, s.y + 20, cx - 6, s.y + 4);
+    ctx.quadraticCurveTo(s.x + s.w - 4, s.y + 16, s.x + s.w - 6, base);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#3a2c20';
+    ctx.beginPath();
+    ctx.moveTo(cx - 8, base - 6);
+    ctx.quadraticCurveTo(cx - 2, s.y + 22, cx + 8, s.y + 10);
+    ctx.lineTo(cx + 4, base - 6);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = 'rgba(90, 140, 96, 0.3)';
+    ctx.beginPath();
+    ctx.ellipse(cx + 4, base - 16, 12, 5, 0.2, 0, TAU);
+    ctx.fill();
+  }
+
+  function drawBramble() {
+    const s = BRAMBLE;
+    if (state.bramblesOpen) {
+      for (const side of [0, 1]) {
+        const x = side ? s.x + s.w - 10 : s.x + 10;
+        ctx.strokeStyle = '#3b5230';
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        ctx.moveTo(x, s.y + s.h);
+        ctx.quadraticCurveTo(x + (side ? 10 : -10), s.y + 4, x + (side ? 4 : -4), s.y - 6);
+        ctx.stroke();
+        ctx.fillStyle = '#5d7a42';
+        ctx.beginPath();
+        ctx.ellipse(x + (side ? 6 : -6), s.y + 2, 6, 3, 0.4, 0, TAU);
+        ctx.fill();
+      }
+      return;
+    }
+    ctx.strokeStyle = '#33452a';
+    ctx.lineWidth = 7;
+    for (let i = 0; i <= 6; i++) {
+      const x = s.x + (s.w / 6) * i;
+      ctx.beginPath();
+      ctx.moveTo(x, s.y + s.h);
+      ctx.quadraticCurveTo(x + (i % 2 ? 14 : -14), s.y + 12, x + (i % 2 ? -6 : 6), s.y - 10);
+      ctx.stroke();
+    }
+    ctx.strokeStyle = '#20301c';
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 22; i++) {
+      const x = s.x + 6 + hash(i + 151) * (s.w - 12);
+      const y = s.y + 3 + hash(i + 161) * (s.h - 6);
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + (hash(i) - 0.5) * 10, y + 4);
+      ctx.stroke();
+    }
+    ctx.fillStyle = '#8f4a4a';
+    for (let i = 0; i < 5; i++) {
+      const x = s.x + 20 + hash(i + 171) * (s.w - 40);
+      const y = s.y + 6 + hash(i + 181) * (s.h - 12);
+      ctx.beginPath();
+      ctx.arc(x, y, 2, 0, TAU);
+      ctx.fill();
+    }
+  }
+
+  function drawSolid(s) {
+    if (s.kind === 'house') drawHouse(s);
+    else if (s.kind === 'tree') drawTree(s);
+    else if (s.kind === 'well') drawWell(s);
+    else if (s.kind === 'rock') drawRock(s);
+    else if (s.kind === 'stump') drawStump(s);
+    else if (s.kind === 'root') drawRoot(s);
+    else if (s.kind === 'bramble') drawBramble();
+    else if (s.kind === 'pond') {
+      const cx = s.x + s.w / 2;
+      const cy = s.y + s.h / 2;
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.18)';
+      ctx.beginPath();
+      ctx.ellipse(cx, cy + 6, s.w / 2, 10, 0, 0, TAU);
+      ctx.fill();
+    }
+  }
+
+  /* ---------------- characters ---------------- */
+
+  function drawShadow(x, y, w) {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
+    ctx.beginPath();
+    ctx.ellipse(x, y, w, w * 0.34, 0, 0, TAU);
+    ctx.fill();
+  }
+
+  function drawNPC(id) {
+    const npc = NPCS[id];
+    const bob = Math.sin(state.t * 2 + npc.x * 0.03) * 1.4;
+    const x = npc.x;
+    const y = npc.y + 16 + bob;
+    drawShadow(x, y + 1, 11);
+    ctx.fillStyle = npc.robe;
+    roundRect(x - 9, y - 25, 18, 25, 6);
+    ctx.fill();
+    ctx.fillStyle = npc.trim;
+    ctx.fillRect(x - 8, y - 15, 16, 3);
+    ctx.fillStyle = '#e8c8a2';
+    ctx.beginPath();
+    ctx.arc(x, y - 31, 7.5, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(40, 30, 20, 0.75)';
+    ctx.beginPath();
+    ctx.arc(x, y - 34, 7.5, Math.PI, TAU);
+    ctx.fill();
+    ctx.fillStyle = '#2b2118';
+    ctx.fillRect(x - 4, y - 31, 2, 2);
+    ctx.fillRect(x + 2, y - 31, 2, 2);
+
+    ctx.font = '7px ' + FONT;
+    const tw = ctx.measureText(npc.name).width + 12;
+    ctx.fillStyle = 'rgba(8, 14, 10, 0.62)';
+    roundRect(x - tw / 2, y - 58, tw, 13, 6);
+    ctx.fill();
+    ctx.fillStyle = '#f3e6c8';
+    ctx.textAlign = 'center';
+    ctx.fillText(npc.name, x, y - 48);
+  }
+
+  function drawHero() {
+    const x = state.px;
+    const y = state.py + 16;
+    const step = state.moving ? Math.sin(state.walk) * 2.4 : 0;
+    drawShadow(x, y + 1, 11);
+    ctx.fillStyle = '#2c1f18';
+    ctx.fillRect(x - 6, y - 5 + step * 0.4, 4, 5);
+    ctx.fillRect(x + 2, y - 5 - step * 0.4, 4, 5);
+    ctx.fillStyle = '#356b5c';
+    roundRect(x - 9, y - 27, 18, 24, 7);
+    ctx.fill();
+    ctx.fillStyle = '#d8b06a';
+    ctx.fillRect(x - 8, y - 14, 16, 3);
+    ctx.fillStyle = '#2f6355';
+    ctx.beginPath();
+    ctx.arc(x, y - 31, 8.5, Math.PI, TAU);
+    ctx.fill();
+    ctx.fillStyle = '#e8c8a2';
+    ctx.beginPath();
+    ctx.arc(x + state.face * 1.5, y - 28, 6.4, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = '#2b2118';
+    ctx.fillRect(x - 2 + state.face * 2, y - 28, 2, 2);
+    ctx.fillStyle = '#6b4c2f';
+    ctx.fillRect(x + state.face * 9, y - 30, 2, 18);
+    ctx.fillStyle = '#c8d2d8';
+    ctx.fillRect(x + state.face * 9 - 1, y - 38, 4, 9);
+  }
+
+  function drawEnemy(e) {
+    const bob = Math.sin(state.t * 2.4 + e.phase) * 2;
+    const x = e.x;
+    const y = e.y + 12 + bob;
+    if (e.kind === 'slime' || e.kind === 'mossback') {
+      const big = e.kind === 'mossback';
+      const rw = big ? 24 : 14;
+      const rh = big ? 18 : 11;
+      drawShadow(x, e.y + 14, rw);
+      ctx.fillStyle = big ? '#4f6b3a' : '#6fae5a';
+      ctx.beginPath();
+      ctx.ellipse(x, y - rh, rw, rh, 0, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(210, 240, 180, 0.25)';
+      ctx.beginPath();
+      ctx.ellipse(x - rw * 0.3, y - rh * 1.5, rw * 0.3, rh * 0.3, 0, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = '#1c2a18';
+      ctx.beginPath();
+      ctx.arc(x - rw * 0.32, y - rh * 1.1, big ? 3 : 2, 0, TAU);
+      ctx.arc(x + rw * 0.32, y - rh * 1.1, big ? 3 : 2, 0, TAU);
+      ctx.fill();
+      if (big) {
+        for (let i = 0; i < 4; i++) {
+          const mx = x - 16 + i * 11;
+          ctx.fillStyle = '#c9b07a';
+          ctx.fillRect(mx - 1, y - rh * 2 - 2, 3, 5);
+          ctx.fillStyle = '#8f4a4a';
+          ctx.beginPath();
+          ctx.ellipse(mx + 1, y - rh * 2 - 2, 5, 2.6, 0, 0, TAU);
+          ctx.fill();
+        }
+      }
+    } else if (e.kind === 'wolf') {
+      drawShadow(x, e.y + 14, 16);
+      ctx.fillStyle = '#5c625f';
+      ctx.beginPath();
+      ctx.ellipse(x, y - 10, 15, 9, 0, 0, TAU);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(x + state.face * 12, y - 17, 8, 0, TAU);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(x + state.face * 7, y - 24);
+      ctx.lineTo(x + state.face * 10, y - 32);
+      ctx.lineTo(x + state.face * 14, y - 24);
+      ctx.closePath();
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(x + state.face * 16, y - 24);
+      ctx.lineTo(x + state.face * 20, y - 31);
+      ctx.lineTo(x + state.face * 22, y - 22);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = '#5c625f';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(x - 14, y - 12);
+      ctx.quadraticCurveTo(x - 26, y - 18, x - 22, y - 26);
+      ctx.stroke();
+      ctx.fillStyle = '#e0b568';
+      ctx.beginPath();
+      ctx.arc(x + state.face * 14, y - 18, 1.8, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = '#2c3230';
+      ctx.fillRect(x - 10, y - 3, 4, 5);
+      ctx.fillRect(x + 6, y - 3, 4, 5);
+    } else if (e.kind === 'rotwarden') {
+      drawShadow(x, e.y + 18, 30);
+      const glow = ctx.createRadialGradient(x, y - 40, 6, x, y - 40, 90);
+      glow.addColorStop(0, 'rgba(224, 150, 70, 0.22)');
+      glow.addColorStop(1, 'rgba(224, 150, 70, 0)');
+      ctx.fillStyle = glow;
+      ctx.fillRect(x - 90, y - 130, 180, 180);
+      ctx.fillStyle = '#33261c';
+      ctx.beginPath();
+      ctx.moveTo(x - 22, y + 12);
+      ctx.quadraticCurveTo(x - 30, y - 34, x - 12, y - 62);
+      ctx.lineTo(x + 14, y - 64);
+      ctx.quadraticCurveTo(x + 30, y - 30, x + 22, y + 12);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = '#3f2f22';
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.moveTo(x - 14, y - 56);
+      ctx.lineTo(x - 40, y - 92);
+      ctx.lineTo(x - 32, y - 104);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x + 12, y - 58);
+      ctx.lineTo(x + 38, y - 96);
+      ctx.lineTo(x + 28, y - 108);
+      ctx.stroke();
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(x - 34, y - 96);
+      ctx.lineTo(x - 46, y - 104);
+      ctx.moveTo(x + 34, y - 100);
+      ctx.lineTo(x + 48, y - 108);
+      ctx.stroke();
+      ctx.fillStyle = '#e0a24a';
+      ctx.beginPath();
+      ctx.arc(x - 7, y - 46, 3.4, 0, TAU);
+      ctx.arc(x + 8, y - 46, 3.4, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(224, 162, 74, 0.55)';
+      ctx.beginPath();
+      ctx.arc(x, y - 22, 7, 0, TAU);
+      ctx.fill();
+      ctx.strokeStyle = '#4a3626';
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(x - 20, y - 30);
+      ctx.quadraticCurveTo(x - 40, y - 24, x - 34, y - 4);
+      ctx.moveTo(x + 20, y - 32);
+      ctx.quadraticCurveTo(x + 42, y - 26, x + 36, y - 6);
+      ctx.stroke();
+    }
+  }
+
+  function drawChest(c) {
+    const x = c.x;
+    const y = c.y;
+    drawShadow(x, y + 9, 15);
+    ctx.fillStyle = '#7a5327';
+    roundRect(x - 14, y - 10, 28, 20, 4);
+    ctx.fill();
+    ctx.fillStyle = '#9d6d33';
+    if (c.opened) {
+      ctx.beginPath();
+      ctx.moveTo(x - 14, y - 10);
+      ctx.lineTo(x - 10, y - 22);
+      ctx.lineTo(x + 12, y - 22);
+      ctx.lineTo(x + 14, y - 12);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#2a1c10';
+      ctx.fillRect(x - 11, y - 13, 22, 5);
+    } else {
+      roundRect(x - 14, y - 18, 28, 11, 4);
+      ctx.fill();
+      ctx.fillStyle = '#d8b06a';
+      ctx.fillRect(x - 14, y - 11, 28, 3);
+      ctx.fillRect(x - 2, y - 16, 4, 7);
+    }
+    ctx.fillStyle = '#4a3624';
+    ctx.fillRect(x - 15, y + 7, 30, 2);
+  }
+
+  function drawCharm(c) {
+    const pulse = 0.6 + Math.sin(state.t * 3) * 0.4;
+    ctx.fillStyle = 'rgba(224, 181, 104, ' + (0.14 * pulse).toFixed(3) + ')';
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, 18, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = '#e8cc86';
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, 5, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = '#b8563f';
+    ctx.beginPath();
+    ctx.ellipse(c.x + 7, c.y + 2, 6, 3, 0.5, 0, TAU);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255, 240, 190, 0.7)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(c.x - 10, c.y);
+    ctx.lineTo(c.x - 16, c.y);
+    ctx.moveTo(c.x + 2, c.y - 10);
+    ctx.lineTo(c.x + 2, c.y - 16);
+    ctx.stroke();
+  }
+
+  function drawFireflies() {
+    if (state.scene === 'village') return;
+    for (let i = 0; i < 14; i++) {
+      const x = 30 + hash(i + 201) * (W - 60) + Math.sin(state.t * 0.7 + i) * 14;
+      const y = TOP + 40 + hash(i + 211) * 480 + Math.cos(state.t * 0.6 + i * 1.7) * 12;
+      const a = 0.25 + (Math.sin(state.t * 2 + i) + 1) * 0.2;
+      ctx.fillStyle = 'rgba(236, 214, 138, ' + a.toFixed(3) + ')';
+      ctx.beginPath();
+      ctx.arc(x, y, 1.6, 0, TAU);
+      ctx.fill();
+    }
+  }
+
+  /* ---------------- interface ---------------- */
+
+  function drawHUD() {
+    const g = ctx.createLinearGradient(0, 0, 0, TOP);
+    g.addColorStop(0, 'rgba(26, 42, 29, 0.98)');
+    g.addColorStop(1, 'rgba(12, 22, 16, 0.97)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, TOP);
+    ctx.strokeStyle = 'rgba(196, 220, 170, 0.16)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, TOP - 0.5);
+    ctx.lineTo(W, TOP - 0.5);
+    ctx.stroke();
+
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = '#f3ecd8';
+    ctx.font = '700 13px ' + SERIF;
+    ctx.fillText('HEARTHVALE', 18, 22);
+    ctx.fillStyle = 'rgba(226, 240, 220, 0.5)';
+    ctx.font = '8.5px ' + FONT;
+    ctx.fillText(SCENE_DEFS[state.scene].label, 18, 35);
+
+    const bw = 132;
+    const bx = 150;
+    const by = 13;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+    roundRect(bx, by, bw, 12, 6);
+    ctx.fill();
+    const ratio = clamp(state.hp / state.maxHp, 0, 1);
+    if (ratio > 0) {
+      ctx.fillStyle = ratio > 0.35 ? '#8fc47a' : '#d97a5a';
+      roundRect(bx, by, Math.max(6, bw * ratio), 12, 6);
+      ctx.fill();
+    }
+    ctx.fillStyle = '#f3ecd8';
+    ctx.font = '8px ' + FONT;
+    ctx.textAlign = 'center';
+    ctx.fillText('HP ' + state.hp + '/' + state.maxHp, bx + bw / 2, by + 9);
+
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#e0b568';
+    ctx.beginPath();
+    ctx.arc(310, 20, 5, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = '#f3ecd8';
+    ctx.font = '10px ' + FONT;
+    ctx.fillText(String(state.gold), 320, 24);
+
+    ctx.fillStyle = '#8fc4b0';
+    ctx.beginPath();
+    ctx.moveTo(378, 14);
+    ctx.lineTo(384, 14);
+    ctx.lineTo(386, 27);
+    ctx.lineTo(376, 27);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#f3ecd8';
+    ctx.fillText(String(state.potions), 392, 24);
+
+    ctx.fillStyle = 'rgba(224, 181, 104, 0.85)';
+    ctx.fillRect(0, 64, W, 24);
+    ctx.fillStyle = '#241a0d';
+    ctx.font = '700 10px ' + FONT;
+    ctx.textAlign = 'left';
+    ctx.fillText('\u25c6 ' + objectiveText(), 14, 80, W - 28);
+  }
+
+  function drawToast() {
+    if (state.toastT <= 0) return;
+    const alpha = Math.min(1, state.toastT * 2.4);
+    ctx.globalAlpha = alpha;
+    ctx.font = '700 9.5px ' + FONT;
+    const tw = Math.min(W - 40, ctx.measureText(state.toast).width + 26);
+    ctx.fillStyle = 'rgba(12, 20, 14, 0.92)';
+    roundRect((W - tw) / 2, 556, tw, 26, 13);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(224, 181, 104, 0.5)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.fillStyle = '#f6e2b0';
+    ctx.textAlign = 'center';
+    ctx.fillText(state.toast, W / 2, 573, tw - 18);
+    ctx.globalAlpha = 1;
+  }
+
+  function drawPrompt() {
+    const it = nearestInteract();
+    if (!it) return;
+    ctx.font = '9.5px ' + FONT;
+    const text = promptFor(it);
+    const tw = ctx.measureText(text).width;
+    ctx.fillStyle = 'rgba(12, 20, 14, 0.86)';
+    roundRect(W / 2 - tw / 2 - 24, 598, tw + 48, 24, 12);
+    ctx.fill();
+    ctx.fillStyle = '#e0b568';
+    ctx.beginPath();
+    ctx.arc(W / 2 - tw / 2 - 8, 610, 8, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = '#231a0d';
+    ctx.font = '700 9px ' + FONT;
+    ctx.textAlign = 'center';
+    ctx.fillText('E', W / 2 - tw / 2 - 8, 613);
+    ctx.fillStyle = '#f3ecd8';
+    ctx.font = '9.5px ' + FONT;
+    ctx.textAlign = 'left';
+    ctx.fillText(text, W / 2 - tw / 2 + 8, 613);
+  }
+
+  function drawDialogue() {
+    const node = currentDialogueNode();
+    if (!node) return;
+    ctx.fillStyle = 'rgba(4, 8, 5, 0.5)';
+    ctx.fillRect(0, TOP, W, H - TOP);
+
+    const x = 24;
+    const y = 336;
+    const w = 432;
+    const h = 282;
+    ctx.fillStyle = 'rgba(26, 21, 14, 0.97)';
+    roundRect(x, y, w, h, 14);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(200, 162, 96, 0.65)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#e0b568';
+    ctx.font = '700 10.5px ' + FONT;
+    ctx.fillText(NPCS[state.dlg.npc].name, x + 20, y + 24);
+    ctx.fillStyle = 'rgba(243, 236, 216, 0.4)';
+    ctx.font = '8px ' + FONT;
+    ctx.fillText('\u2014 ' + SCENE_DEFS[state.scene].label, x + 20 + ctx.measureText(NPCS[state.dlg.npc].name).width + 10, y + 24);
+
+    const bodyFont = '12px ' + FONT;
+    const lines = wrapText(nodeText(node), w - 40, bodyFont);
+    ctx.fillStyle = '#f3ecd8';
+    ctx.font = bodyFont;
+    const shown = lines.slice(0, 5);
+    shown.forEach((line, i) => ctx.fillText(line, x + 20, y + 48 + i * 18));
+
+    const choices = visibleChoices(node);
+    const startY = y + 54 + shown.length * 18;
+    choices.slice(0, 4).forEach((c, i) => {
+      const cy = startY + i * 26;
+      const active = i === state.dlg.sel;
+      if (active) {
+        ctx.fillStyle = 'rgba(224, 181, 104, 0.16)';
+        roundRect(x + 14, cy - 13, w - 28, 22, 6);
+        ctx.fill();
+      }
+      ctx.fillStyle = active ? '#ffe6b0' : 'rgba(243, 236, 216, 0.72)';
+      ctx.font = (active ? '700 ' : '') + '11px ' + FONT;
+      ctx.fillText((i + 1) + '. ' + c.text, x + 24, cy + 2, w - 60);
+    });
+
+    ctx.fillStyle = 'rgba(243, 236, 216, 0.32)';
+    ctx.font = '8px ' + FONT;
+    ctx.textAlign = 'right';
+    ctx.fillText('\u2191\u2193 choose \u00b7 E confirm', x + w - 20, y + h - 12);
+  }
+
+  function drawBattle() {
+    const b = state.battle;
+    if (!b) return;
+    const e = b.enemy;
+    ctx.fillStyle = 'rgba(4, 8, 5, 0.66)';
+    ctx.fillRect(0, TOP, W, H - TOP);
+
+    const x = 28;
+    const y = 148;
+    const w = 424;
+    const h = 462;
+    ctx.fillStyle = 'rgba(24, 20, 14, 0.97)';
+    roundRect(x, y, w, h, 14);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(200, 162, 96, 0.65)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#f3ecd8';
+    ctx.font = '700 16px ' + SERIF;
+    ctx.fillText(e.name, W / 2, y + 28);
+
+    const ebw = 220;
+    const ebx = (W - ebw) / 2;
+    const eby = y + 40;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+    roundRect(ebx, eby, ebw, 10, 5);
+    ctx.fill();
+    ctx.fillStyle = '#c05a4a';
+    roundRect(ebx, eby, Math.max(2, ebw * (e.hp / e.maxHp)), 10, 5);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(243, 236, 216, 0.75)';
+    ctx.font = '8px ' + FONT;
+    ctx.fillText(e.hp + ' / ' + e.maxHp, W / 2, eby + 22);
+
+    const logX = x + 18;
+    const logY = y + 76;
+    const logW = w - 36;
+    const logH = 132;
+    ctx.fillStyle = 'rgba(10, 16, 11, 0.6)';
+    roundRect(logX, logY, logW, logH, 8);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(200, 162, 96, 0.18)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    const logFont = '10px ' + FONT;
+    const logLines = [];
+    b.log.slice(-5).forEach((entry) => {
+      wrapText(entry, logW - 20, logFont).forEach((line) => logLines.push(line));
+    });
+    ctx.fillStyle = 'rgba(243, 236, 216, 0.82)';
+    ctx.font = logFont;
+    ctx.textAlign = 'left';
+    logLines.slice(-6).forEach((line, i, arr) => {
+      ctx.fillText(line, logX + 10, logY + 20 + i * 15);
+    });
+
+    const fx = x + 18;
+    const fy = y + 224;
+    const fw = w - 36;
+    battleActions().forEach((action, i) => {
+      const cy = fy + i * 46;
+      const active = i === b.sel;
+      ctx.fillStyle = active ? 'rgba(224, 181, 104, 0.18)' : 'rgba(255, 255, 255, 0.035)';
+      roundRect(fx, cy, fw, 40, 8);
+      ctx.fill();
+      if (active) {
+        ctx.strokeStyle = 'rgba(224, 181, 104, 0.6)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+      ctx.textAlign = 'left';
+      ctx.fillStyle = active ? '#ffe6b0' : '#f3ecd8';
+      ctx.font = '700 11px ' + FONT;
+      ctx.fillText((i + 1) + '. ' + action.label, fx + 12, cy + 16);
+      ctx.fillStyle = 'rgba(243, 236, 216, 0.5)';
+      ctx.font = '8.5px ' + FONT;
+      ctx.fillText(action.note, fx + 12, cy + 31);
+    });
+
+    ctx.textAlign = 'left';
+    ctx.fillStyle = 'rgba(243, 236, 216, 0.55)';
+    ctx.font = '8.5px ' + FONT;
+    ctx.fillText('YOU  ' + state.hp + '/' + state.maxHp + ' HP', x + 20, y + h - 22);
+    ctx.fillStyle = '#8fc4b0';
+    ctx.beginPath();
+    ctx.arc(x + 152, y + h - 26, 4, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(243, 236, 216, 0.55)';
+    ctx.fillText('POTIONS ' + state.potions, x + 162, y + h - 22);
+    ctx.textAlign = 'right';
+    ctx.fillStyle = 'rgba(243, 236, 216, 0.3)';
+    ctx.fillText('\u2191\u2193 choose \u00b7 E confirm', x + w - 20, y + h - 12);
+  }
+
+  function render() {
+    drawGround();
+    const items = [];
+    for (const s of solidsFor()) {
+      if (s.kind === 'bramble') continue;
+      items.push({ y: s.y + s.h, draw: () => drawSolid(s) });
+    }
+    if (state.scene === 'forest' && state.bramblesOpen) {
+      items.push({ y: 124, draw: drawBramble });
+    }
+    for (const id of SCENE_DEFS[state.scene].npcs) {
+      items.push({ y: NPCS[id].y + 18, draw: () => drawNPC(id) });
+    }
+    const dyn = state.scenes[state.scene];
+    if (dyn && dyn.chests) {
+      for (const c of dyn.chests) items.push({ y: c.y + 12, draw: () => drawChest(c) });
+    }
+    if (state.scene === 'forest' && dyn && dyn.charm && !dyn.charm.taken) {
+      items.push({ y: dyn.charm.y + 8, draw: () => drawCharm(dyn.charm) });
+    }
+    for (const e of currentEnemies()) {
+      if (!e.dead) items.push({ y: e.y + 20, draw: () => drawEnemy(e) });
+    }
+    items.push({ y: state.py + 18, draw: drawHero });
+    items.sort((a, b) => a.y - b.y);
+    items.forEach((item) => item.draw());
+
+    drawFireflies();
+
+    if (state.flash > 0) {
+      ctx.globalAlpha = Math.min(0.45, state.flash * 0.45);
+      ctx.fillStyle = state.flashColor;
+      ctx.fillRect(0, 0, W, H);
+      ctx.globalAlpha = 1;
+    }
+
+    drawHUD();
+    if (state.mode === 'playing') drawPrompt();
+    if (state.mode === 'battle') drawBattle();
+    if (state.mode === 'dialogue') drawDialogue();
+    drawToast();
+  }
+
+  /* ---------------- input ---------------- */
+
+  function padPress(dir) {
+    if (state.mode === 'playing') {
+      input[dir] = true;
+    } else if (state.mode === 'dialogue') {
+      if (dir === 'up') moveChoice(-1);
+      if (dir === 'down') moveChoice(1);
+    } else if (state.mode === 'battle') {
+      if (dir === 'up') battleSelect(-1);
+      if (dir === 'down') battleSelect(1);
+    }
+  }
+
+  function padRelease(dir) {
+    input[dir] = false;
+  }
+
+  function actPress() {
+    if (state.mode === 'playing') interact();
+    else if (state.mode === 'dialogue') choose(state.dlg ? state.dlg.sel : 0);
+    else if (state.mode === 'battle') battleChoose(state.battle ? state.battle.sel : 0);
+    else if (state.mode === 'done' || state.mode === 'failed') startRun();
+  }
+
+  function bindPad(el, onDown, onUp) {
+    el.addEventListener('pointerdown', (ev) => {
+      ev.preventDefault();
+      el.classList.add('is-down');
+      if (el.setPointerCapture) {
+        try { el.setPointerCapture(ev.pointerId); } catch (err) { /* ignore */ }
+      }
+      onDown();
+    });
+    const release = () => {
+      el.classList.remove('is-down');
+      if (onUp) onUp();
+    };
+    el.addEventListener('pointerup', release);
+    el.addEventListener('pointercancel', release);
+    el.addEventListener('pointerleave', release);
+  }
+
+  bindPad(leftBtn, () => padPress('left'), () => padRelease('left'));
+  bindPad(rightBtn, () => padPress('right'), () => padRelease('right'));
+  bindPad(upBtn, () => padPress('up'), () => padRelease('up'));
+  bindPad(downBtn, () => padPress('down'), () => padRelease('down'));
+  bindPad(actBtn, actPress, null);
+
+  startBtn.addEventListener('click', startRun);
+  againBtn.addEventListener('click', startRun);
+
+  window.addEventListener('keydown', (ev) => {
+    const k = ev.key;
+    if (k === ' ' || k === 'Enter' || k === 'Escape' || k.indexOf('Arrow') === 0) ev.preventDefault();
+
+    if (state.mode === 'menu') {
+      if (k === 'Enter' || k === ' ') startRun();
+      return;
+    }
+
+    if (state.mode === 'playing') {
+      if (k === 'ArrowLeft' || k === 'a' || k === 'A') input.left = true;
+      else if (k === 'ArrowRight' || k === 'd' || k === 'D') input.right = true;
+      else if (k === 'ArrowUp' || k === 'w' || k === 'W') input.up = true;
+      else if (k === 'ArrowDown' || k === 's' || k === 'S') input.down = true;
+      else if (k === 'e' || k === 'E' || k === ' ') interact();
+      return;
+    }
+
+    if (state.mode === 'dialogue' && state.dlg) {
+      if (k === 'ArrowUp' || k === 'w' || k === 'W') moveChoice(-1);
+      else if (k === 'ArrowDown' || k === 's' || k === 'S') moveChoice(1);
+      else if (k === '1' || k === '2' || k === '3' || k === '4') choose(Number(k) - 1);
+      else if (k === 'Enter' || k === ' ' || k === 'e' || k === 'E') choose(state.dlg.sel);
+      else if (k === 'Escape') closeDialogue();
+      return;
+    }
+
+    if (state.mode === 'battle' && state.battle) {
+      if (k === 'ArrowUp' || k === 'w' || k === 'W') battleSelect(-1);
+      else if (k === 'ArrowDown' || k === 's' || k === 'S') battleSelect(1);
+      else if (k === '1' || k === '2' || k === '3' || k === '4') battleChoose(Number(k) - 1);
+      else if (k === 'Enter' || k === ' ' || k === 'e' || k === 'E') battleChoose(state.battle.sel);
+      return;
+    }
+
+    if (state.mode === 'done' || state.mode === 'failed') {
+      if (k === 'Enter' || k === ' ') startRun();
+    }
+  });
+
+  window.addEventListener('keyup', (ev) => {
+    const k = ev.key;
+    if (k === 'ArrowLeft' || k === 'a' || k === 'A') input.left = false;
+    else if (k === 'ArrowRight' || k === 'd' || k === 'D') input.right = false;
+    else if (k === 'ArrowUp' || k === 'w' || k === 'W') input.up = false;
+    else if (k === 'ArrowDown' || k === 's' || k === 'S') input.down = false;
+  });
+
+  window.addEventListener('blur', () => {
+    input.left = false;
+    input.right = false;
+    input.up = false;
+    input.down = false;
+  });
+
+  /* ---------------- boot ---------------- */
+
+  let lastFrame = 0;
+  function frame(now) {
+    const dt = Math.min(0.05, lastFrame ? (now - lastFrame) / 1000 : 0.016);
+    lastFrame = now;
+    state.t += dt;
+    if (state.toastT > 0) state.toastT = Math.max(0, state.toastT - dt);
+    if (state.flash > 0) state.flash = Math.max(0, state.flash - dt * 2.2);
+    if (state.shake > 0) state.shake = Math.max(0, state.shake - dt * 3);
+    if (state.mode === 'playing') update(dt);
+    render();
+    requestAnimationFrame(frame);
+  }
+
+  resetWorld();
+  render();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

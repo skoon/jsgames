@@ -1,0 +1,1521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0c16">
+<title>Night Curator</title>
+<link rel="stylesheet" href="../common.css">
+<style>
+  :root {
+    --bg-top: #1d2138;
+    --bg-mid: #0a0c16;
+    --bg-bottom: #05060b;
+    --stage-bg: #0a0c16;
+    --ink: #eef2ff;
+  }
+  .panel { max-width: 384px; }
+  .title { margin-bottom: 12px; color: #a9e6ff; text-shadow: 0 0 28px rgba(120, 210, 255, 0.28); }
+  .title .accent { color: #f4cd8a; }
+  .score {
+    font-size: 52px;
+    line-height: 1;
+    font-weight: 700;
+    color: #f4cd8a;
+    text-shadow: 0 0 30px rgba(244, 205, 138, 0.3);
+  }
+  .best { margin-top: 9px; font-size: 12.5px; letter-spacing: 0.16em; }
+  .run-line {
+    margin: 6px 0 0;
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    text-transform: none;
+    color: rgba(238, 242, 255, 0.66);
+  }
+  .rules { margin-top: 12px; }
+  .rule { font-size: 12.5px; }
+  .rule::before { background: #f4cd8a; }
+  .btn { margin-top: 18px; padding: 13px 28px; font-size: 12.5px; font-weight: 700; letter-spacing: 0.16em; }
+</style>
+</head>
+<body>
+  <div id="stage">
+    <canvas id="game" width="480" height="640" tabindex="0" aria-label="Night Curator. Hang exhibits to earn coins, hire guards, and draw patrol routes with a drag so thieves never reach the gallery."></canvas>
+    <div id="overlay" class="overlay">
+      <div id="introPanel" class="panel panel-card">
+        <p class="eyebrow">Arcade &middot; Museum</p>
+        <h1 class="title">Night <span class="accent">Curator</span></h1>
+        <p class="lead">The gallery earns while the city sleeps, and the thieves know it. Hang new exhibits, hire guards, and trace their patrols before the alarms run out.</p>
+        <div class="rules">
+          <p class="rule">Every lit exhibit earns coins each second. Spend them on another exhibit or another guard.</p>
+          <p class="rule">Drag from a guard across the floor to draw a patrol loop, or tap the floor and tap the guard to set it stop by stop.</p>
+          <p class="rule">Guards catch any thief who comes within arm's reach. A thief cracks a case in a couple of seconds.</p>
+          <p class="rule">A stolen exhibit stops earning until you restore it. Three thieves escape and the gallery closes.</p>
+        </div>
+        <button type="button" id="startBtn" class="btn">Open the gallery</button>
+      </div>
+      <div id="resultPanel" class="panel panel-card" hidden>
+        <p class="eyebrow">Alarms spent</p>
+        <h1 class="title">Gallery <span class="accent">Closed</span></h1>
+        <p class="label">Coins earned</p>
+        <p class="score" id="finalScore">0</p>
+        <p class="best" id="bestLine">Best 0000</p>
+        <p class="run-line" id="runLine">Night 1 &middot; 0 thieves caught</p>
+        <button type="button" id="againBtn" class="btn">Reopen</button>
+      </div>
+    </div>
+  </div>
+  <p class="hint">Drag from a guard to draw a route &middot; 1 exhibit &middot; 2 hire &middot; R clear route</p>
+  <div id="srStatus" class="sr-only" aria-live="polite"></div>
+
+<script>
+(() => {
+  'use strict';
+
+  const W = 480;
+  const H = 640;
+  const TAU = Math.PI * 2;
+  const FONT = 'ui-monospace, "SF Mono", Menlo, Consolas, monospace';
+  const STORAGE_KEY = 'nightcurator.best.v1';
+
+  const HALL = { x: 14, y: 84, w: 452, h: 486 };
+  const FLOOR = { x: 26, y: 96, w: 428, h: 462, x2: 454, y2: 558 };
+  const PED_X = [120, 240, 360];
+  const PED_Y = [196, 322, 448];
+  const DOORS = [
+    { x: 34, y: 322 },
+    { x: 446, y: 322 },
+    { x: 240, y: 548 },
+  ];
+  const BTN_A = { x: 16, y: 582, w: 220, h: 48 };
+  const BTN_B = { x: 244, y: 582, w: 220, h: 48 };
+
+  const CATCH_R = 24;
+  const GUARD_SPEED = 58;
+  const MAX_EXHIBITS = 9;
+  const MAX_GUARDS = 4;
+  const ALARMS = 3;
+  const REPAIR_COST = 45;
+
+  const ARTIFACTS = [
+    { name: 'Moon Vase', value: 2.2, kind: 'vase', color: '#9fdcff' },
+    { name: 'Gilded Mask', value: 2.0, kind: 'mask', color: '#f4cd8a' },
+    { name: 'Star Chart', value: 1.7, kind: 'scroll', color: '#c9b8ff' },
+    { name: 'Ember Gem', value: 2.6, kind: 'gem', color: '#ff9a7a' },
+    { name: 'Astrolabe', value: 2.1, kind: 'astrolabe', color: '#9fe8c8' },
+    { name: 'Tin Crown', value: 1.9, kind: 'crown', color: '#ffd98a' },
+    { name: 'Salt Idol', value: 2.4, kind: 'idol', color: '#a8d8b0' },
+    { name: 'Amber Fossil', value: 1.8, kind: 'fossil', color: '#ffbe7a' },
+    { name: 'Glass Bell', value: 2.3, kind: 'bell', color: '#b9e6ff' },
+  ];
+
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d', { alpha: false });
+  const overlay = document.getElementById('overlay');
+  const introPanel = document.getElementById('introPanel');
+  const resultPanel = document.getElementById('resultPanel');
+  const startBtn = document.getElementById('startBtn');
+  const againBtn = document.getElementById('againBtn');
+  const finalScoreEl = document.getElementById('finalScore');
+  const bestLineEl = document.getElementById('bestLine');
+  const runLineEl = document.getElementById('runLine');
+  const srStatus = document.getElementById('srStatus');
+
+  const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
+  const rand = (lo, hi) => lo + Math.random() * (hi - lo);
+  const randInt = (n) => Math.floor(Math.random() * n);
+  const pad = (n, len) => String(n).padStart(len || 4, '0');
+  const dist = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
+
+  function hexA(hex, a) {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return 'rgba(' + r + ',' + g + ',' + b + ',' + a + ')';
+  }
+
+  function readBest() {
+    try {
+      const raw = window.localStorage.getItem(STORAGE_KEY);
+      const n = Number(raw);
+      return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+    } catch (err) {
+      return 0;
+    }
+  }
+
+  function writeBest(v) {
+    try {
+      window.localStorage.setItem(STORAGE_KEY, String(Math.floor(v)));
+    } catch (err) {
+      /* storage is optional */
+    }
+  }
+
+  function announce(msg) {
+    if (srStatus) srStatus.textContent = msg;
+  }
+
+  function text(str, x, y, size, color, align, weight) {
+    ctx.font = (weight || 400) + ' ' + size + 'px ' + FONT;
+    ctx.fillStyle = color;
+    ctx.textAlign = align || 'left';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillText(str, x, y);
+  }
+
+  function textFit(str, x, y, size, color, align, weight, maxW) {
+    let s = size;
+    ctx.font = (weight || 400) + ' ' + s + 'px ' + FONT;
+    while (s > 6 && ctx.measureText(str).width > maxW) {
+      s -= 0.5;
+      ctx.font = (weight || 400) + ' ' + s + 'px ' + FONT;
+    }
+    text(str, x, y, s, color, align, weight);
+  }
+
+  const state = {
+    mode: 'menu',
+    time: 0,
+    coins: 0,
+    total: 0,
+    income: 0,
+    alarms: ALARMS,
+    best: 0,
+    night: 1,
+    caught: 0,
+    escaped: 0,
+    exhibits: [],
+    guards: [],
+    thieves: [],
+    particles: [],
+    pops: [],
+    spawnTimer: 16,
+    selected: -1,
+    draft: [],
+    dragging: false,
+    dragMoved: false,
+    tip: 0,
+    shake: 0,
+    flash: 0,
+    flashColor: '#ff8474',
+    toast: '',
+    toastTimer: 0,
+  };
+  state.best = readBest();
+
+  function costExhibit() {
+    return 30 + 15 * state.exhibits.length;
+  }
+
+  function costGuard() {
+    return 55 + 30 * state.guards.length;
+  }
+
+  function usedSlots() {
+    const used = [];
+    for (let i = 0; i < MAX_EXHIBITS; i++) used.push(false);
+    for (const ex of state.exhibits) used[ex.slot] = true;
+    return used;
+  }
+
+  function freeSlot() {
+    const used = usedSlots();
+    for (let i = 0; i < MAX_EXHIBITS; i++) if (!used[i]) return i;
+    return -1;
+  }
+
+  function addExhibit(slot) {
+    const art = ARTIFACTS[slot % ARTIFACTS.length];
+    state.exhibits.push({
+      slot: slot,
+      x: PED_X[slot % 3],
+      y: PED_Y[Math.floor(slot / 3)],
+      art: art,
+      lit: true,
+      warm: 0,
+    });
+  }
+
+  function addParticles(x, y, color, count, spread) {
+    for (let i = 0; i < count; i++) {
+      const a = rand(0, TAU);
+      const sp = rand(20, 70) * (spread || 1);
+      state.particles.push({
+        x: x,
+        y: y,
+        vx: Math.cos(a) * sp,
+        vy: Math.sin(a) * sp - 20,
+        life: rand(0.4, 0.9),
+        max: 0.9,
+        size: rand(1.2, 2.8),
+        color: color,
+      });
+    }
+  }
+
+  function pop(textStr, x, y, color, big) {
+    state.pops.push({
+      text: textStr,
+      x: x,
+      y: y,
+      color: color,
+      life: big ? 1.4 : 1.0,
+      max: big ? 1.4 : 1.0,
+      size: big ? 16 : 11,
+    });
+  }
+
+  function toast(msg) {
+    state.toast = msg;
+    state.toastTimer = 2.0;
+  }
+
+  function buyExhibit() {
+    if (state.mode !== 'playing') return;
+    const slot = freeSlot();
+    if (slot < 0) {
+      toast('The gallery is full');
+      announce('The gallery is full.');
+      return;
+    }
+    const cost = costExhibit();
+    if (state.coins < cost) {
+      toast('Need ' + cost + ' coins');
+      announce('Not enough coins. An exhibit costs ' + cost + '.');
+      return;
+    }
+    state.coins -= cost;
+    addExhibit(slot);
+    state.tip = 0;
+    addParticles(PED_X[slot % 3], PED_Y[Math.floor(slot / 3)], '#f4cd8a', 16, 1);
+    pop('HUNG', PED_X[slot % 3], PED_Y[Math.floor(slot / 3)] - 34, '#f4cd8a', false);
+    announce('Exhibit hung for ' + cost + ' coins. Income is now ' + state.income.toFixed(1) + ' per second.');
+  }
+
+  function hireGuard() {
+    if (state.mode !== 'playing') return;
+    if (state.guards.length >= MAX_GUARDS) {
+      toast('All guard posts are filled');
+      announce('All guard posts are filled.');
+      return;
+    }
+    const cost = costGuard();
+    if (state.coins < cost) {
+      toast('Need ' + cost + ' coins');
+      announce('Not enough coins. A guard costs ' + cost + '.');
+      return;
+    }
+    state.coins -= cost;
+    const gx = 160 + state.guards.length * 50;
+    state.guards.push({
+      x: gx,
+      y: 516,
+      route: [],
+      seg: 0,
+      angle: -Math.PI / 2,
+      flash: 0,
+      walk: 0,
+    });
+    state.selected = state.guards.length - 1;
+    state.draft = [];
+    state.tip = 0;
+    addParticles(gx, 516, '#7fe3c8', 14, 1);
+    pop('HIRED', gx, 490, '#7fe3c8', false);
+    announce('Guard hired for ' + cost + '. Drag from the guard to draw a patrol route.');
+    toast('Drag from the guard to draw a route');
+  }
+
+  function repairExhibit(ex) {
+    if (state.mode !== 'playing' || ex.lit) return;
+    if (state.coins < REPAIR_COST) {
+      toast('Need ' + REPAIR_COST + ' coins to restore');
+      announce('Not enough coins. Restoration costs ' + REPAIR_COST + '.');
+      return;
+    }
+    state.coins -= REPAIR_COST;
+    ex.lit = true;
+    ex.warm = 1;
+    addParticles(ex.x, ex.y, ex.art.color, 14, 1);
+    pop('RESTORED', ex.x, ex.y - 34, '#9fe8c8', false);
+    announce(ex.art.name + ' restored. It is earning again.');
+  }
+
+  function startRun() {
+    state.mode = 'playing';
+    state.time = 0;
+    state.coins = 40;
+    state.total = 0;
+    state.income = 0;
+    state.alarms = ALARMS;
+    state.night = 1;
+    state.caught = 0;
+    state.escaped = 0;
+    state.exhibits = [];
+    state.guards = [];
+    state.thieves = [];
+    state.particles = [];
+    state.pops = [];
+    state.spawnTimer = 16;
+    state.selected = -1;
+    state.draft = [];
+    state.dragging = false;
+    state.dragMoved = false;
+    state.tip = 15;
+    state.shake = 0;
+    state.flash = 0;
+    state.toast = '';
+    state.toastTimer = 0;
+    addExhibit(0);
+    addExhibit(4);
+    addExhibit(8);
+    overlay.hidden = true;
+    introPanel.hidden = true;
+    resultPanel.hidden = true;
+    canvas.focus();
+    announce('The gallery opens. Three exhibits are earning. Choose an exhibit or a guard from the bar below.');
+  }
+
+  /* ---------- patrols ---------- */
+  function selectGuard(i) {
+    const g = state.guards[i];
+    if (!g) return;
+    if (state.selected === i && state.draft.length >= 2) {
+      finalizeRoute();
+      return;
+    }
+    state.selected = i;
+    state.draft = [];
+    state.dragging = false;
+    state.dragMoved = false;
+    announce('Guard ' + (i + 1) + ' selected. Drag across the gallery or tap stops, then tap the guard to set the loop.');
+  }
+
+  function addWaypoint(p) {
+    const g = state.guards[state.selected];
+    if (!g) return;
+    const x = clamp(p.x, FLOOR.x + 14, FLOOR.x2 - 14);
+    const y = clamp(p.y, FLOOR.y + 14, FLOOR.y2 - 14);
+    const last = state.draft.length ? state.draft[state.draft.length - 1] : { x: g.x, y: g.y };
+    if (dist(x, y, last.x, last.y) < 16) return;
+    state.draft.push({ x: x, y: y });
+  }
+
+  function finalizeRoute() {
+    const g = state.guards[state.selected];
+    if (!g) return;
+    if (state.draft.length < 2) {
+      toast('Add at least two stops');
+      announce('A patrol needs at least two stops.');
+      return;
+    }
+    g.route = state.draft.map((p) => ({ x: p.x, y: p.y }));
+    g.seg = 0;
+    state.draft = [];
+    state.dragging = false;
+    addParticles(g.x, g.y, '#7fe3c8', 10, 1);
+    toast('Patrol route set');
+    announce('Patrol route set with ' + g.route.length + ' stops.');
+  }
+
+  function clearRoute() {
+    const g = state.guards[state.selected];
+    if (!g) return;
+    if (!g.route.length && !state.draft.length) return;
+    g.route = [];
+    g.seg = 0;
+    state.draft = [];
+    toast('Patrol route cleared');
+    announce('Patrol route cleared.');
+  }
+
+  function updateGuard(g, dt) {
+    if (!g.route.length) return;
+    const target = g.route[g.seg];
+    const dx = target.x - g.x;
+    const dy = target.y - g.y;
+    const d = Math.hypot(dx, dy);
+    if (d < 1.6) {
+      g.seg = (g.seg + 1) % g.route.length;
+      return;
+    }
+    const step = Math.min(d, GUARD_SPEED * dt);
+    g.x += (dx / d) * step;
+    g.y += (dy / d) * step;
+    g.angle = Math.atan2(dy, dx);
+    g.walk += dt * 9;
+  }
+
+  /* ---------- thieves ---------- */
+  function litExhibits() {
+    return state.exhibits.filter((ex) => ex.lit);
+  }
+
+  function nearestDoor(x, y) {
+    let best = DOORS[0];
+    let bestD = Infinity;
+    for (const d of DOORS) {
+      const dd = dist(x, y, d.x, d.y);
+      if (dd < bestD) {
+        bestD = dd;
+        best = d;
+      }
+    }
+    return best;
+  }
+
+  function approachPoint(ex, door) {
+    const dx = door.x - ex.x;
+    const dy = door.y - ex.y;
+    const d = Math.hypot(dx, dy) || 1;
+    return { x: ex.x + (dx / d) * 36, y: ex.y + (dy / d) * 36 };
+  }
+
+  function nextSpawnDelay() {
+    return Math.max(2.8, 10.5 - state.night * 0.8) * rand(0.82, 1.18);
+  }
+
+  function spawnThief() {
+    const lit = litExhibits();
+    if (!lit.length) return;
+    let total = 0;
+    for (const ex of lit) total += ex.art.value;
+    let pick = Math.random() * total;
+    let ex = lit[0];
+    for (const cand of lit) {
+      pick -= cand.art.value;
+      if (pick <= 0) {
+        ex = cand;
+        break;
+      }
+    }
+    const door = DOORS[randInt(DOORS.length)];
+    const ap = approachPoint(ex, door);
+    state.thieves.push({
+      x: door.x,
+      y: door.y,
+      ex: ex,
+      door: door,
+      tx: ap.x,
+      ty: ap.y,
+      state: 'approach',
+      timer: 2.5,
+      carry: null,
+      angle: Math.atan2(ap.y - door.y, ap.x - door.x),
+      bob: rand(0, TAU),
+      speed: Math.min(52, 34 + state.night * 2),
+      dead: false,
+    });
+  }
+
+  function retargetThief(t) {
+    const lit = litExhibits();
+    if (!lit.length) {
+      t.state = 'flee';
+      const d = nearestDoor(t.x, t.y);
+      t.door = d;
+      t.tx = d.x;
+      t.ty = d.y;
+      return;
+    }
+    let best = lit[0];
+    let bestD = Infinity;
+    for (const ex of lit) {
+      const dd = dist(t.x, t.y, ex.x, ex.y);
+      if (dd < bestD) {
+        bestD = dd;
+        best = ex;
+      }
+    }
+    const ap = approachPoint(best, t.door);
+    t.ex = best;
+    t.tx = ap.x;
+    t.ty = ap.y;
+    t.state = 'approach';
+  }
+
+  function moveToward(o, tx, ty, speed, dt) {
+    const dx = tx - o.x;
+    const dy = ty - o.y;
+    const d = Math.hypot(dx, dy);
+    if (d < 0.001) return;
+    const step = Math.min(d, speed * dt);
+    o.x += (dx / d) * step;
+    o.y += (dy / d) * step;
+    o.angle = Math.atan2(dy, dx);
+  }
+
+  function updateThief(t, dt) {
+    const speed = t.state === 'flee' ? t.speed * 1.35 : t.speed;
+    t.bob += dt * 7;
+    if (t.state === 'approach') {
+      moveToward(t, t.tx, t.ty, speed, dt);
+      if (dist(t.x, t.y, t.tx, t.ty) < 3) {
+        t.state = 'crack';
+        t.timer = 2.5;
+      }
+    } else if (t.state === 'crack') {
+      if (!t.ex.lit) {
+        retargetThief(t);
+        return;
+      }
+      t.timer -= dt;
+      if (t.timer <= 0) {
+        t.ex.lit = false;
+        t.carry = t.ex;
+        t.state = 'flee';
+        const d = nearestDoor(t.x, t.y);
+        t.door = d;
+        t.tx = d.x;
+        t.ty = d.y;
+        pop('TAKEN', t.ex.x, t.ex.y - 36, '#ff8474', false);
+        addParticles(t.ex.x, t.ex.y, '#ff8474', 10, 1);
+        announce(t.ex.art.name + ' has been lifted. It has stopped earning until restored.');
+      }
+    } else if (t.state === 'flee') {
+      moveToward(t, t.tx, t.ty, speed, dt);
+      if (dist(t.x, t.y, t.tx, t.ty) < 5) escapeThief(t);
+    }
+  }
+
+  function catchThief(t) {
+    if (t.dead) return;
+    t.dead = true;
+    state.caught += 1;
+    const bounty = 9 + Math.floor(state.night * 1.5);
+    state.coins += bounty;
+    state.total += bounty;
+    if (t.carry) {
+      t.carry.lit = true;
+      t.carry.warm = 1;
+    }
+    addParticles(t.x, t.y, '#7fe3c8', 16, 1.2);
+    pop('+' + bounty, t.x, t.y - 28, '#7fe3c8', false);
+    state.flash = 0.4;
+    state.flashColor = '#7fe3c8';
+    if (state.caught % 8 === 0 && state.alarms < 5) {
+      state.alarms += 1;
+      pop('+1 ALARM', 240, 250, '#f4cd8a', true);
+      announce('Thief caught, and a commendation restores one alarm.');
+    } else {
+      announce('Thief caught. ' + state.caught + ' caught tonight.');
+    }
+  }
+
+  function escapeThief(t) {
+    if (t.dead) return;
+    t.dead = true;
+    state.escaped += 1;
+    state.alarms -= 1;
+    state.flash = 1;
+    state.flashColor = '#ff8474';
+    state.shake = 7;
+    pop('-1 ALARM', 240, 300, '#ff8474', true);
+    announce('A thief escaped with ' + (t.carry ? t.carry.art.name : 'nothing') + '. ' + state.alarms + ' alarms left.');
+    if (state.alarms <= 0) endRun();
+  }
+
+  /* ---------- loop ---------- */
+  function updateParticles(dt) {
+    for (const p of state.particles) {
+      p.life -= dt;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.vy += 70 * dt;
+      p.vx *= 0.985;
+    }
+    state.particles = state.particles.filter((p) => p.life > 0);
+  }
+
+  function updatePops(dt) {
+    for (const p of state.pops) {
+      p.life -= dt;
+      p.y -= 22 * dt;
+    }
+    state.pops = state.pops.filter((p) => p.life > 0);
+  }
+
+  function update(dt) {
+    updateParticles(dt);
+    updatePops(dt);
+    state.flash = Math.max(0, state.flash - dt * 2.2);
+    state.shake = Math.max(0, state.shake - dt * 18);
+    state.toastTimer = Math.max(0, state.toastTimer - dt);
+    for (const ex of state.exhibits) ex.warm = Math.max(0, ex.warm - dt * 1.4);
+    for (const g of state.guards) g.flash = Math.max(0, g.flash - dt * 2.4);
+    if (state.mode !== 'playing') return;
+
+    state.time += dt;
+    state.night = 1 + Math.floor(state.time / 50);
+    state.tip = Math.max(0, state.tip - dt);
+
+    state.income = 0;
+    for (const ex of state.exhibits) {
+      if (!ex.lit) continue;
+      const gain = ex.art.value * dt;
+      state.coins += gain;
+      state.total += gain;
+      state.income += ex.art.value;
+    }
+
+    for (const g of state.guards) updateGuard(g, dt);
+
+    state.spawnTimer -= dt;
+    if (state.spawnTimer <= 0) {
+      if (state.thieves.length >= 5) {
+        state.spawnTimer = 1.2;
+      } else {
+        spawnThief();
+        state.spawnTimer = nextSpawnDelay();
+      }
+    }
+
+    for (const t of state.thieves) updateThief(t, dt);
+    if (state.mode !== 'playing') {
+      state.thieves = state.thieves.filter((t) => !t.dead);
+      return;
+    }
+    for (const t of state.thieves) {
+      if (t.dead) continue;
+      for (const g of state.guards) {
+        if (dist(t.x, t.y, g.x, g.y) < CATCH_R) {
+          g.flash = 1;
+          catchThief(t);
+          break;
+        }
+      }
+    }
+    state.thieves = state.thieves.filter((t) => !t.dead);
+  }
+
+  function endRun() {
+    if (state.mode !== 'playing') return;
+    state.mode = 'over';
+    state.dragging = false;
+    state.dragMoved = false;
+    state.selected = -1;
+    state.draft = [];
+    const score = Math.floor(state.total);
+    const isBest = score > state.best;
+    if (isBest) {
+      state.best = score;
+      writeBest(score);
+    }
+    finalScoreEl.textContent = String(score);
+    bestLineEl.textContent = (isBest ? 'New best ' : 'Best ') + pad(state.best);
+    runLineEl.textContent = 'Night ' + state.night + ' \u00b7 ' + state.caught + ' thieves caught';
+    overlay.hidden = false;
+    introPanel.hidden = true;
+    resultPanel.hidden = false;
+    againBtn.focus();
+    announce('The gallery is closed. You earned ' + score + ' coins and caught ' + state.caught + ' thieves.');
+  }
+
+  /* ---------- painting ---------- */
+  function roundRect(x, y, w, h, r) {
+    const rr = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + rr, y);
+    ctx.lineTo(x + w - rr, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + rr);
+    ctx.lineTo(x + w, y + h - rr);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - rr, y + h);
+    ctx.lineTo(x + rr, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - rr);
+    ctx.lineTo(x, y + rr);
+    ctx.quadraticCurveTo(x, y, x + rr, y);
+    ctx.closePath();
+  }
+
+  function ellipse(x, y, rx, ry, color) {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.ellipse(x, y, rx, ry, 0, 0, TAU);
+    ctx.fill();
+  }
+
+  function drawHall() {
+    ctx.fillStyle = '#070912';
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.fillStyle = '#161c2d';
+    roundRect(HALL.x, HALL.y, HALL.w, HALL.h, 10);
+    ctx.fill();
+
+    ctx.fillStyle = '#0e1422';
+    ctx.fillRect(FLOOR.x, FLOOR.y, FLOOR.w, FLOOR.h);
+
+    const TS = 54;
+    for (let row = 0; row * TS < FLOOR.h; row++) {
+      for (let col = 0; col * TS < FLOOR.w; col++) {
+        if ((row + col) % 2 === 0) continue;
+        ctx.fillStyle = 'rgba(190, 215, 255, 0.022)';
+        ctx.fillRect(FLOOR.x + col * TS, FLOOR.y + row * TS, TS, TS);
+      }
+    }
+
+    ctx.fillStyle = 'rgba(92, 34, 50, 0.34)';
+    ctx.fillRect(203, 286, 74, FLOOR.y2 - 286);
+    ctx.strokeStyle = 'rgba(244, 205, 138, 0.16)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(203.5, 286.5, 73, FLOOR.y2 - 287);
+
+    ctx.strokeStyle = 'rgba(244, 205, 138, 0.22)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(FLOOR.x + 1, FLOOR.y + 1, FLOOR.w - 2, FLOOR.h - 2);
+
+    for (let i = 0; i < 5; i++) {
+      const x = FLOOR.x + 46 + i * 84;
+      ctx.strokeStyle = 'rgba(190, 215, 255, 0.05)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(x, HALL.y + 2);
+      ctx.lineTo(x, FLOOR.y);
+      ctx.stroke();
+    }
+
+    drawDoor(14, 296, 14, 52, 1, 0);
+    drawDoor(452, 296, 14, 52, -1, 0);
+    drawDoor(214, 558, 52, 12, 0, -1);
+
+    const glow = ctx.createRadialGradient(240, 320, 40, 240, 320, 250);
+    glow.addColorStop(0, 'rgba(130, 150, 220, 0.05)');
+    glow.addColorStop(1, 'rgba(130, 150, 220, 0)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(FLOOR.x, FLOOR.y, FLOOR.w, FLOOR.h);
+  }
+
+  function drawDoor(x, y, w, h, dx, dy) {
+    const g = ctx.createLinearGradient(x, y, x + (dx ? w : 0), y + (dy ? h : 0));
+    g.addColorStop(0, 'rgba(255, 196, 120, 0.36)');
+    g.addColorStop(1, 'rgba(255, 196, 120, 0.06)');
+    ctx.fillStyle = g;
+    ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = 'rgba(255, 214, 150, 0.5)';
+    if (dx) ctx.fillRect(dx > 0 ? x + w - 2 : x, y, 2, h);
+    else ctx.fillRect(x, y + h - 2, w, 2);
+  }
+
+  function drawPlinth(ex) {
+    const lit = ex.lit;
+    if (lit) {
+      const pool = ctx.createRadialGradient(ex.x, ex.y, 4, ex.x, ex.y, 56);
+      pool.addColorStop(0, 'rgba(255, 214, 150, 0.15)');
+      pool.addColorStop(1, 'rgba(255, 214, 150, 0)');
+      ctx.fillStyle = pool;
+      ctx.beginPath();
+      ctx.arc(ex.x, ex.y, 56, 0, TAU);
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.moveTo(ex.x - 8, FLOOR.y);
+      ctx.lineTo(ex.x + 8, FLOOR.y);
+      ctx.lineTo(ex.x + 26, ex.y - 18);
+      ctx.lineTo(ex.x - 26, ex.y - 18);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(255, 222, 168, 0.05)';
+      ctx.fill();
+    }
+
+    ellipse(ex.x, ex.y + 24, 24, 7, 'rgba(0, 0, 0, 0.45)');
+
+    ctx.fillStyle = lit ? '#262f46' : '#1a2030';
+    roundRect(ex.x - 24, ex.y + 8, 48, 20, 4);
+    ctx.fill();
+
+    ctx.fillStyle = lit ? '#333f5e' : '#222a3c';
+    roundRect(ex.x - 20, ex.y + 4, 40, 12, 3);
+    ctx.fill();
+
+    ctx.fillStyle = lit ? 'rgba(244, 205, 138, 0.55)' : 'rgba(150, 160, 185, 0.25)';
+    ctx.fillRect(ex.x - 22, ex.y + 2, 44, 2);
+
+    ctx.strokeStyle = lit ? 'rgba(178, 214, 255, 0.22)' : 'rgba(255, 132, 116, 0.25)';
+    ctx.lineWidth = 1;
+    if (lit) ctx.setLineDash([]);
+    else ctx.setLineDash([3, 4]);
+    roundRect(ex.x - 19, ex.y - 28, 38, 36, 3);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    if (lit) {
+      drawArtifact(ex.art.kind, ex.x, ex.y - 8, ex.art.color);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.10)';
+      ctx.beginPath();
+      ctx.moveTo(ex.x - 16, ex.y - 26);
+      ctx.lineTo(ex.x - 8, ex.y - 26);
+      ctx.lineTo(ex.x - 14, ex.y - 14);
+      ctx.lineTo(ex.x - 18, ex.y - 18);
+      ctx.closePath();
+      ctx.fill();
+    } else {
+      ctx.strokeStyle = 'rgba(150, 165, 195, 0.35)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(ex.x - 14, ex.y - 22);
+      ctx.lineTo(ex.x - 4, ex.y - 10);
+      ctx.lineTo(ex.x - 10, ex.y + 2);
+      ctx.moveTo(ex.x + 12, ex.y - 20);
+      ctx.lineTo(ex.x + 4, ex.y - 8);
+      ctx.stroke();
+    }
+
+    const label = lit ? ex.art.name.toUpperCase() : 'RESTORE ' + REPAIR_COST;
+    ctx.font = '600 7px ' + FONT;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = lit ? 'rgba(238, 242, 255, 0.5)' : 'rgba(255, 132, 116, 0.7)';
+    ctx.fillText(label, ex.x, ex.y + 44);
+
+    if (lit) {
+      ctx.font = '600 7px ' + FONT;
+      ctx.fillStyle = 'rgba(244, 205, 138, 0.65)';
+      ctx.fillText('\u25c6 ' + ex.art.value.toFixed(1) + '/s', ex.x, ex.y + 54);
+    }
+  }
+
+  function drawArtifact(kind, x, y, color) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.fillStyle = color;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1;
+    if (kind === 'vase') {
+      ctx.beginPath();
+      ctx.moveTo(-2, -12);
+      ctx.lineTo(2, -12);
+      ctx.lineTo(3, -7);
+      ctx.quadraticCurveTo(11, -2, 7, 7);
+      ctx.quadraticCurveTo(0, 12, -7, 7);
+      ctx.quadraticCurveTo(-11, -2, -3, -7);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
+      ctx.fillRect(-5, 2, 10, 1.5);
+    } else if (kind === 'mask') {
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 8, 10, 0, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(12, 16, 28, 0.8)';
+      ctx.beginPath();
+      ctx.ellipse(-3, -2, 2, 2.6, 0, 0, TAU);
+      ctx.ellipse(3, -2, 2, 2.6, 0, 0, TAU);
+      ctx.fill();
+    } else if (kind === 'scroll') {
+      ctx.fillRect(-9, -7, 18, 14);
+      ctx.fillStyle = 'rgba(12, 16, 28, 0.45)';
+      ctx.fillRect(-6, -3, 12, 1);
+      ctx.fillRect(-6, 1, 10, 1);
+      ctx.fillRect(-6, 5, 7, 1);
+      ctx.fillStyle = color;
+      ctx.fillRect(-10, -8, 3, 16);
+      ctx.fillRect(7, -8, 3, 16);
+    } else if (kind === 'gem') {
+      ctx.beginPath();
+      ctx.moveTo(0, -11);
+      ctx.lineTo(9, -2);
+      ctx.lineTo(0, 11);
+      ctx.lineTo(-9, -2);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+      ctx.beginPath();
+      ctx.moveTo(0, -9);
+      ctx.lineTo(3, -2);
+      ctx.lineTo(-4, -2);
+      ctx.closePath();
+      ctx.fill();
+    } else if (kind === 'astrolabe') {
+      ctx.beginPath();
+      ctx.arc(0, 0, 10, 0, TAU);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(0, 0, 5, 0, TAU);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(-12, 0);
+      ctx.lineTo(12, 0);
+      ctx.moveTo(0, -12);
+      ctx.lineTo(0, 12);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(0, 0, 10, -2.2, -0.9);
+      ctx.stroke();
+    } else if (kind === 'crown') {
+      ctx.beginPath();
+      ctx.moveTo(-10, 7);
+      ctx.lineTo(-10, -6);
+      ctx.lineTo(-5, 0);
+      ctx.lineTo(0, -9);
+      ctx.lineTo(5, 0);
+      ctx.lineTo(10, -6);
+      ctx.lineTo(10, 7);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = 'rgba(12, 16, 28, 0.4)';
+      ctx.fillRect(-10, 3, 20, 2);
+    } else if (kind === 'idol') {
+      ctx.beginPath();
+      ctx.arc(0, -7, 4.5, 0, TAU);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(-6, 10);
+      ctx.lineTo(-4, -2);
+      ctx.lineTo(4, -2);
+      ctx.lineTo(6, 10);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = 'rgba(12, 16, 28, 0.5)';
+      ctx.fillRect(-5, 2, 10, 1.5);
+    } else if (kind === 'fossil') {
+      ctx.beginPath();
+      for (let i = 0; i < 34; i++) {
+        const a = i * 0.42;
+        const r = 1 + i * 0.36;
+        const px = Math.cos(a) * r;
+        const py = Math.sin(a) * r;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+    } else if (kind === 'bell') {
+      ctx.beginPath();
+      ctx.moveTo(-9, 8);
+      ctx.quadraticCurveTo(-8, -6, 0, -9);
+      ctx.quadraticCurveTo(8, -6, 9, 8);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = 'rgba(12, 16, 28, 0.6)';
+      ctx.beginPath();
+      ctx.arc(0, 10, 2.2, 0, TAU);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawRoutes() {
+    for (let i = 0; i < state.guards.length; i++) {
+      const g = state.guards[i];
+      if (g.route.length < 2) continue;
+      ctx.save();
+      ctx.setLineDash([6, 6]);
+      ctx.lineDashOffset = -state.time * 16;
+      ctx.lineWidth = i === state.selected ? 2.2 : 1.6;
+      ctx.strokeStyle = i === state.selected ? 'rgba(127, 227, 200, 0.8)' : 'rgba(127, 227, 200, 0.26)';
+      ctx.beginPath();
+      ctx.moveTo(g.route[0].x, g.route[0].y);
+      for (let k = 1; k < g.route.length; k++) ctx.lineTo(g.route[k].x, g.route[k].y);
+      ctx.closePath();
+      ctx.stroke();
+      ctx.restore();
+
+      for (let k = 0; k < g.route.length; k++) {
+        const p = g.route[k];
+        ctx.fillStyle = i === state.selected ? 'rgba(127, 227, 200, 0.9)' : 'rgba(127, 227, 200, 0.35)';
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 2.6, 0, TAU);
+        ctx.fill();
+        if (i === state.selected) {
+          ctx.strokeStyle = 'rgba(127, 227, 200, 0.25)';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, 7, 0, TAU);
+          ctx.stroke();
+        }
+      }
+    }
+
+    const g = state.guards[state.selected];
+    if (!g || !state.draft.length) return;
+    ctx.save();
+    ctx.setLineDash([4, 4]);
+    ctx.strokeStyle = 'rgba(244, 205, 138, 0.85)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(g.x, g.y);
+    for (const p of state.draft) ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+    ctx.restore();
+    for (const p of state.draft) {
+      ctx.fillStyle = '#f4cd8a';
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 3.2, 0, TAU);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(244, 205, 138, 0.3)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 8, 0, TAU);
+      ctx.stroke();
+    }
+  }
+
+  function drawThief(t) {
+    const bob = Math.sin(t.bob) * 1.5;
+    ellipse(t.x, t.y + 12, 11, 4, 'rgba(0, 0, 0, 0.4)');
+    ctx.fillStyle = '#0c0f1b';
+    roundRect(t.x - 8, t.y - 6 + bob, 16, 20, 6);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(t.x, t.y - 7 + bob, 7.5, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = '#ff6f6f';
+    ctx.beginPath();
+    ctx.arc(t.x - 3, t.y - 8 + bob, 1.5, 0, TAU);
+    ctx.arc(t.x + 3, t.y - 8 + bob, 1.5, 0, TAU);
+    ctx.fill();
+
+    if (t.carry) {
+      ctx.fillStyle = '#3a2c18';
+      ctx.beginPath();
+      ctx.arc(t.x + 11, t.y + 2 + bob, 5.5, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = t.carry.art.color;
+      ctx.beginPath();
+      ctx.moveTo(t.x + 11, t.y - 2 + bob);
+      ctx.lineTo(t.x + 14, t.y + 2 + bob);
+      ctx.lineTo(t.x + 11, t.y + 6 + bob);
+      ctx.lineTo(t.x + 8, t.y + 2 + bob);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    if (t.state === 'crack') {
+      const p = 1 - t.timer / 2.5;
+      ctx.strokeStyle = 'rgba(255, 132, 116, 0.85)';
+      ctx.lineWidth = 2.4;
+      ctx.beginPath();
+      ctx.arc(t.x, t.y - 2, 17, -Math.PI / 2, -Math.PI / 2 + TAU * p);
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(255, 132, 116, 0.18)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(t.x, t.y - 2, 17, 0, TAU);
+      ctx.stroke();
+    }
+  }
+
+  function drawGuard(g, i) {
+    ctx.save();
+    ctx.translate(g.x, g.y);
+    ctx.rotate(g.angle);
+    const cone = ctx.createLinearGradient(0, 0, 70, 0);
+    cone.addColorStop(0, 'rgba(255, 232, 178, 0.16)');
+    cone.addColorStop(1, 'rgba(255, 232, 178, 0)');
+    ctx.fillStyle = cone;
+    ctx.beginPath();
+    ctx.moveTo(0, -5);
+    ctx.lineTo(70, -26);
+    ctx.lineTo(70, 26);
+    ctx.lineTo(0, 5);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+
+    ctx.strokeStyle = 'rgba(127, 227, 200, ' + (i === state.selected ? 0.5 : 0.16) + ')';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 4]);
+    ctx.beginPath();
+    ctx.arc(g.x, g.y, CATCH_R, 0, TAU);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ellipse(g.x, g.y + 12, 10, 4, 'rgba(0, 0, 0, 0.45)');
+
+    const step = Math.sin(g.walk) * 1.6;
+    ctx.fillStyle = '#0d1a1c';
+    ctx.fillRect(g.x - 5, g.y + 6, 3.4, 5 + step);
+    ctx.fillRect(g.x + 1.6, g.y + 6, 3.4, 5 - step);
+
+    ctx.fillStyle = '#3f8f7c';
+    roundRect(g.x - 7, g.y - 6, 14, 15, 4);
+    ctx.fill();
+    ctx.fillStyle = '#2c6a5c';
+    ctx.fillRect(g.x - 7, g.y + 3, 14, 3);
+
+    ctx.fillStyle = '#f4cd8a';
+    ctx.beginPath();
+    ctx.arc(g.x, g.y - 1, 1.8, 0, TAU);
+    ctx.fill();
+
+    ctx.fillStyle = '#e7c9a2';
+    ctx.beginPath();
+    ctx.arc(g.x, g.y - 9, 4.6, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = '#28584f';
+    ctx.beginPath();
+    ctx.arc(g.x, g.y - 11, 5, Math.PI, TAU);
+    ctx.fill();
+    ctx.fillRect(g.x - 6.4, g.y - 11, 12.8, 2);
+
+    if (g.flash > 0) {
+      ctx.strokeStyle = 'rgba(127, 227, 200, ' + g.flash.toFixed(3) + ')';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(g.x, g.y, 20 + (1 - g.flash) * 12, 0, TAU);
+      ctx.stroke();
+    }
+
+    if (i === state.selected) {
+      ctx.fillStyle = 'rgba(244, 205, 138, 0.9)';
+      ctx.font = '700 8px ' + FONT;
+      ctx.textAlign = 'center';
+      ctx.fillText('GUARD ' + (i + 1), g.x, g.y - 22);
+    }
+  }
+
+  function drawParticles() {
+    for (const p of state.particles) {
+      ctx.globalAlpha = Math.max(0, p.life / p.max);
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size, 0, TAU);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawPops() {
+    for (const p of state.pops) {
+      const a = Math.max(0, p.life / p.max);
+      ctx.globalAlpha = a;
+      ctx.font = '700 ' + p.size + 'px ' + FONT;
+      ctx.textAlign = 'center';
+      ctx.fillStyle = p.color;
+      ctx.fillText(p.text, p.x, p.y);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawHud() {
+    const g = ctx.createLinearGradient(0, 0, 0, 76);
+    g.addColorStop(0, 'rgba(12, 16, 28, 1)');
+    g.addColorStop(1, 'rgba(10, 13, 23, 0.96)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, 76);
+    ctx.fillStyle = 'rgba(244, 205, 138, 0.22)';
+    ctx.fillRect(0, 75, W, 1);
+
+    ctx.save();
+    ctx.translate(24, 28);
+    ctx.rotate(Math.PI / 4);
+    ctx.fillStyle = '#f4cd8a';
+    ctx.fillRect(-4, -4, 8, 8);
+    ctx.restore();
+
+    text(String(Math.floor(state.coins)), 40, 40, 23, '#f4cd8a', 'left', 700);
+    text('+' + state.income.toFixed(1) + ' / sec', 41, 58, 9, 'rgba(127, 227, 200, 0.85)', 'left', 600);
+
+    text('NIGHT ' + state.night, 240, 30, 9, 'rgba(238, 242, 255, 0.5)', 'center', 700);
+    const t = Math.floor(state.time);
+    text(Math.floor(t / 60) + ':' + pad(t % 60, 2), 240, 54, 18, '#eef2ff', 'center', 700);
+
+    text('ALARMS', 458, 28, 8, 'rgba(238, 242, 255, 0.45)', 'right', 700);
+    const lamps = Math.max(3, state.alarms);
+    for (let i = 0; i < lamps; i++) {
+      const x = 458 - (lamps - 1 - i) * 20 - 6;
+      const on = i < state.alarms;
+      ctx.fillStyle = on ? '#ff8474' : 'rgba(255, 132, 116, 0.14)';
+      ctx.beginPath();
+      ctx.arc(x, 46, 6, 0, TAU);
+      ctx.fill();
+      if (on) {
+        ctx.fillStyle = 'rgba(255, 132, 116, 0.18)';
+        ctx.beginPath();
+        ctx.arc(x, 46, 10, 0, TAU);
+        ctx.fill();
+      }
+    }
+    text(state.caught + ' CAUGHT', 458, 64, 8, 'rgba(238, 242, 255, 0.35)', 'right', 600);
+  }
+
+  function barButton(rect, title, value, disabled, hotkey, kind) {
+    ctx.fillStyle = disabled ? 'rgba(255, 255, 255, 0.03)' : 'rgba(244, 205, 138, 0.07)';
+    roundRect(rect.x, rect.y, rect.w, rect.h, 11);
+    ctx.fill();
+    ctx.strokeStyle = disabled ? 'rgba(255, 255, 255, 0.06)' : 'rgba(244, 205, 138, 0.28)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    const cx = rect.x + 26;
+    const cy = rect.y + rect.h / 2;
+    ctx.strokeStyle = disabled ? 'rgba(238, 242, 255, 0.3)' : '#f4cd8a';
+    ctx.lineWidth = 1.6;
+    if (kind === 'exhibit') {
+      ctx.strokeRect(cx - 9, cy - 9, 18, 18);
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - 5);
+      ctx.lineTo(cx + 5, cy);
+      ctx.lineTo(cx, cy + 5);
+      ctx.lineTo(cx - 5, cy);
+      ctx.closePath();
+      ctx.fillStyle = disabled ? 'rgba(238, 242, 255, 0.3)' : '#f4cd8a';
+      ctx.fill();
+    } else {
+      ctx.beginPath();
+      ctx.arc(cx, cy - 2, 6.5, Math.PI, TAU);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(cx - 9, cy + 1);
+      ctx.lineTo(cx + 9, cy + 1);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(cx - 4, cy + 1);
+      ctx.lineTo(cx - 4, cy + 8);
+      ctx.moveTo(cx + 4, cy + 1);
+      ctx.lineTo(cx + 4, cy + 8);
+      ctx.stroke();
+    }
+
+    text(title, rect.x + 48, rect.y + 21, 9.5, disabled ? 'rgba(238, 242, 255, 0.4)' : 'rgba(238, 242, 255, 0.72)', 'left', 700);
+    text(value, rect.x + 48, rect.y + 38, 13, disabled ? 'rgba(238, 242, 255, 0.3)' : '#f4cd8a', 'left', 700);
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.06)';
+    ctx.beginPath();
+    ctx.arc(rect.x + rect.w - 18, rect.y + 16, 8, 0, TAU);
+    ctx.fill();
+    text(hotkey, rect.x + rect.w - 18, rect.y + 19.5, 9, 'rgba(238, 242, 255, 0.45)', 'center', 700);
+  }
+
+  function drawToolbar() {
+    ctx.fillStyle = 'rgba(8, 11, 20, 0.98)';
+    ctx.fillRect(0, 572, W, H - 572);
+    ctx.fillStyle = 'rgba(244, 205, 138, 0.16)';
+    ctx.fillRect(0, 572, W, 1);
+
+    const full = state.exhibits.length >= MAX_EXHIBITS;
+    const exCost = costExhibit();
+    barButton(BTN_A, full ? 'GALLERY FULL' : 'HANG EXHIBIT', full ? 'All nine spots in use' : '\u25c6 ' + exCost, full || state.coins < exCost, '1', 'exhibit');
+
+    const maxed = state.guards.length >= MAX_GUARDS;
+    const gCost = costGuard();
+    barButton(BTN_B, maxed ? 'ALL POSTS FILLED' : 'HIRE GUARD', maxed ? 'Four guards on watch' : '\u25c6 ' + gCost, maxed || state.coins < gCost, '2', 'guard');
+  }
+
+  function drawBanner() {
+    let msg = '';
+    if (state.toastTimer > 0) msg = state.toast;
+    else if (state.selected >= 0 && !state.draft.length) msg = 'Drag from the guard to trace a route';
+    else if (state.selected >= 0) msg = 'Tap the floor for stops \u00b7 tap the guard to set it';
+    else if (state.tip > 0) msg = 'Hire a guard, then drag a patrol across the hall';
+    if (!msg) return;
+
+    ctx.font = '600 9px ' + FONT;
+    const w = Math.min(FLOOR.w - 24, ctx.measureText(msg).width + 26);
+    const x = 240 - w / 2;
+    const y = state.toastTimer > 0 ? 512 : 520;
+    ctx.fillStyle = state.toastTimer > 0 ? 'rgba(255, 132, 116, 0.14)' : 'rgba(10, 15, 26, 0.82)';
+    roundRect(x, y, w, 24, 12);
+    ctx.fill();
+    ctx.strokeStyle = state.toastTimer > 0 ? 'rgba(255, 132, 116, 0.35)' : 'rgba(244, 205, 138, 0.25)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    textFit(msg, 240, y + 16, 9, state.toastTimer > 0 ? '#ffb3a8' : 'rgba(238, 242, 255, 0.82)', 'center', 600, w - 18);
+  }
+
+  function drawVignette() {
+    const g = ctx.createRadialGradient(240, 320, 170, 240, 320, 430);
+    g.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    g.addColorStop(1, 'rgba(0, 0, 0, 0.55)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  function drawFlash() {
+    if (state.flash <= 0) return;
+    ctx.fillStyle = hexA(state.flashColor, Number((state.flash * 0.16).toFixed(3)));
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  function render() {
+    drawHall();
+    ctx.save();
+    if (state.shake > 0) {
+      ctx.translate(rand(-1, 1) * state.shake * 0.5, rand(-1, 1) * state.shake * 0.35);
+    }
+    for (const ex of state.exhibits) drawPlinth(ex);
+    drawRoutes();
+    for (const t of state.thieves) drawThief(t);
+    for (let i = 0; i < state.guards.length; i++) drawGuard(state.guards[i], i);
+    drawParticles();
+    drawPops();
+    ctx.restore();
+    drawVignette();
+    drawHud();
+    drawToolbar();
+    drawBanner();
+    drawFlash();
+  }
+
+  /* ---------- input ---------- */
+  function canvasPoint(e) {
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: ((e.clientX - rect.left) / rect.width) * W,
+      y: ((e.clientY - rect.top) / rect.height) * H,
+    };
+  }
+
+  function inRect(p, r) {
+    return p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h;
+  }
+
+  function inFloor(p) {
+    return p.x >= FLOOR.x && p.x <= FLOOR.x2 && p.y >= FLOOR.y && p.y <= FLOOR.y2;
+  }
+
+  function guardAt(p) {
+    let best = -1;
+    let bestD = 26;
+    for (let i = 0; i < state.guards.length; i++) {
+      const g = state.guards[i];
+      const d = dist(p.x, p.y, g.x, g.y);
+      if (d < bestD) {
+        bestD = d;
+        best = i;
+      }
+    }
+    return best;
+  }
+
+  function pedestalAt(p) {
+    for (const ex of state.exhibits) {
+      if (dist(p.x, p.y, ex.x, ex.y) < 30) return ex;
+    }
+    return null;
+  }
+
+  function onPointerDown(e) {
+    if (state.mode !== 'playing') return;
+    const p = canvasPoint(e);
+    if (inRect(p, BTN_A)) {
+      e.preventDefault();
+      buyExhibit();
+      return;
+    }
+    if (inRect(p, BTN_B)) {
+      e.preventDefault();
+      hireGuard();
+      return;
+    }
+    if (!inFloor(p)) return;
+    e.preventDefault();
+
+    const gi = guardAt(p);
+    if (gi >= 0) {
+      if (state.selected === gi && state.draft.length >= 2) {
+        finalizeRoute();
+        return;
+      }
+      selectGuard(gi);
+      state.dragging = true;
+      state.dragMoved = false;
+      return;
+    }
+
+    const ex = pedestalAt(p);
+    if (ex && !ex.lit) {
+      repairExhibit(ex);
+      return;
+    }
+    if (state.selected >= 0) addWaypoint(p);
+  }
+
+  function onPointerMove(e) {
+    const p = canvasPoint(e);
+    if (state.mode !== 'playing') {
+      canvas.style.cursor = 'default';
+      return;
+    }
+    if (!state.dragging) {
+      const g = guardAt(p);
+      const ex = pedestalAt(p);
+      const hot = g >= 0 || inRect(p, BTN_A) || inRect(p, BTN_B) || (ex && !ex.lit);
+      canvas.style.cursor = hot ? 'pointer' : state.selected >= 0 ? 'crosshair' : 'default';
+      return;
+    }
+    canvas.style.cursor = 'crosshair';
+    if (!inFloor(p)) return;
+    const g = state.guards[state.selected];
+    if (!g) return;
+    const last = state.draft.length ? state.draft[state.draft.length - 1] : { x: g.x, y: g.y };
+    if (dist(p.x, p.y, last.x, last.y) < 22) return;
+    addWaypoint(p);
+    state.dragMoved = true;
+  }
+
+  function onPointerUp() {
+    if (!state.dragging) return;
+    state.dragging = false;
+    if (state.dragMoved && state.draft.length >= 2) finalizeRoute();
+    else if (state.dragMoved) state.draft = [];
+    state.dragMoved = false;
+  }
+
+  canvas.addEventListener('pointerdown', onPointerDown);
+  canvas.addEventListener('pointermove', onPointerMove);
+  canvas.addEventListener('pointerup', onPointerUp);
+  canvas.addEventListener('pointercancel', onPointerUp);
+  window.addEventListener('pointerup', onPointerUp);
+  canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+  window.addEventListener('keydown', (e) => {
+    if (state.mode !== 'playing') return;
+    const k = e.key.toLowerCase();
+    if (k === '1') {
+      e.preventDefault();
+      buyExhibit();
+    } else if (k === '2') {
+      e.preventDefault();
+      hireGuard();
+    } else if (k === 'enter') {
+      if (state.selected >= 0) {
+        e.preventDefault();
+        finalizeRoute();
+      }
+    } else if (k === 'r') {
+      if (state.selected >= 0) {
+        e.preventDefault();
+        clearRoute();
+      }
+    } else if (k === 'escape') {
+      state.selected = -1;
+      state.draft = [];
+      state.dragging = false;
+      announce('Selection cleared.');
+    } else if (k === 'arrowleft' || k === 'arrowright') {
+      if (state.guards.length) {
+        e.preventDefault();
+        const dir = k === 'arrowleft' ? -1 : 1;
+        const next = ((state.selected + dir) % state.guards.length + state.guards.length) % state.guards.length;
+        selectGuard(next);
+      }
+    }
+  });
+
+  window.addEventListener('blur', () => {
+    state.dragging = false;
+    state.dragMoved = false;
+    canvas.style.cursor = 'default';
+  });
+
+  startBtn.addEventListener('click', startRun);
+  againBtn.addEventListener('click', startRun);
+
+  /* ---------- boot ---------- */
+  introPanel.hidden = false;
+  resultPanel.hidden = true;
+  overlay.hidden = false;
+  startBtn.focus();
+
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min((now - last) / 1000, 0.05);
+    last = now;
+    update(dt);
+    render();
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

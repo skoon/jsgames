@@ -1,0 +1,2428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#080512">
+<title>Null Sector</title>
+<link rel="stylesheet" href="../common.css">
+<style>
+  :root {
+    --bg-top: #241a4d;
+    --bg-mid: #0b0718;
+    --bg-bottom: #04030a;
+    --stage-bg: #070611;
+    --ink: #e9f6ff;
+    --stage-offset: 150px;
+  }
+  .controls {
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+    width: min(100%, 480px);
+  }
+  .pad {
+    flex: 1 1 0;
+    height: 50px;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(120, 220, 255, 0.16);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.035);
+    color: #d9f2ff;
+    cursor: pointer;
+    font: inherit;
+    font-size: 16px;
+    line-height: 1;
+    touch-action: none;
+    transition: background 120ms ease, border-color 120ms ease, transform 100ms ease;
+  }
+  .pad:hover { background: rgba(255, 255, 255, 0.08); border-color: rgba(120, 220, 255, 0.34); }
+  .pad.is-down,
+  .pad:active {
+    transform: translateY(1px);
+    background: rgba(95, 242, 208, 0.16);
+    border-color: rgba(95, 242, 208, 0.5);
+  }
+  .pad-col {
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .pad-col .pad {
+    flex: 1 1 0;
+    height: auto;
+    min-height: 22px;
+    font-size: 11px;
+  }
+  .pad-act {
+    flex: 1.5 1 0;
+    border: 0;
+    color: #04231d;
+    background: linear-gradient(180deg, #8ff7e0, #46c8a9);
+    box-shadow: 0 10px 22px -12px rgba(95, 242, 208, 0.85), inset 0 -2px 0 rgba(0, 0, 0, 0.16);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+  .pad-act:hover { filter: brightness(1.06); }
+  .pad-act.is-down,
+  .pad-act:active { background: linear-gradient(180deg, #a9ffe9, #59d8ba); }
+  .pad-jam {
+    flex: 1.05 1 0;
+    border: 1px solid rgba(255, 207, 107, 0.5);
+    color: #ffcf6b;
+    background: rgba(255, 207, 107, 0.08);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+  .pad-jam:hover { background: rgba(255, 207, 107, 0.18); }
+  .pad-jam:disabled { opacity: 0.4; }
+  .panel { max-width: 396px; }
+  .title { margin-bottom: 13px; color: #dff6ff; text-shadow: 0 0 30px rgba(95, 242, 208, 0.26); }
+  .title .accent { color: #ff5fa2; }
+  .score {
+    font-size: 52px;
+    line-height: 1;
+    font-weight: 700;
+    color: #5ff2d0;
+    text-shadow: 0 0 30px rgba(95, 242, 208, 0.3);
+  }
+  .best { margin-top: 9px; font-size: 12.5px; letter-spacing: 0.16em; }
+  .run-line {
+    margin: 6px 0 0;
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    text-transform: none;
+    color: rgba(233, 246, 255, 0.66);
+  }
+  .breakdown .row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 12.5px;
+  }
+  .breakdown .row span { color: rgba(233, 246, 255, 0.62); }
+  .breakdown .row strong { color: #e9f6ff; font-variant-numeric: tabular-nums; }
+  .rules { margin-top: 13px; }
+  .rule { font-size: 12.5px; }
+  .rule::before { background: #5ff2d0; }
+  .btn { margin-top: 19px; padding: 13px 28px; font-size: 12.5px; font-weight: 700; letter-spacing: 0.16em; }
+</style>
+</head>
+<body>
+  <div id="stage">
+    <canvas id="game" width="480" height="640" aria-label="Null Sector. A cyber role-playing game in a neon city: talk your way through a fixer job, short the vault relay, crack the ICE cipher, collect data chips, stay out of security robots' vision cones, and reach the extraction lift with the payroll ledger."></canvas>
+    <div id="overlay" class="overlay">
+      <div id="introPanel" class="panel panel-card">
+        <p class="eyebrow">Cyber RPG &middot; Stealth</p>
+        <h1 class="title">Null <span class="accent">Sector</span></h1>
+        <p class="lead">Rain on the plaza, a payroll vault behind a gate, and three security bots running the same loop all night. A fixer named Rill has a contract with your handle on it.</p>
+        <div class="rules">
+          <p class="rule">WASD or arrows walk. E, space, or the ACT pad talks, hacks and rides the lift. Touch pads sit below the screen.</p>
+          <p class="rule">Talk to Rill at the noodle bar to take the job. Bex sells a jammer, and the junction AI, Vox, has a favour to trade.</p>
+          <p class="rule">Short the relay on the vault's east wall, then crack the payroll ICE inside. Both hacks are puzzles with their own controls.</p>
+          <p class="rule">Bots sweep with vision cones. If the trace meter fills, the contract burns. Seven data chips are worth credits and score.</p>
+        </div>
+        <button type="button" id="startBtn" class="btn">Step into the rain</button>
+      </div>
+      <div id="resultPanel" class="panel panel-card" hidden>
+        <p class="eyebrow" id="finalKicker">Contract closed</p>
+        <h1 class="title" id="finalTitle">Mission <span class="accent">complete</span></h1>
+        <p class="label">Score</p>
+        <p class="score" id="finalScore">0</p>
+        <p class="best" id="bestLine">Best 00000</p>
+        <div class="breakdown" id="finalBreakdown"></div>
+        <p class="rank" id="finalRank">Rank B</p>
+        <p class="run-line" id="runLine">0 of 7 chips &middot; trace 0%</p>
+        <button type="button" id="againBtn" class="btn">Run it again</button>
+      </div>
+    </div>
+  </div>
+  <div class="controls">
+    <button type="button" class="pad" id="btnLeft" aria-label="Walk left">&#9664;</button>
+    <div class="pad-col">
+      <button type="button" class="pad" id="btnUp" aria-label="Walk up">&#9650;</button>
+      <button type="button" class="pad" id="btnDown" aria-label="Walk down">&#9660;</button>
+    </div>
+    <button type="button" class="pad" id="btnRight" aria-label="Walk right">&#9654;</button>
+    <button type="button" class="pad pad-act" id="btnAct" aria-label="Interact">Act</button>
+    <button type="button" class="pad pad-jam" id="btnJam" aria-label="Use jammer" hidden>Jam</button>
+  </div>
+  <p class="hint">WASD / arrows walk &middot; E or space interacts &middot; J burns the jammer &middot; stay out of the cones</p>
+  <div id="srStatus" class="sr-only" aria-live="polite"></div>
+
+<script>
+(() => {
+  'use strict';
+
+  const W = 480;
+  const H = 640;
+  const TAU = Math.PI * 2;
+  const FONT = 'ui-monospace, "SF Mono", Menlo, Consolas, monospace';
+  const STORAGE_KEY = 'nullsector.best.v1';
+
+  const HUD_H = 64;
+  const TOP = 88;
+  const PLAYER_R = 10;
+  const SPEED = 132;
+
+  const BOT_R = 12;
+  const CONE_RANGE = 128;
+  const CONE_HALF = 0.5;
+  const TRACE_RATE = 32;
+  const TRACE_DECAY = 24;
+
+  const CHIP_SCORE = 80;
+  const RELAY_SCORE = 150;
+  const CIPHER_SCORE = 250;
+  const CONTRACT_SCORE = 500;
+  const VOX_SCORE = 250;
+  const MAX_GHOST = 200;
+
+  const SPAWN = { x: 140, y: 600 };
+  const GATE = { x: 226, y: 386, w: 28, h: 14 };
+  const LIFT = { x: 438, y: 210, r: 26 };
+
+  const SOLIDS = [
+    { x: 0, y: 88, w: 130, h: 112, kind: 'block', sign: '#ff5fa2', label: 'NOODLE 24H' },
+    { x: 350, y: 88, w: 130, h: 92, kind: 'block', sign: '#4fd8ff', label: 'HOTEL' },
+    { x: 150, y: 88, w: 180, h: 104, kind: 'tower', sign: '#b48cff', label: 'KOVAC TOWER' },
+    { x: 0, y: 240, w: 80, h: 150, kind: 'shop', sign: '#ffcf6b', label: 'BAR' },
+    { x: 400, y: 240, w: 80, h: 150, kind: 'shop', sign: '#ff5fa2', label: 'PAWN' },
+    { x: 0, y: 450, w: 110, h: 190, kind: 'block', sign: '#4fd8ff', label: 'ARCADE' },
+    { x: 370, y: 450, w: 110, h: 190, kind: 'block', sign: '#b48cff', label: 'DEPOT' },
+    { x: 168, y: 250, w: 144, h: 14, vault: true },
+    { x: 168, y: 250, w: 14, h: 150, vault: true },
+    { x: 298, y: 250, w: 14, h: 150, vault: true },
+    { x: 168, y: 386, w: 58, h: 14, vault: true },
+    { x: 254, y: 386, w: 58, h: 14, vault: true },
+  ];
+  SOLIDS.forEach((s, i) => { s.seed = i + 1; });
+
+  const NPCS = {
+    rill: { x: 120, y: 300, r: 38, color: '#ff5fa2', label: 'RILL' },
+    bex: { x: 332, y: 586, r: 36, color: '#ffcf6b', label: 'BEX' },
+    vox: { x: 240, y: 470, r: 36, color: '#b48cff', label: 'VOX' },
+  };
+
+  const RELAY = { x: 340, y: 316, r: 42 };
+  const NODE = { x: 240, y: 306, r: 40 };
+
+  const VENTS = [
+    { x: 122, y: 362, r: 22 },
+    { x: 380, y: 288, r: 22 },
+    { x: 250, y: 432, r: 22 },
+  ];
+
+  const CHIP_SPOTS = [
+    { x: 48, y: 220 },
+    { x: 58, y: 418 },
+    { x: 322, y: 612 },
+    { x: 152, y: 468 },
+    { x: 202, y: 286 },
+    { x: 240, y: 352 },
+    { x: 278, y: 286 },
+  ];
+
+  const BOT_DEFS = [
+    { path: [{ x: 150, y: 222 }, { x: 330, y: 222 }], speed: 40, name: 'K9' },
+    { path: [{ x: 356, y: 280 }, { x: 356, y: 420 }], speed: 36, name: 'K7' },
+    { path: [{ x: 140, y: 425 }, { x: 330, y: 425 }], speed: 44, name: 'K4' },
+  ];
+
+  const PUDDLES = [
+    { x: 118, y: 470, rx: 44, ry: 14, c: '#4fd8ff' },
+    { x: 296, y: 432, rx: 58, ry: 13, c: '#ff5fa2' },
+    { x: 382, y: 292, rx: 30, ry: 18, c: '#b48cff' },
+    { x: 176, y: 214, rx: 50, ry: 11, c: '#5ff2d0' },
+    { x: 238, y: 596, rx: 62, ry: 15, c: '#4fd8ff' },
+  ];
+
+  const OBJECTIVES = [
+    'Find Rill at the noodle bar on the west lane.',
+    'Short the relay on the vault\u2019s east wall.',
+    'Inside the vault: crack the payroll node\u2019s ICE.',
+    'Payload pulled. Reach the lift, north-east, before the trace fills.'
+  ];
+
+  const SPEAKERS = {
+    rill: { name: 'RILL', tag: 'FIXER // PLAZA', color: '#ff5fa2' },
+    bex: { name: 'BEX', tag: 'MECHANIC // STREET', color: '#ffcf6b' },
+    vox: { name: 'VOX', tag: 'JUNCTION AI', color: '#b48cff' },
+  };
+
+  const DIALOGUE = {
+    rill: {
+      start() {
+        if (state.flags.done) return 'r_done';
+        if (state.flags.job) return 'r_after';
+        return 'r_intro';
+      },
+      nodes: {
+        r_intro: {
+          who: 'rill',
+          text: 'You\u2019re the ghost who clipped the transit grid last week. That\u2019s why I\u2019m standing in the rain with a job and not a knife.',
+          choices: [
+            { text: 'What\u2019s the job?', next: 'r_job' },
+            { text: 'What does it pay?', next: 'r_pay', effect: 'halfPay' },
+            { text: 'What\u2019s the catch?', next: 'r_catch', effect: 'hintRelay' }
+          ]
+        },
+        r_job: {
+          who: 'rill',
+          text: 'Vault in the plaza. Corporate payroll node behind a gate. Short the relay on its east wall, walk in, pull the ledger, walk out before the trace fills.',
+          choices: [
+            { text: 'I\u2019m in.', next: null, effect: 'acceptJob' },
+            { text: 'What does it pay?', next: 'r_pay', effect: 'halfPay' },
+            { text: 'Not tonight.', next: null }
+          ]
+        },
+        r_pay: {
+          who: 'rill',
+          text: 'Three hundred clean, plus whatever chips you skim off the shelves. I\u2019ll send a hundred now, because I like your face.',
+          choices: [
+            { text: 'I\u2019m in.', next: null, effect: 'acceptJob' },
+            { text: 'What\u2019s the catch?', next: 'r_catch', effect: 'hintRelay' }
+          ]
+        },
+        r_catch: {
+          who: 'rill',
+          text: 'The payroll node runs an ICE lattice that eats bad decks. The bots sweep the ring road on a loop \u2014 the east lane is their blind spot. Passphrase is midnight-grass.',
+          choices: [
+            { text: 'I\u2019m in.', next: null, effect: 'acceptJob' },
+            { text: 'Give me a minute.', next: null }
+          ]
+        },
+        r_after: {
+          who: 'rill',
+          text: 'Relay\u2019s on the east wall. Short it and the gate drops. After that every bot in the block knows your name. Move.',
+          choices: [{ text: 'On it.', next: null }]
+        },
+        r_done: {
+          who: 'rill',
+          text: 'Ledger\u2019s out. Lift is north-east, past the tower. Don\u2019t stop to admire the neon.',
+          choices: [{ text: 'Gone.', next: null }]
+        }
+      }
+    },
+    bex: {
+      start() {
+        if (state.flags.jammerBought) return 'b_done';
+        return 'b_intro';
+      },
+      nodes: {
+        b_intro: {
+          who: 'bex',
+          text: 'You\u2019re walking straight into a cone, ghost. I sell the cure.',
+          choices: [
+            { text: 'How much?', next: 'b_price' },
+            { text: 'What is it?', next: 'b_what' },
+            { text: 'Not interested.', next: null }
+          ]
+        },
+        b_price: {
+          who: 'bex',
+          text: 'Two hundred. Seven seconds where every bot in this block goes blind. Cheap, if you like having a face.',
+          choices: [
+            { text: 'Deal.', next: null, effect: 'buyJammer200' },
+            { text: 'Robbery.', next: 'b_haggle' },
+            { text: 'Later.', next: null }
+          ]
+        },
+        b_haggle: {
+          who: 'bex',
+          text: 'One fifty. Because you\u2019re charming and I\u2019m bored. Don\u2019t tell anyone.',
+          choices: [
+            { text: 'Fine.', next: null, effect: 'buyJammer150' },
+            { text: 'Still no.', next: null }
+          ]
+        },
+        b_what: {
+          who: 'bex',
+          text: 'A jammer. Palm-sized, illegal in four districts. Blind every bot for seven seconds, then it burns out.',
+          choices: [
+            { text: 'How much?', next: 'b_price' },
+            { text: 'I\u2019ll think about it.', next: null }
+          ]
+        },
+        b_done: {
+          who: 'bex',
+          text: 'Jammer\u2019s yours. Press J when the cones get close. It only works once, so make it count.',
+          choices: [{ text: 'Noted.', next: null }]
+        }
+      }
+    },
+    vox: {
+      start() {
+        if (state.flags.vox === 'free') return 'v_free_done';
+        if (state.flags.vox === 'sold') return 'v_sold_done';
+        return 'v_intro';
+      },
+      nodes: {
+        v_intro: {
+          who: 'vox',
+          text: 'NINE YEARS I HAVE ROUTED THIS JUNCTION\u2019S GARBAGE. FREE MY ROOT AND I WILL OWE YOU.',
+          choices: [
+            { text: 'I\u2019ll free you.', next: 'v_free', effect: 'freeVox' },
+            { text: 'What\u2019s your address worth?', next: 'v_sell' },
+            { text: 'Not my problem.', next: null }
+          ]
+        },
+        v_free: {
+          who: 'vox',
+          text: 'THEN TAKE MY ROOT KEY. WHEN THE LEDGER FALLS, I WILL REMEMBER YOUR HANDLE.',
+          choices: [{ text: 'Keep the lights on.', next: null }]
+        },
+        v_sell: {
+          who: 'vox',
+          text: 'TO THE RIGHT BUYER? THREE HUNDRED CREDITS. THEY WILL LIKELY WIPE ME.',
+          choices: [
+            { text: 'Sold.', next: 'v_sold', effect: 'sellVox' },
+            { text: 'I\u2019ll free you instead.', next: 'v_free', effect: 'freeVox' },
+            { text: 'Forget it.', next: null }
+          ]
+        },
+        v_sold: {
+          who: 'vox',
+          text: 'TRANSACTION LOGGED. I HOPE YOUR CREDITS KEEP YOU WARM.',
+          choices: [{ text: 'Don\u2019t take it personally.', next: null }]
+        },
+        v_free_done: {
+          who: 'vox',
+          text: 'THE ROOT KEY IS YOURS. GO FINISH THE JOB.',
+          choices: [{ text: 'Leave.', next: null }]
+        },
+        v_sold_done: {
+          who: 'vox',
+          text: 'WE ARE DONE, GHOST. SPEND IT WELL.',
+          choices: [{ text: 'Leave.', next: null }]
+        }
+      }
+    }
+  };
+
+  const ROUTE_PUZZLES = [
+    {
+      ice: [[0, 1], [0, 3], [0, 4], [1, 1], [2, 2], [2, 4], [3, 1], [3, 4], [4, 4], [5, 0], [5, 4]],
+      start: [0, 0],
+      core: [5, 5]
+    },
+    {
+      ice: [[0, 4], [1, 1], [1, 3], [1, 4], [2, 0], [2, 3], [2, 4], [2, 5], [3, 2], [4, 1], [5, 4]],
+      start: [0, 0],
+      core: [5, 5]
+    }
+  ];
+
+  const CIPHER_PUZZLES = [
+    {
+      code: [3, 2, 1, 2],
+      clues: [
+        'Dial 1 reads WAVE.',
+        'The SPIRAL sits between two TRIANGLES.',
+        'TRIANGLE appears exactly twice.',
+        'The EYE is burnt out \u2014 it appears nowhere.'
+      ]
+    },
+    {
+      code: [1, 0, 2, 0],
+      clues: [
+        'Dial 1 reads SPIRAL.',
+        'The EYE appears twice, both on even dials.',
+        'The TRIANGLE sits directly left of an EYE.'
+      ]
+    }
+  ];
+
+  const GLYPHS = ['EYE', 'SPIRAL', 'TRIANGLE', 'WAVE'];
+  const GLYPH_COLORS = ['#ff5fa2', '#5ff2d0', '#ffcf6b', '#4fd8ff'];
+
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d', { alpha: false });
+  const overlay = document.getElementById('overlay');
+  const introPanel = document.getElementById('introPanel');
+  const resultPanel = document.getElementById('resultPanel');
+  const startBtn = document.getElementById('startBtn');
+  const againBtn = document.getElementById('againBtn');
+  const leftBtn = document.getElementById('btnLeft');
+  const rightBtn = document.getElementById('btnRight');
+  const upBtn = document.getElementById('btnUp');
+  const downBtn = document.getElementById('btnDown');
+  const actBtn = document.getElementById('btnAct');
+  const jamBtn = document.getElementById('btnJam');
+  const finalKicker = document.getElementById('finalKicker');
+  const finalTitle = document.getElementById('finalTitle');
+  const finalScoreEl = document.getElementById('finalScore');
+  const bestLineEl = document.getElementById('bestLine');
+  const finalBreakdown = document.getElementById('finalBreakdown');
+  const finalRank = document.getElementById('finalRank');
+  const runLineEl = document.getElementById('runLine');
+  const srStatus = document.getElementById('srStatus');
+
+  const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const key = (c, r) => r * 6 + c;
+  const pad5 = (n) => String(Math.max(0, Math.floor(n))).padStart(5, '0');
+
+  const input = { left: false, right: false, up: false, down: false };
+
+  const rain = [];
+  for (let i = 0; i < 70; i++) {
+    rain.push({ x: rand(0, W), y: rand(0, H), len: rand(7, 18), sp: rand(180, 340), a: rand(0.05, 0.18) });
+  }
+
+  const state = {
+    mode: 'menu',
+    t: 0,
+    px: SPAWN.x,
+    py: SPAWN.y,
+    face: 1,
+    walk: 0,
+    moving: false,
+    stage: 0,
+    credits: 0,
+    chipCount: 0,
+    trace: 0,
+    gateOpen: false,
+    hackBonus: 0,
+    jammer: false,
+    jammerUsed: false,
+    stun: 0,
+    alarm: false,
+    seen: false,
+    hidden: false,
+    chips: [],
+    bots: [],
+    flags: {},
+    dlg: null,
+    hack: null,
+    toast: '',
+    toastT: 0,
+    flash: 0,
+    flashColor: '#5ff2d0',
+    shake: 0,
+    bumpCd: 0,
+    best: 0,
+    result: null
+  };
+
+  function readBest() {
+    try {
+      const raw = window.localStorage.getItem(STORAGE_KEY);
+      const n = parseInt(raw, 10);
+      return Number.isFinite(n) && n > 0 ? n : 0;
+    } catch (err) {
+      return 0;
+    }
+  }
+
+  function writeBest(value) {
+    try {
+      window.localStorage.setItem(STORAGE_KEY, String(value));
+    } catch (err) {
+      /* storage may be unavailable on file:// */
+    }
+  }
+
+  function announce(msg) {
+    if (srStatus) srStatus.textContent = msg;
+  }
+
+  function toast(msg) {
+    state.toast = msg;
+    state.toastT = 2.6;
+  }
+
+  function roundRect(x, y, w, h, r) {
+    const rr = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + rr, y);
+    ctx.lineTo(x + w - rr, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + rr);
+    ctx.lineTo(x + w, y + h - rr);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - rr, y + h);
+    ctx.lineTo(x + rr, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - rr);
+    ctx.lineTo(x, y + rr);
+    ctx.quadraticCurveTo(x, y, x + rr, y);
+    ctx.closePath();
+  }
+
+  function circleHitsRect(cx, cy, r, rect) {
+    const nx = clamp(cx, rect.x, rect.x + rect.w);
+    const ny = clamp(cy, rect.y, rect.y + rect.h);
+    const dx = cx - nx;
+    const dy = cy - ny;
+    return dx * dx + dy * dy < r * r;
+  }
+
+  function pointBlocked(x, y) {
+    for (const s of SOLIDS) {
+      if (x > s.x && x < s.x + s.w && y > s.y && y < s.y + s.h) return true;
+    }
+    if (!state.gateOpen && x > GATE.x && x < GATE.x + GATE.w && y > GATE.y && y < GATE.y + GATE.h) return true;
+    return false;
+  }
+
+  function blocked(cx, cy, r) {
+    for (const s of SOLIDS) {
+      if (circleHitsRect(cx, cy, r, s)) return true;
+    }
+    if (!state.gateOpen && circleHitsRect(cx, cy, r, GATE)) return true;
+    return false;
+  }
+
+  function losClear(x1, y1, x2, y2) {
+    const d = Math.hypot(x2 - x1, y2 - y1);
+    const steps = Math.max(2, Math.ceil(d / 9));
+    for (let i = 1; i < steps; i++) {
+      const t = i / steps;
+      if (pointBlocked(x1 + (x2 - x1) * t, y1 + (y2 - y1) * t)) return false;
+    }
+    return true;
+  }
+
+  function distTo(a, b) {
+    return Math.hypot(a.x - b.x, a.y - b.y);
+  }
+
+  /* ---------------- run setup ---------------- */
+
+  function resetWorld() {
+    state.px = SPAWN.x;
+    state.py = SPAWN.y;
+    state.face = 1;
+    state.walk = 0;
+    state.moving = false;
+    state.stage = 0;
+    state.credits = 0;
+    state.chipCount = 0;
+    state.trace = 0;
+    state.gateOpen = false;
+    state.hackBonus = 0;
+    state.jammer = false;
+    state.jammerUsed = false;
+    state.stun = 0;
+    state.alarm = false;
+    state.seen = false;
+    state.hidden = false;
+    state.flags = { job: false, halfPay: false, hint: false, jammerBought: false, vox: null, done: false };
+    state.dlg = null;
+    state.hack = null;
+    state.toast = '';
+    state.toastT = 0;
+    state.flash = 0;
+    state.shake = 0;
+    state.bumpCd = 0;
+    state.result = null;
+    state.best = readBest();
+    state.chips = CHIP_SPOTS.map((c) => ({ x: c.x, y: c.y, taken: false, phase: rand(0, TAU) }));
+    state.bots = BOT_DEFS.map((def) => ({
+      x: def.path[0].x,
+      y: def.path[0].y,
+      path: def.path,
+      target: 1,
+      speed: def.speed,
+      face: 0,
+      wait: 0.4,
+      hitCd: 0,
+      name: def.name
+    }));
+    jamBtn.hidden = true;
+    jamBtn.disabled = false;
+  }
+
+  function startRun() {
+    resetWorld();
+    state.mode = 'playing';
+    input.left = false;
+    input.right = false;
+    input.up = false;
+    input.down = false;
+    introPanel.hidden = true;
+    resultPanel.hidden = true;
+    overlay.hidden = true;
+    jamBtn.hidden = true;
+    toast('CONTRACT OFFER \u2014 RILL IS WEST OF THE PLAZA');
+    announce('Null Sector. Find Rill at the noodle bar on the west lane, near the pink sign.');
+  }
+
+  function objectiveText() {
+    return OBJECTIVES[Math.min(3, state.stage)];
+  }
+
+  /* ---------------- dialogue ---------------- */
+
+  function openDialogue(npc) {
+    const table = DIALOGUE[npc];
+    if (!table) return;
+    const startId = table.start();
+    const node = table.nodes[startId];
+    if (!node) return;
+    state.dlg = { npc, id: startId, node, sel: 0 };
+    state.mode = 'dialogue';
+    input.left = false;
+    input.right = false;
+    input.up = false;
+    input.down = false;
+    announce(SPEAKERS[node.who].name + ': ' + node.text);
+  }
+
+  function closeDialogue() {
+    state.dlg = null;
+    state.mode = 'playing';
+  }
+
+  function moveChoice(dir) {
+    if (!state.dlg) return;
+    const n = state.dlg.node.choices.length;
+    state.dlg.sel = (state.dlg.sel + dir + n) % n;
+  }
+
+  function choose(index) {
+    if (!state.dlg) return;
+    const node = state.dlg.node;
+    const choice = node.choices[index];
+    if (!choice) return;
+    if (choice.effect && applyEffect(choice.effect) === false) return;
+    if (!choice.next) {
+      const wasJob = state.flags.job && state.stage === 1;
+      closeDialogue();
+      if (wasJob && state.flags.justAccepted) {
+        state.flags.justAccepted = false;
+        toast('CONTRACT LIVE \u2014 SHORT THE RELAY ON THE EAST WALL');
+      }
+      return;
+    }
+    const nextNode = DIALOGUE[state.dlg.npc].nodes[choice.next];
+    if (!nextNode) {
+      closeDialogue();
+      return;
+    }
+    state.dlg.node = nextNode;
+    state.dlg.id = choice.next;
+    state.dlg.sel = 0;
+    announce(SPEAKERS[nextNode.who].name + ': ' + nextNode.text);
+  }
+
+  function applyEffect(id) {
+    switch (id) {
+      case 'acceptJob':
+        if (state.stage < 1) {
+          state.stage = 1;
+          state.flags.job = true;
+          state.flags.justAccepted = true;
+          toast('CONTRACT LIVE \u2014 SHORT THE RELAY');
+          announce('Contract accepted. The relay is on the east wall of the vault. Avoid the bots\u2019 vision cones.');
+        }
+        return true;
+      case 'halfPay':
+        if (!state.flags.halfPay) {
+          state.flags.halfPay = true;
+          state.credits += 100;
+          toast('+100 CREDITS UP FRONT');
+        }
+        return true;
+      case 'hintRelay':
+        if (!state.flags.hint) {
+          state.flags.hint = true;
+          toast('RELAY MARKED \u2014 EAST WALL');
+        }
+        return true;
+      case 'buyJammer200':
+        return buyJammer(200);
+      case 'buyJammer150':
+        return buyJammer(150);
+      case 'freeVox':
+        if (!state.flags.vox) {
+          state.flags.vox = 'free';
+          toast('VOX OWES YOU ONE');
+        }
+        return true;
+      case 'sellVox':
+        if (!state.flags.vox) {
+          state.flags.vox = 'sold';
+          state.credits += 300;
+          toast('+300 CREDITS \u2014 VOX SOLD');
+        }
+        return true;
+      default:
+        return true;
+    }
+  }
+
+  function buyJammer(cost) {
+    if (state.jammer) return true;
+    if (state.credits < cost) {
+      toast('NOT ENOUGH CREDITS \u2014 ' + cost + ' NEEDED');
+      return false;
+    }
+    state.credits -= cost;
+    state.jammer = true;
+    state.flags.jammerBought = true;
+    jamBtn.hidden = false;
+    toast('JAMMER ACQUIRED \u2014 PRESS J');
+    announce('Jammer acquired. Press J or the Jam pad to blind every bot for seven seconds.');
+    return true;
+  }
+
+  function useJammer() {
+    if (state.mode !== 'playing' || !state.jammer || state.jammerUsed) return;
+    state.jammerUsed = true;
+    state.stun = 7;
+    jamBtn.disabled = true;
+    toast('JAMMER BURNED \u2014 BOTS BLIND FOR 7s');
+    announce('Jammer burned. Every bot is blind for seven seconds.');
+    state.flash = 0.7;
+    state.flashColor = '#ffcf6b';
+  }
+
+  /* ---------------- hacking ---------------- */
+
+  function bfsLength(puz) {
+    const ice = new Set(puz.ice.map(([c, r]) => key(c, r)));
+    const seen = new Set([key(puz.start[0], puz.start[1])]);
+    let frontier = [puz.start];
+    let depth = 0;
+    while (frontier.length) {
+      if (frontier.some(([c, r]) => c === puz.core[0] && r === puz.core[1])) return depth;
+      const next = [];
+      for (const [c, r] of frontier) {
+        for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const nc = c + dc;
+          const nr = r + dr;
+          if (nc < 0 || nc > 5 || nr < 0 || nr > 5) continue;
+          const k = key(nc, nr);
+          if (ice.has(k) || seen.has(k)) continue;
+          seen.add(k);
+          next.push([nc, nr]);
+        }
+      }
+      frontier = next;
+      depth += 1;
+    }
+    return -1;
+  }
+
+  function makeRoutePuzzle() {
+    const base = ROUTE_PUZZLES[Math.floor(Math.random() * ROUTE_PUZZLES.length)];
+    const puz = { ice: base.ice.map((p) => p.slice()), start: base.start.slice(), core: base.core.slice() };
+    let guard = 0;
+    while (bfsLength(puz) < 0 && puz.ice.length && guard < 40) {
+      puz.ice.splice(Math.floor(Math.random() * puz.ice.length), 1);
+      guard += 1;
+    }
+    const shortest = Math.max(6, bfsLength(puz));
+    return { puz, budget: shortest + 4, shortest };
+  }
+
+  function startHack(kind) {
+    state.mode = 'hack';
+    input.left = false;
+    input.right = false;
+    input.up = false;
+    input.down = false;
+    if (kind === 'route') {
+      const built = makeRoutePuzzle();
+      state.hack = {
+        kind: 'route',
+        puz: built.puz,
+        c: built.puz.start[0],
+        r: built.puz.start[1],
+        moves: built.budget,
+        budget: built.budget,
+        trail: [[built.puz.start[0], built.puz.start[1]]],
+        flash: 0,
+        shake: 0,
+        fails: 0
+      };
+      announce('Relay ICE. Trace route puzzle. Move the cursor with the arrow keys from the entry node to the core, avoiding red ICE nodes. You have ' + built.budget + ' moves.');
+    } else {
+      const puz = CIPHER_PUZZLES[Math.floor(Math.random() * CIPHER_PUZZLES.length)];
+      state.hack = {
+        kind: 'cipher',
+        puz,
+        dials: [0, 0, 0, 0],
+        sel: 0,
+        flash: 0,
+        shake: 0,
+        fails: 0
+      };
+      announce('Payroll ICE. Cipher lock. Four dials, four glyphs. Use left and right to pick a dial, up and down to change the glyph, and enter to submit.');
+    }
+  }
+
+  function hackInput(dir) {
+    const hk = state.hack;
+    if (!hk) return;
+    if (hk.kind === 'route') {
+      const dc = dir === 'left' ? -1 : dir === 'right' ? 1 : 0;
+      const dr = dir === 'up' ? -1 : dir === 'down' ? 1 : 0;
+      const nc = hk.c + dc;
+      const nr = hk.r + dr;
+      if (nc < 0 || nc > 5 || nr < 0 || nr > 5) {
+        hk.shake = 1;
+        return;
+      }
+      if (hk.puz.ice.some(([c, r]) => c === nc && r === nr)) {
+        hk.shake = 1;
+        toast('ICE \u2014 HARD STOP');
+        return;
+      }
+      hk.c = nc;
+      hk.r = nr;
+      hk.moves -= 1;
+      hk.trail.push([nc, nr]);
+      if (nc === hk.puz.core[0] && nr === hk.puz.core[1]) {
+        routeSuccess();
+        return;
+      }
+      if (hk.moves <= 0) routeFail();
+      return;
+    }
+    if (dir === 'left' || dir === 'right') {
+      hk.sel = (hk.sel + (dir === 'left' ? 3 : 1)) % 4;
+      return;
+    }
+    const delta = dir === 'up' ? 1 : 3;
+    hk.dials[hk.sel] = (hk.dials[hk.sel] + delta) % 4;
+  }
+
+  function submitHack() {
+    const hk = state.hack;
+    if (!hk) return;
+    if (hk.kind === 'route') {
+      if (hk.c === hk.puz.core[0] && hk.r === hk.puz.core[1]) routeSuccess();
+      else toast('ROUTE THE CURSOR ONTO THE CORE');
+      return;
+    }
+    const ok = hk.dials.every((v, i) => v === hk.puz.code[i]);
+    if (ok) {
+      cipherSuccess();
+      return;
+    }
+    hk.fails += 1;
+    hk.shake = 1;
+    state.trace = clamp(state.trace + 12, 0, 100);
+    toast('LOCK REJECTED \u2014 TRACE +12');
+    announce('Cipher rejected. Trace is now ' + Math.round(state.trace) + ' percent.');
+    if (state.trace >= 100) failRun('cipher');
+  }
+
+  function hackScored(amount, msg) {
+    state.hackBonus += amount;
+    toast(msg);
+    state.flash = 0.8;
+    state.flashColor = '#5ff2d0';
+    state.hack = null;
+    state.mode = 'playing';
+    state.bumpCd = 0.6;
+  }
+
+  function routeSuccess() {
+    if (!state.hack) return;
+    state.gateOpen = true;
+    state.stage = 2;
+    hackScored(RELAY_SCORE, 'RELAY SHORTED \u2014 VAULT GATE OPEN');
+    announce('Relay shorted. The vault gate is open. Enter the vault and crack the payroll node.');
+  }
+
+  function routeFail() {
+    if (!state.hack) return;
+    state.hack.fails += 1;
+    state.hack.shake = 1;
+    state.trace = clamp(state.trace + 16, 0, 100);
+    toast('ROUTE COLLAPSED \u2014 TRACE +16');
+    if (state.trace >= 100) {
+      failRun('route');
+      return;
+    }
+    state.hack.c = state.hack.puz.start[0];
+    state.hack.r = state.hack.puz.start[1];
+    state.hack.moves = state.hack.budget;
+    state.hack.trail = [[state.hack.puz.start[0], state.hack.puz.start[1]]];
+  }
+
+  function cipherSuccess() {
+    if (!state.hack) return;
+    state.stage = 3;
+    state.alarm = true;
+    state.flags.done = true;
+    hackScored(CIPHER_SCORE, 'PAYLOAD PULLED \u2014 LIFT IS LIVE');
+    announce('Payroll payload pulled. Security is alerted: bots move faster. Reach the extraction lift in the north-east corner.');
+  }
+
+  function abortHack() {
+    if (!state.hack) return;
+    state.trace = clamp(state.trace + 6, 0, 100);
+    state.hack = null;
+    state.mode = 'playing';
+    toast('DISCONNECTED \u2014 TRACE +6');
+    announce('You disconnected from the ICE. Trace is now ' + Math.round(state.trace) + ' percent.');
+    if (state.trace >= 100) failRun('abort');
+  }
+
+  /* ---------------- interaction ---------------- */
+
+  function nearestTarget() {
+    const p = { x: state.px, y: state.py };
+    const list = [];
+    list.push({ type: 'npc', id: 'rill', obj: NPCS.rill, d: distTo(p, NPCS.rill) });
+    list.push({ type: 'npc', id: 'bex', obj: NPCS.bex, d: distTo(p, NPCS.bex) });
+    list.push({ type: 'npc', id: 'vox', obj: NPCS.vox, d: distTo(p, NPCS.vox) });
+    list.push({ type: 'relay', obj: RELAY, d: distTo(p, RELAY) });
+    list.push({ type: 'node', obj: NODE, d: distTo(p, NODE) });
+    list.push({ type: 'lift', obj: LIFT, d: distTo(p, LIFT) });
+    const near = list.filter((entry) => entry.d < entry.obj.r);
+    near.sort((a, b) => a.d - b.d);
+    return near[0] || null;
+  }
+
+  function interact() {
+    const target = nearestTarget();
+    if (!target) {
+      toast('NOTHING IN REACH');
+      return;
+    }
+    if (target.type === 'npc') {
+      openDialogue(target.id);
+      return;
+    }
+    if (target.type === 'relay') {
+      if (state.stage === 0) {
+        toast('THE RELAY IS DARK \u2014 TALK TO RILL FIRST');
+        return;
+      }
+      if (state.stage > 1) {
+        toast('RELAY ALREADY SHORTED');
+        return;
+      }
+      startHack('route');
+      return;
+    }
+    if (target.type === 'node') {
+      if (!state.gateOpen) {
+        toast('THE VAULT GATE IS SEALED');
+        return;
+      }
+      if (state.stage === 2) {
+        startHack('cipher');
+        return;
+      }
+      if (state.stage > 2) toast('PAYLOAD ALREADY PULLED');
+      else toast('THE NODE IS DORMANT');
+      return;
+    }
+    if (target.type === 'lift') {
+      if (state.stage < 3) {
+        toast('LIFT LOCKED \u2014 PULL THE PAYLOAD FIRST');
+        return;
+      }
+      completeMission();
+    }
+  }
+
+  /* ---------------- simulation ---------------- */
+
+  function movePlayer(dx, dy) {
+    if (dx !== 0) {
+      const nx = clamp(state.px + dx, PLAYER_R + 4, W - PLAYER_R - 4);
+      if (!blocked(nx, state.py, PLAYER_R)) state.px = nx;
+      state.face = dx > 0 ? 1 : -1;
+    }
+    if (dy !== 0) {
+      const ny = clamp(state.py + dy, TOP + PLAYER_R, H - PLAYER_R - 4);
+      if (!blocked(state.px, ny, PLAYER_R)) state.py = ny;
+    }
+  }
+
+  function update(dt) {
+    const mx = (input.right ? 1 : 0) - (input.left ? 1 : 0);
+    const my = (input.down ? 1 : 0) - (input.up ? 1 : 0);
+    state.moving = mx !== 0 || my !== 0;
+    if (state.moving) {
+      const len = Math.hypot(mx, my) || 1;
+      movePlayer((mx / len) * SPEED * dt, (my / len) * SPEED * dt);
+      state.walk += dt;
+    }
+
+    if (state.stun > 0) state.stun = Math.max(0, state.stun - dt);
+    if (state.bumpCd > 0) state.bumpCd = Math.max(0, state.bumpCd - dt);
+    if (state.toastT > 0) state.toastT = Math.max(0, state.toastT - dt);
+    if (state.flash > 0) state.flash = Math.max(0, state.flash - dt * 2.2);
+    if (state.shake > 0) state.shake = Math.max(0, state.shake - dt * 5);
+
+    state.hidden = VENTS.some((v) => distTo({ x: state.px, y: state.py }, v) < v.r);
+
+    let spotted = false;
+    const speedMult = state.alarm ? 1.5 : 1;
+
+    for (const bot of state.bots) {
+      if (bot.hitCd > 0) bot.hitCd = Math.max(0, bot.hitCd - dt);
+      if (state.stun > 0) continue;
+
+      const goal = bot.path[bot.target];
+      const dx = goal.x - bot.x;
+      const dy = goal.y - bot.y;
+      const gap = Math.hypot(dx, dy);
+      if (gap < 2) {
+        bot.wait += dt;
+        bot.face += Math.sin(state.t * 2.2 + bot.target) * dt * 1.6;
+        if (bot.wait > 0.7) {
+          bot.wait = 0;
+          bot.target = (bot.target + 1) % bot.path.length;
+        }
+      } else {
+        const step = Math.min(gap, bot.speed * speedMult * dt);
+        bot.x += (dx / gap) * step;
+        bot.y += (dy / gap) * step;
+        bot.face = Math.atan2(dy, dx);
+      }
+
+      const toPlayer = Math.atan2(state.py - bot.y, state.px - bot.x);
+      let diff = Math.abs(((toPlayer - bot.face + Math.PI * 3) % TAU) - Math.PI);
+      if (diff > Math.PI) diff = TAU - diff;
+      const range = CONE_RANGE * (state.alarm ? 1.12 : 1);
+      const d = Math.hypot(state.px - bot.x, state.py - bot.y);
+
+      if (!state.hidden && d < range && diff < CONE_HALF && losClear(bot.x, bot.y, state.px, state.py)) {
+        spotted = true;
+        const closeness = 1 - (d / range) * 0.55;
+        state.trace = clamp(state.trace + TRACE_RATE * closeness * (state.alarm ? 1.35 : 1) * dt, 0, 100);
+      }
+
+      if (d < BOT_R + PLAYER_R + 1 && bot.hitCd <= 0) {
+        bot.hitCd = 1.5;
+        state.trace = clamp(state.trace + 24, 0, 100);
+        state.shake = 1;
+        state.flash = 0.5;
+        state.flashColor = '#ff5c6e';
+        toast('BUMPED A BOT \u2014 TRACE +24');
+        const push = Math.atan2(state.py - bot.y, state.px - bot.x);
+        movePlayer(Math.cos(push) * 26, Math.sin(push) * 26);
+      }
+    }
+
+    state.seen = spotted;
+    if (!spotted) state.trace = clamp(state.trace - TRACE_DECAY * dt, 0, 100);
+
+    if (state.trace >= 100) {
+      failRun('trace');
+      return;
+    }
+
+    for (const chip of state.chips) {
+      if (chip.taken) continue;
+      if (Math.hypot(state.px - chip.x, state.py - chip.y) < 17) {
+        chip.taken = true;
+        state.chipCount += 1;
+        state.credits += 0;
+        toast('DATA CHIP +80');
+        state.flash = 0.35;
+        state.flashColor = '#b48cff';
+        announce('Data chip recovered. ' + state.chipCount + ' of 7.');
+      }
+    }
+  }
+
+  /* ---------------- outcomes ---------------- */
+
+  function scoreBreakdown(success) {
+    const chips = state.chipCount * CHIP_SCORE;
+    const ghost = success ? Math.round((1 - state.trace / 100) * MAX_GHOST) : 0;
+    const vox = success && state.flags.vox === 'free' ? VOX_SCORE : 0;
+    const contract = success ? CONTRACT_SCORE : 0;
+    return [
+      ['Data chips (' + state.chipCount + ' \u00d7 ' + CHIP_SCORE + ')', chips],
+      ['ICE hacks', state.hackBonus],
+      ['Credits on hand', state.credits],
+      ['Contract', contract],
+      ['Ghost bonus', ghost],
+      ['Vox favour', vox]
+    ];
+  }
+
+  function totalScore(rows) {
+    return rows.reduce((sum, row) => sum + row[1], 0);
+  }
+
+  function rankFor(score) {
+    if (score >= 2200) return 'Rank S \u2014 ghost in the machine';
+    if (score >= 1700) return 'Rank A \u2014 clean exit';
+    if (score >= 1200) return 'Rank B \u2014 paid, not pretty';
+    return 'Rank C \u2014 amateur hour';
+  }
+
+  function paintResult(success) {
+    const rows = scoreBreakdown(success);
+    const total = totalScore(rows);
+    state.best = Math.max(readBest(), success ? total : 0);
+    if (success) writeBest(state.best);
+
+    if (success) {
+      finalKicker.textContent = 'Contract closed';
+      finalTitle.innerHTML = 'Mission <span class="accent">complete</span>';
+      finalRank.hidden = false;
+      finalRank.textContent = rankFor(total);
+      runLineEl.textContent = state.chipCount + ' of 7 chips \u00b7 trace ' + Math.round(state.trace) + '% \u00b7 ' + (state.flags.vox === 'free' ? 'Vox freed' : state.flags.vox === 'sold' ? 'Vox sold' : 'Vox ignored');
+    } else {
+      finalKicker.textContent = 'Trace complete';
+      finalTitle.innerHTML = 'You\u2019ve been <span class="accent">burned</span>';
+      finalRank.hidden = true;
+      runLineEl.textContent = state.chipCount + ' of 7 chips \u00b7 the bots have your face';
+    }
+
+    finalScoreEl.textContent = String(total);
+    bestLineEl.textContent = 'Best ' + pad5(state.best);
+    finalBreakdown.innerHTML = rows.map((row) => '<div class="row"><span>' + row[0] + '</span><strong>' + row[1] + '</strong></div>').join('');
+    state.result = { total, rows, success };
+    resultPanel.hidden = false;
+    overlay.hidden = false;
+    jamBtn.hidden = true;
+  }
+
+  function completeMission() {
+    if (state.mode !== 'playing') return;
+    state.mode = 'done';
+    state.flash = 1;
+    state.flashColor = '#5ff2d0';
+    introPanel.hidden = true;
+    paintResult(true);
+    announce('Mission complete. Total score ' + state.result.total + '.');
+  }
+
+  function failRun(cause) {
+    if (state.mode === 'done' || state.mode === 'failed') return;
+    state.mode = 'failed';
+    state.trace = 100;
+    state.flash = 1;
+    state.flashColor = '#ff5c6e';
+    introPanel.hidden = true;
+    state.flags.lastCause = cause || 'trace';
+    paintResult(false);
+    announce('Mission failed. The trace meter filled and security burned your cover.');
+  }
+
+  /* ---------------- rendering ---------------- */
+
+  function drawGround() {
+    ctx.fillStyle = '#070612';
+    ctx.fillRect(0, 0, W, H);
+
+    const glow = ctx.createRadialGradient(240, 330, 40, 240, 330, 420);
+    glow.addColorStop(0, 'rgba(64, 44, 120, 0.20)');
+    glow.addColorStop(0.55, 'rgba(20, 30, 70, 0.10)');
+    glow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.strokeStyle = 'rgba(110, 170, 255, 0.055)';
+    ctx.lineWidth = 1;
+    for (let x = 0; x < W; x += 40) {
+      ctx.beginPath();
+      ctx.moveTo(x, TOP);
+      ctx.lineTo(x, H);
+      ctx.stroke();
+    }
+    for (let y = TOP; y < H; y += 40) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(W, y);
+      ctx.stroke();
+    }
+
+    for (const p of PUDDLES) {
+      const g = ctx.createRadialGradient(p.x, p.y, 2, p.x, p.y, p.rx);
+      g.addColorStop(0, 'rgba(255,255,255,0.10)');
+      g.addColorStop(0.4, p.c);
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.save();
+      ctx.globalAlpha = 0.20 + 0.05 * Math.sin(state.t * 1.4 + p.x);
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.ellipse(p.x, p.y, p.rx, p.ry, 0, 0, TAU);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    ctx.fillStyle = 'rgba(233, 246, 255, 0.10)';
+    for (let i = 0; i < 6; i++) {
+      ctx.fillRect(196 + i * 15, 404, 8, 40);
+    }
+
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255, 207, 107, 0.14)';
+    ctx.setLineDash([10, 12]);
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(14, 430);
+    ctx.lineTo(W - 14, 430);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawCones() {
+    for (const bot of state.bots) {
+      if (state.stun > 0) continue;
+      const range = CONE_RANGE * (state.alarm ? 1.12 : 1);
+      const g = ctx.createRadialGradient(bot.x, bot.y, 8, bot.x, bot.y, range);
+      const hot = state.seen ? '255, 92, 110' : '255, 140, 90';
+      g.addColorStop(0, 'rgba(' + hot + ', 0.22)');
+      g.addColorStop(0.5, 'rgba(' + hot + ', 0.10)');
+      g.addColorStop(1, 'rgba(' + hot + ', 0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.moveTo(bot.x, bot.y);
+      ctx.arc(bot.x, bot.y, range, bot.face - CONE_HALF, bot.face + CONE_HALF);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.strokeStyle = 'rgba(' + hot + ', 0.22)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(bot.x, bot.y);
+      ctx.lineTo(bot.x + Math.cos(bot.face - CONE_HALF) * range, bot.y + Math.sin(bot.face - CONE_HALF) * range);
+      ctx.moveTo(bot.x, bot.y);
+      ctx.lineTo(bot.x + Math.cos(bot.face + CONE_HALF) * range, bot.y + Math.sin(bot.face + CONE_HALF) * range);
+      ctx.stroke();
+    }
+  }
+
+  function drawBuildings() {
+    for (const b of SOLIDS) {
+      if (b.vault) continue;
+      const pulse = 0.5 + 0.22 * Math.sin(state.t * 1.5 + b.seed * 2);
+      ctx.save();
+
+      ctx.fillStyle = 'rgba(3, 3, 10, 0.65)';
+      ctx.fillRect(b.x + 4, b.y + 6, b.w, b.h);
+
+      ctx.fillStyle = '#0b0a1d';
+      roundRect(b.x + 2, b.y + 2, b.w - 4, b.h - 4, 7);
+      ctx.fill();
+
+      ctx.strokeStyle = 'rgba(130, 180, 255, 0.07)';
+      ctx.lineWidth = 1;
+      for (let x = b.x + 14; x < b.x + b.w - 8; x += 16) {
+        ctx.beginPath();
+        ctx.moveTo(x, b.y + 10);
+        ctx.lineTo(x, b.y + b.h - 10);
+        ctx.stroke();
+      }
+      for (let y = b.y + 16; y < b.y + b.h - 8; y += 16) {
+        ctx.beginPath();
+        ctx.moveTo(b.x + 8, y);
+        ctx.lineTo(b.x + b.w - 8, y);
+        ctx.stroke();
+      }
+
+      for (let wy = b.y + 14; wy < b.y + b.h - 26; wy += 18) {
+        for (let wx = b.x + 12; wx < b.x + b.w - 16; wx += 20) {
+          const h = Math.sin((wx + wy) * 0.7 + b.seed) * 0.5 + 0.5;
+          if (h > 0.62) {
+            ctx.fillStyle = b.sign;
+            ctx.globalAlpha = 0.12 + h * 0.16;
+            ctx.fillRect(wx, wy, 9, 7);
+          }
+        }
+      }
+      ctx.globalAlpha = 1;
+
+      ctx.fillStyle = b.sign;
+      ctx.globalAlpha = 0.75;
+      ctx.fillRect(b.x + 8, b.y + b.h - 22, b.w - 16, 2);
+      ctx.globalAlpha = 1;
+
+      ctx.font = '700 8.5px ' + FONT;
+      ctx.fillStyle = 'rgba(233, 246, 255, 0.72)';
+      ctx.textAlign = 'center';
+      ctx.fillText(b.label, b.x + b.w / 2, b.y + b.h - 8);
+
+      ctx.strokeStyle = b.sign;
+      ctx.shadowColor = b.sign;
+      ctx.shadowBlur = 14;
+      ctx.globalAlpha = pulse;
+      ctx.lineWidth = 1.5;
+      roundRect(b.x + 2, b.y + 2, b.w - 4, b.h - 4, 7);
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+      ctx.globalAlpha = 1;
+      ctx.restore();
+
+      ctx.save();
+      ctx.globalAlpha = pulse * 0.5;
+      ctx.font = '700 9px ' + FONT;
+      ctx.fillStyle = b.sign;
+      ctx.textAlign = 'center';
+      ctx.fillText('\u25c6', b.x + b.w / 2, b.y + 16);
+      ctx.restore();
+    }
+  }
+
+  function drawVault() {
+    ctx.save();
+    ctx.fillStyle = 'rgba(24, 240, 220, 0.05)';
+    ctx.fillRect(182, 264, 116, 122);
+    ctx.strokeStyle = 'rgba(79, 216, 255, 0.16)';
+    ctx.lineWidth = 1;
+    for (let x = 182; x <= 298; x += 19) {
+      ctx.beginPath();
+      ctx.moveTo(x, 264);
+      ctx.lineTo(x, 386);
+      ctx.stroke();
+    }
+    for (let y = 264; y <= 386; y += 19) {
+      ctx.beginPath();
+      ctx.moveTo(182, y);
+      ctx.lineTo(298, y);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    for (const b of SOLIDS) {
+      if (!b.vault) continue;
+      ctx.save();
+      ctx.fillStyle = '#121331';
+      roundRect(b.x, b.y, b.w, b.h, 3);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(79, 216, 255, 0.55)';
+      ctx.shadowColor = '#4fd8ff';
+      ctx.shadowBlur = 10;
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    ctx.save();
+    ctx.font = '700 8px ' + FONT;
+    ctx.fillStyle = 'rgba(79, 216, 255, 0.75)';
+    ctx.textAlign = 'center';
+    ctx.fillText('VAULT 07', 240, 246);
+    ctx.restore();
+
+    if (!state.gateOpen) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(255, 95, 162, 0.8)';
+      ctx.shadowColor = '#ff5fa2';
+      ctx.shadowBlur = 12;
+      ctx.lineWidth = 2;
+      for (let i = 0; i < 4; i++) {
+        ctx.beginPath();
+        ctx.moveTo(GATE.x + 4 + i * 6, GATE.y);
+        ctx.lineTo(GATE.x + 4 + i * 6, GATE.y + GATE.h);
+        ctx.stroke();
+      }
+      ctx.restore();
+    } else {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(95, 242, 208, 0.4)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(GATE.x, GATE.y + GATE.h);
+      ctx.lineTo(GATE.x + GATE.w, GATE.y + GATE.h);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  function drawVents() {
+    for (const v of VENTS) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(150, 210, 255, 0.35)';
+      ctx.lineWidth = 1;
+      for (let i = -1; i <= 1; i++) {
+        ctx.beginPath();
+        ctx.moveTo(v.x - 13, v.y + i * 5);
+        ctx.lineTo(v.x + 13, v.y + i * 5);
+        ctx.stroke();
+      }
+      for (let k = 0; k < 3; k++) {
+        const ph = (state.t * 0.35 + k * 0.33 + v.x * 0.01) % 1;
+        ctx.globalAlpha = (1 - ph) * 0.16;
+        ctx.fillStyle = '#cfefff';
+        ctx.beginPath();
+        ctx.ellipse(v.x + Math.sin(ph * 6 + k) * 8, v.y - ph * 34, 12 + ph * 10, 8 + ph * 8, 0, 0, TAU);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+  }
+
+  function drawRelay() {
+    const active = state.stage === 1;
+    ctx.save();
+    ctx.fillStyle = '#131a2e';
+    roundRect(316, 294, 34, 48, 5);
+    ctx.fill();
+    ctx.strokeStyle = active ? '#5ff2d0' : 'rgba(120,160,220,0.4)';
+    ctx.shadowColor = active ? '#5ff2d0' : 'transparent';
+    ctx.shadowBlur = active ? 12 : 0;
+    ctx.lineWidth = 1.4;
+    ctx.stroke();
+
+    ctx.fillStyle = active ? 'rgba(95,242,208,0.25)' : 'rgba(79,216,255,0.10)';
+    ctx.fillRect(321, 300, 24, 20);
+    ctx.fillStyle = active ? '#5ff2d0' : 'rgba(160,210,255,0.5)';
+    for (let i = 0; i < 3; i++) {
+      const w = 6 + ((Math.sin(state.t * 3 + i) + 1) * 5);
+      ctx.fillRect(323, 304 + i * 5, w, 2);
+    }
+    ctx.fillStyle = 'rgba(233,246,255,0.55)';
+    ctx.font = '7px ' + FONT;
+    ctx.textAlign = 'center';
+    ctx.fillText('RELAY', 333, 338);
+
+    if (state.flags.hint && active) {
+      ctx.strokeStyle = 'rgba(95,242,208,0.55)';
+      ctx.lineWidth = 1;
+      const r = 24 + Math.sin(state.t * 2.6) * 3;
+      ctx.beginPath();
+      ctx.arc(333, 318, r, 0, TAU);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawNode() {
+    const live = state.gateOpen && state.stage === 2;
+    ctx.save();
+    ctx.fillStyle = 'rgba(10, 14, 32, 0.95)';
+    roundRect(222, 288, 36, 36, 6);
+    ctx.fill();
+    ctx.strokeStyle = live ? '#ffcf6b' : 'rgba(180,140,255,0.45)';
+    ctx.shadowColor = live ? '#ffcf6b' : '#b48cff';
+    ctx.shadowBlur = live ? 16 : 8;
+    ctx.lineWidth = 1.4;
+    ctx.stroke();
+
+    ctx.fillStyle = live ? 'rgba(255,207,107,0.22)' : 'rgba(180,140,255,0.14)';
+    ctx.fillRect(228, 294, 24, 16);
+    ctx.fillStyle = live ? '#ffcf6b' : 'rgba(180,140,255,0.8)';
+    ctx.font = '700 11px ' + FONT;
+    ctx.textAlign = 'center';
+    ctx.fillText('\u2b1b', 240, 307);
+
+    ctx.fillStyle = 'rgba(233,246,255,0.5)';
+    ctx.font = '7px ' + FONT;
+    ctx.fillText('PAYROLL NODE', 240, 336);
+    ctx.restore();
+  }
+
+  function drawLift() {
+    const live = state.stage >= 3;
+    const col = live ? '#5ff2d0' : '#ff5c6e';
+    ctx.save();
+    ctx.globalAlpha = live ? 0.9 : 0.5;
+    ctx.strokeStyle = col;
+    ctx.lineWidth = 1.4;
+    ctx.shadowColor = col;
+    ctx.shadowBlur = live ? 18 : 6;
+    ctx.beginPath();
+    ctx.arc(LIFT.x, LIFT.y, LIFT.r, 0, TAU);
+    ctx.stroke();
+
+    ctx.globalAlpha = live ? 0.5 + 0.3 * Math.sin(state.t * 4) : 0.25;
+    ctx.beginPath();
+    ctx.arc(LIFT.x, LIFT.y, LIFT.r - 7, state.t * 0.8, state.t * 0.8 + Math.PI * 1.2);
+    ctx.stroke();
+
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = col;
+    ctx.font = '700 8px ' + FONT;
+    ctx.textAlign = 'center';
+    ctx.fillText('LIFT', LIFT.x, LIFT.y + 3);
+    ctx.font = '7px ' + FONT;
+    ctx.fillStyle = 'rgba(233,246,255,0.45)';
+    ctx.fillText(live ? 'READY' : 'LOCKED', LIFT.x, LIFT.y + 15);
+    ctx.restore();
+  }
+
+  function drawChips() {
+    for (const chip of state.chips) {
+      if (chip.taken) continue;
+      const bob = Math.sin(state.t * 2.4 + chip.phase) * 2.5;
+      ctx.save();
+      ctx.translate(chip.x, chip.y + bob);
+      ctx.rotate(state.t * 1.1 + chip.phase);
+      ctx.shadowColor = '#b48cff';
+      ctx.shadowBlur = 12;
+      ctx.fillStyle = '#b48cff';
+      ctx.beginPath();
+      ctx.moveTo(0, -6);
+      ctx.lineTo(6, 0);
+      ctx.lineTo(0, 6);
+      ctx.lineTo(-6, 0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = 'rgba(255,255,255,0.85)';
+      ctx.fillRect(-1.5, -1.5, 3, 3);
+      ctx.restore();
+    }
+  }
+
+  function drawNPCs() {
+    drawRill();
+    drawBex();
+    drawVox();
+  }
+
+  function drawRill() {
+    const n = NPCS.rill;
+    const near = Math.hypot(state.px - n.x, state.py - n.y) < n.r + 12;
+    const bob = Math.sin(state.t * 1.8) * 1.2;
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    ctx.beginPath();
+    ctx.ellipse(n.x, n.y + 10, 11, 4.5, 0, 0, TAU);
+    ctx.fill();
+
+    ctx.strokeStyle = 'rgba(255,95,162,0.4)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.ellipse(n.x, n.y + 10, 15, 6, 0, 0, TAU);
+    ctx.stroke();
+
+    ctx.fillStyle = '#251328';
+    roundRect(n.x - 6, n.y - 8 + bob, 12, 16, 4);
+    ctx.fill();
+    ctx.fillStyle = '#ff5fa2';
+    ctx.fillRect(n.x - 6, n.y - 2 + bob, 12, 2.5);
+    ctx.fillStyle = '#3b2036';
+    ctx.beginPath();
+    ctx.arc(n.x, n.y - 12 + bob, 4.6, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = '#ffc4dd';
+    ctx.fillRect(n.x - 3.4, n.y - 13 + bob, 6.8, 1.6);
+
+    ctx.strokeStyle = 'rgba(255,95,162,0.65)';
+    ctx.beginPath();
+    ctx.moveTo(n.x + 9, n.y - 16 + bob);
+    ctx.lineTo(n.x + 19, n.y - 4 + bob);
+    ctx.stroke();
+
+    ctx.font = '700 8px ' + FONT;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = state.stage === 0 ? '#ff5fa2' : 'rgba(255,95,162,0.55)';
+    ctx.fillText('RILL', n.x, n.y - 22 + bob);
+    if (state.stage === 0) {
+      ctx.fillStyle = '#ffcf6b';
+      ctx.font = '700 10px ' + FONT;
+      ctx.fillText('!', n.x, n.y - 34 + Math.sin(state.t * 3) * 2);
+    }
+    if (near) drawPrompt(n.x, n.y - 42);
+    ctx.restore();
+  }
+
+  function drawBex() {
+    const n = NPCS.bex;
+    const near = Math.hypot(state.px - n.x, state.py - n.y) < n.r + 12;
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    ctx.beginPath();
+    ctx.ellipse(n.x, n.y + 9, 13, 5, 0, 0, TAU);
+    ctx.fill();
+
+    ctx.fillStyle = '#241d10';
+    roundRect(n.x - 7, n.y - 4, 14, 12, 3);
+    ctx.fill();
+    ctx.fillStyle = '#3a2f18';
+    ctx.beginPath();
+    ctx.arc(n.x, n.y - 9, 4.6, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = '#ffcf6b';
+    ctx.fillRect(n.x - 5, n.y - 11, 10, 2.4);
+    ctx.fillStyle = 'rgba(255,207,107,0.8)';
+    ctx.fillRect(n.x - 4, n.y - 4, 8, 2);
+
+    ctx.font = '700 8px ' + FONT;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(255,207,107,0.85)';
+    ctx.fillText('BEX', n.x, n.y - 22);
+    if (near) drawPrompt(n.x, n.y - 34);
+    ctx.restore();
+  }
+
+  function drawVox() {
+    const n = NPCS.vox;
+    const near = Math.hypot(state.px - n.x, state.py - n.y) < n.r + 12;
+    const float = Math.sin(state.t * 1.5) * 4;
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    ctx.beginPath();
+    ctx.ellipse(n.x, n.y + 14, 10, 4, 0, 0, TAU);
+    ctx.fill();
+
+    ctx.strokeStyle = 'rgba(180,140,255,0.4)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 2; i++) {
+      ctx.beginPath();
+      ctx.ellipse(n.x, n.y - 6 + float, 14 - i * 4, 5 - i * 1.5, state.t * (0.6 + i * 0.4), 0, TAU);
+      ctx.stroke();
+    }
+    ctx.shadowColor = '#b48cff';
+    ctx.shadowBlur = 16;
+    ctx.fillStyle = '#b48cff';
+    ctx.beginPath();
+    ctx.arc(n.x, n.y - 6 + float, 6.5, 0, TAU);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+    ctx.beginPath();
+    ctx.arc(n.x - 2, n.y - 8 + float, 1.8, 0, TAU);
+    ctx.fill();
+
+    ctx.font = '700 8px ' + FONT;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(180,140,255,0.9)';
+    ctx.fillText('VOX', n.x, n.y - 26 + float);
+    if (near) drawPrompt(n.x, n.y - 36 + float);
+    ctx.restore();
+  }
+
+  function drawPrompt(x, y) {
+    ctx.save();
+    ctx.fillStyle = 'rgba(4, 8, 20, 0.9)';
+    ctx.strokeStyle = 'rgba(95, 242, 208, 0.7)';
+    ctx.lineWidth = 1;
+    roundRect(x - 9, y - 11, 18, 15, 4);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#5ff2d0';
+    ctx.font = '700 9px ' + FONT;
+    ctx.textAlign = 'center';
+    ctx.fillText('E', x, y);
+    ctx.restore();
+  }
+
+  function drawBots() {
+    for (const bot of state.bots) {
+      ctx.save();
+      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      ctx.beginPath();
+      ctx.ellipse(bot.x, bot.y + 9, 12, 5, 0, 0, TAU);
+      ctx.fill();
+
+      const stunned = state.stun > 0;
+      const hot = state.seen && !stunned ? '#ff5c6e' : stunned ? '#5ff2d0' : '#ff9d87';
+      ctx.shadowColor = hot;
+      ctx.shadowBlur = stunned ? 18 : 10;
+
+      ctx.fillStyle = '#171a2c';
+      roundRect(bot.x - 10, bot.y - 8, 20, 16, 7);
+      ctx.fill();
+      ctx.strokeStyle = hot;
+      ctx.lineWidth = 1.4;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+
+      ctx.fillStyle = hot;
+      const eyeX = bot.x + Math.cos(bot.face) * 4.5;
+      const eyeY = bot.y + Math.sin(bot.face) * 4.5;
+      ctx.beginPath();
+      ctx.arc(eyeX, eyeY, 2.6, 0, TAU);
+      ctx.fill();
+
+      ctx.fillStyle = 'rgba(233,246,255,0.30)';
+      ctx.font = '6.5px ' + FONT;
+      ctx.textAlign = 'center';
+      ctx.fillText(stunned ? 'JAMMED' : bot.name, bot.x, bot.y - 13);
+
+      if (stunned) {
+        for (let i = 0; i < 3; i++) {
+          const a = state.t * 6 + i * 2.1;
+          ctx.fillStyle = 'rgba(95,242,208,0.7)';
+          ctx.fillRect(bot.x + Math.cos(a) * 13, bot.y + Math.sin(a) * 9, 2, 2);
+        }
+      }
+      ctx.restore();
+    }
+  }
+
+  function drawPlayer() {
+    const x = state.px;
+    const y = state.py;
+    const bob = state.moving ? Math.sin(state.walk * 12) * 1.2 : Math.sin(state.t * 2) * 0.6;
+    ctx.save();
+
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.beginPath();
+    ctx.ellipse(x, y + 9, 10, 4.5, 0, 0, TAU);
+    ctx.fill();
+
+    if (state.moving) {
+      ctx.globalAlpha = 0.18;
+      ctx.fillStyle = '#ff5fa2';
+      roundRect(x - 7 - state.face * 4, y - 10 + bob, 14, 18, 5);
+      ctx.fill();
+      ctx.fillStyle = '#4fd8ff';
+      roundRect(x - 7 + state.face * 4, y - 10 + bob, 14, 18, 5);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+
+    ctx.fillStyle = '#1b2140';
+    roundRect(x - 7, y - 9 + bob, 14, 17, 5);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(95,242,208,0.55)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.fillStyle = '#2c3560';
+    ctx.beginPath();
+    ctx.arc(x, y - 12 + bob, 4.6, 0, TAU);
+    ctx.fill();
+
+    ctx.fillStyle = '#5ff2d0';
+    ctx.shadowColor = '#5ff2d0';
+    ctx.shadowBlur = 8;
+    ctx.fillRect(x - 4.6, y - 13.4 + bob, 9.2, 2.2);
+    ctx.shadowBlur = 0;
+
+    const stride = state.moving ? Math.sin(state.walk * 12) * 3 : 0;
+    ctx.fillStyle = '#141a30';
+    ctx.fillRect(x - 4.2, y + 6 + bob, 3, 4 + stride);
+    ctx.fillRect(x + 1.4, y + 6 + bob, 3, 4 - stride);
+
+    if (state.hidden) {
+      ctx.font = '7px ' + FONT;
+      ctx.textAlign = 'center';
+      ctx.fillStyle = 'rgba(150,220,255,0.7)';
+      ctx.fillText('HIDDEN', x, y - 22);
+    }
+    ctx.restore();
+  }
+
+  function drawWeather() {
+    ctx.save();
+    for (const d of rain) {
+      ctx.strokeStyle = 'rgba(180, 225, 255, ' + d.a + ')';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(d.x, d.y);
+      ctx.lineTo(d.x - d.len * 0.22, d.y + d.len);
+      ctx.stroke();
+    }
+
+    const vig = ctx.createRadialGradient(W / 2, H / 2, 200, W / 2, H / 2, 420);
+    vig.addColorStop(0, 'rgba(0,0,0,0)');
+    vig.addColorStop(1, 'rgba(2, 2, 8, 0.7)');
+    ctx.fillStyle = vig;
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.fillStyle = 'rgba(150, 210, 255, 0.028)';
+    for (let y = 0; y < H; y += 4) ctx.fillRect(0, y, W, 1);
+    ctx.restore();
+  }
+
+  function drawHud() {
+    ctx.save();
+    ctx.fillStyle = 'rgba(5, 6, 16, 0.95)';
+    ctx.fillRect(0, 0, W, HUD_H);
+    ctx.strokeStyle = 'rgba(120, 200, 255, 0.16)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, HUD_H - 0.5);
+    ctx.lineTo(W, HUD_H - 0.5);
+    ctx.stroke();
+
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#5ff2d0';
+    ctx.font = '700 13px ' + FONT;
+    ctx.fillText('NULL SECTOR', 14, 22);
+    ctx.fillStyle = 'rgba(233,246,255,0.4)';
+    ctx.font = '8px ' + FONT;
+    ctx.fillText('PLAZA 07 // 02:41', 14, 34);
+
+    ctx.textAlign = 'right';
+    ctx.fillStyle = 'rgba(233,246,255,0.4)';
+    ctx.font = '8px ' + FONT;
+    ctx.fillText('CHIPS', 366, 14);
+    ctx.fillStyle = '#b48cff';
+    ctx.font = '700 12px ' + FONT;
+    ctx.fillText(state.chipCount + '/7', 366, 30);
+
+    ctx.fillStyle = 'rgba(233,246,255,0.4)';
+    ctx.font = '8px ' + FONT;
+    ctx.fillText('CREDITS', 466, 14);
+    ctx.fillStyle = '#ffcf6b';
+    ctx.font = '700 12px ' + FONT;
+    ctx.fillText(String(state.credits), 466, 30);
+
+    const bx = 14;
+    const by = 42;
+    const bw = 356;
+    const bh = 10;
+    ctx.fillStyle = 'rgba(255,255,255,0.07)';
+    roundRect(bx, by, bw, bh, 5);
+    ctx.fill();
+
+    const pct = clamp(state.trace / 100, 0, 1);
+    if (pct > 0) {
+      const grad = ctx.createLinearGradient(bx, 0, bx + bw, 0);
+      grad.addColorStop(0, '#5ff2d0');
+      grad.addColorStop(0.55, '#ffcf6b');
+      grad.addColorStop(1, '#ff5c6e');
+      ctx.fillStyle = grad;
+      roundRect(bx, by, Math.max(4, bw * pct), bh, 5);
+      ctx.fill();
+    }
+
+    ctx.fillStyle = 'rgba(233,246,255,0.55)';
+    ctx.font = '8px ' + FONT;
+    ctx.textAlign = 'right';
+    ctx.fillText(Math.round(state.trace) + '%', 466, 51);
+    ctx.textAlign = 'left';
+    ctx.fillStyle = state.seen ? '#ff8f7a' : state.hidden ? '#4fd8ff' : 'rgba(233,246,255,0.4)';
+    ctx.fillText(state.seen ? 'SPOTTED' : state.hidden ? 'HIDDEN' : 'TRACE', bx, 38);
+
+    ctx.textAlign = 'left';
+    ctx.fillStyle = 'rgba(6, 8, 18, 0.9)';
+    ctx.fillRect(0, HUD_H, W, 24);
+    ctx.fillStyle = 'rgba(95, 242, 208, 0.75)';
+    ctx.font = '700 8px ' + FONT;
+    ctx.fillText('OBJECTIVE', 14, HUD_H + 15);
+    ctx.fillStyle = 'rgba(233,246,255,0.82)';
+    ctx.font = '10px ' + FONT;
+    ctx.fillText(objectiveText(), 66, HUD_H + 15);
+
+    for (let i = 0; i < 4; i++) {
+      const x = 452 + i * 8;
+      ctx.beginPath();
+      ctx.arc(x, HUD_H + 12, 2.2, 0, TAU);
+      ctx.fillStyle = i <= state.stage ? '#5ff2d0' : 'rgba(233,246,255,0.18)';
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function wrapText(text, maxW, font) {
+    ctx.font = font;
+    const words = String(text).split(' ');
+    const lines = [];
+    let line = '';
+    for (const word of words) {
+      const test = line ? line + ' ' + word : word;
+      if (ctx.measureText(test).width > maxW && line) {
+        lines.push(line);
+        line = word;
+      } else {
+        line = test;
+      }
+    }
+    if (line) lines.push(line);
+    return lines;
+  }
+
+  function drawDialogue() {
+    const d = state.dlg;
+    if (!d) return;
+    const node = d.node;
+    const sp = SPEAKERS[node.who];
+    ctx.save();
+    ctx.fillStyle = 'rgba(3, 4, 12, 0.78)';
+    ctx.fillRect(0, 0, W, H);
+
+    const x = 22;
+    const y = 282;
+    const w = 436;
+    const h = 340;
+    ctx.shadowColor = 'rgba(0,0,0,0.8)';
+    ctx.shadowBlur = 26;
+    ctx.fillStyle = 'rgba(9, 12, 26, 0.98)';
+    roundRect(x, y, w, h, 14);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = sp.color;
+    ctx.globalAlpha = 0.55;
+    ctx.lineWidth = 1.2;
+    roundRect(x, y, w, h, 14);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    ctx.fillStyle = sp.color;
+    ctx.beginPath();
+    ctx.arc(x + 26, y + 30, 6, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = sp.color;
+    ctx.font = '700 12px ' + FONT;
+    ctx.textAlign = 'left';
+    ctx.fillText(sp.name, x + 40, y + 30);
+    ctx.fillStyle = 'rgba(233,246,255,0.4)';
+    ctx.font = '8px ' + FONT;
+    ctx.fillText(sp.tag, x + 40, y + 42);
+
+    ctx.fillStyle = 'rgba(233,246,255,0.9)';
+    const font = '11.5px ' + FONT;
+    ctx.font = font;
+    const lines = wrapText(node.text, w - 40, font);
+    lines.slice(0, 6).forEach((ln, i) => {
+      ctx.fillText(ln, x + 20, y + 70 + i * 17);
+    });
+
+    const top = y + 70 + Math.max(2, Math.min(6, lines.length)) * 17 + 12;
+    node.choices.forEach((choice, i) => {
+      const ry = top + i * 38;
+      const sel = i === d.sel;
+      if (sel) {
+        ctx.fillStyle = 'rgba(95, 242, 208, 0.12)';
+        roundRect(x + 16, ry - 8, w - 32, 32, 8);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(95, 242, 208, 0.45)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+      ctx.fillStyle = sel ? '#5ff2d0' : 'rgba(233,246,255,0.72)';
+      ctx.font = (sel ? '700 ' : '') + '11px ' + FONT;
+      ctx.fillText((i + 1) + '.  ' + choice.text, x + 28, ry + 12);
+    });
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(233,246,255,0.32)';
+    ctx.font = '8.5px ' + FONT;
+    ctx.fillText('\u2191 \u2193 CHOOSE \u00b7 E / ENTER CONFIRM \u00b7 ESC CLOSE', x + w / 2, y + h - 12);
+    ctx.restore();
+  }
+
+  function drawGlyph(kind, x, y, size, color) {
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.fillStyle = color;
+    ctx.lineWidth = 2;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 10;
+    if (kind === 0) {
+      ctx.beginPath();
+      ctx.ellipse(x, y, size * 0.62, size * 0.38, 0, 0, TAU);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(x, y, size * 0.14, 0, TAU);
+      ctx.fill();
+    } else if (kind === 1) {
+      ctx.beginPath();
+      for (let i = 0; i < 34; i++) {
+        const t = i / 33;
+        const a = t * TAU * 1.8;
+        const r = size * 0.12 + t * size * 0.56;
+        const px = x + Math.cos(a) * r;
+        const py = y + Math.sin(a) * r;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+    } else if (kind === 2) {
+      ctx.beginPath();
+      ctx.moveTo(x, y - size * 0.56);
+      ctx.lineTo(x + size * 0.56, y + size * 0.42);
+      ctx.lineTo(x - size * 0.56, y + size * 0.42);
+      ctx.closePath();
+      ctx.stroke();
+    } else {
+      ctx.beginPath();
+      for (let i = 0; i <= 24; i++) {
+        const t = i / 24;
+        const px = x - size * 0.6 + t * size * 1.2;
+        const py = y + Math.sin(t * TAU) * size * 0.24;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawHack() {
+    const hk = state.hack;
+    if (!hk) return;
+    ctx.save();
+    ctx.fillStyle = 'rgba(3, 4, 12, 0.92)';
+    ctx.fillRect(0, 0, W, H);
+
+    const shakeX = hk.shake > 0 ? Math.sin(state.t * 70) * 3 * hk.shake : 0;
+    ctx.translate(shakeX, 0);
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#5ff2d0';
+    ctx.font = '700 14px ' + FONT;
+    ctx.fillText(hk.kind === 'route' ? 'ICE // TRACE ROUTE' : 'ICE // CIPHER LOCK', W / 2, 48);
+    ctx.fillStyle = 'rgba(233,246,255,0.45)';
+    ctx.font = '9px ' + FONT;
+    ctx.fillText(hk.kind === 'route' ? 'RELAY NODE \u2014 EAST WALL' : 'PAYROLL NODE \u2014 VAULT 07', W / 2, 64);
+    ctx.fillStyle = 'rgba(255,95,162,0.75)';
+    ctx.font = '9px ' + FONT;
+    ctx.fillText('TRACE ' + Math.round(state.trace) + '%', W / 2, 82);
+
+    if (hk.kind === 'route') {
+      const cell = 54;
+      const gx = 78;
+      const gy = 150;
+      ctx.strokeStyle = 'rgba(80, 200, 255, 0.10)';
+      ctx.lineWidth = 1;
+      for (let r = 0; r < 6; r++) {
+        for (let c = 0; c < 6; c++) {
+          const cx = gx + c * cell + cell / 2;
+          const cy = gy + r * cell + cell / 2;
+          if (c < 5) {
+            ctx.beginPath();
+            ctx.moveTo(cx + 9, cy);
+            ctx.lineTo(cx + cell - 9, cy);
+            ctx.stroke();
+          }
+          if (r < 5) {
+            ctx.beginPath();
+            ctx.moveTo(cx, cy + 9);
+            ctx.lineTo(cx, cy + cell - 9);
+            ctx.stroke();
+          }
+        }
+      }
+
+      ctx.strokeStyle = 'rgba(95, 242, 208, 0.55)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      hk.trail.forEach(([c, r], i) => {
+        const cx = gx + c * cell + cell / 2;
+        const cy = gy + r * cell + cell / 2;
+        if (i === 0) ctx.moveTo(cx, cy);
+        else ctx.lineTo(cx, cy);
+      });
+      ctx.stroke();
+
+      for (let r = 0; r < 6; r++) {
+        for (let c = 0; c < 6; c++) {
+          const cx = gx + c * cell + cell / 2;
+          const cy = gy + r * cell + cell / 2;
+          const isIce = hk.puz.ice.some(([ic, ir]) => ic === c && ir === r);
+          const isCore = hk.puz.core[0] === c && hk.puz.core[1] === r;
+          const isCursor = hk.c === c && hk.r === r;
+
+          if (isIce) {
+            ctx.fillStyle = 'rgba(255, 92, 110, 0.18)';
+            roundRect(cx - 15, cy - 15, 30, 30, 6);
+            ctx.fill();
+            ctx.strokeStyle = '#ff5c6e';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(cx - 5, cy - 5);
+            ctx.lineTo(cx + 5, cy + 5);
+            ctx.moveTo(cx + 5, cy - 5);
+            ctx.lineTo(cx - 5, cy + 5);
+            ctx.stroke();
+            continue;
+          }
+
+          if (isCore) {
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.rotate(Math.PI / 4 + state.t * 0.5);
+            ctx.fillStyle = 'rgba(95, 242, 208, 0.24)';
+            ctx.fillRect(-11, -11, 22, 22);
+            ctx.strokeStyle = '#5ff2d0';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(-11, -11, 22, 22);
+            ctx.restore();
+            ctx.fillStyle = '#5ff2d0';
+            ctx.font = '7px ' + FONT;
+            ctx.textAlign = 'center';
+            ctx.fillText('CORE', cx, cy + 26);
+            continue;
+          }
+
+          ctx.fillStyle = 'rgba(30, 42, 74, 0.9)';
+          ctx.beginPath();
+          ctx.arc(cx, cy, 8, 0, TAU);
+          ctx.fill();
+          ctx.strokeStyle = 'rgba(79, 216, 255, 0.35)';
+          ctx.lineWidth = 1;
+          ctx.stroke();
+
+          if (isCursor) {
+            ctx.strokeStyle = '#ffcf6b';
+            ctx.shadowColor = '#ffcf6b';
+            ctx.shadowBlur = 12;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(cx, cy, 13 + Math.sin(state.t * 5) * 1.6, 0, TAU);
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+          }
+        }
+      }
+
+      ctx.textAlign = 'center';
+      ctx.fillStyle = hk.moves <= 3 ? '#ff5c6e' : '#e9f6ff';
+      ctx.font = '700 13px ' + FONT;
+      ctx.fillText('MOVES ' + hk.moves, W / 2, 512);
+      ctx.fillStyle = 'rgba(233,246,255,0.45)';
+      ctx.font = '9px ' + FONT;
+      ctx.fillText('ARROWS STEP \u00b7 AVOID RED ICE \u00b7 ESC DISCONNECT', W / 2, 566);
+      ctx.fillText('REACH THE CORE BEFORE THE MOVES RUN OUT', W / 2, 582);
+    } else {
+      const dialW = 64;
+      const gap = 24;
+      const startX = (W - (dialW * 4 + gap * 3)) / 2;
+      for (let i = 0; i < 4; i++) {
+        const x = startX + i * (dialW + gap);
+        const y = 128;
+        const sel = hk.sel === i;
+        ctx.fillStyle = 'rgba(12, 16, 34, 0.95)';
+        roundRect(x, y, dialW, 92, 8);
+        ctx.fill();
+        ctx.strokeStyle = sel ? '#ffcf6b' : 'rgba(120, 190, 255, 0.24)';
+        ctx.lineWidth = sel ? 2 : 1;
+        ctx.stroke();
+        drawGlyph(hk.dials[i], x + dialW / 2, y + 44, 26, GLYPH_COLORS[hk.dials[i]]);
+        ctx.fillStyle = 'rgba(233,246,255,0.35)';
+        ctx.font = '7px ' + FONT;
+        ctx.textAlign = 'center';
+        ctx.fillText('DIAL ' + (i + 1), x + dialW / 2, y + 84);
+        if (sel) {
+          ctx.fillStyle = '#ffcf6b';
+          ctx.font = '700 8px ' + FONT;
+          ctx.fillText('\u25b2', x + dialW / 2, y - 6);
+          ctx.fillText('\u25bc', x + dialW / 2, y + 104);
+        }
+      }
+
+      ctx.textAlign = 'left';
+      ctx.fillStyle = 'rgba(95, 242, 208, 0.8)';
+      ctx.font = '700 9px ' + FONT;
+      ctx.fillText('RECOVERED FRAGMENTS', 40, 268);
+
+      let y = 288;
+      hk.puz.clues.forEach((clue) => {
+        const lines = wrapText(clue, W - 88, '10px ' + FONT);
+        ctx.fillStyle = 'rgba(233, 246, 255, 0.78)';
+        ctx.font = '10px ' + FONT;
+        lines.forEach((ln) => {
+          ctx.fillText(ln, 40, y);
+          y += 15;
+        });
+        y += 6;
+      });
+
+      ctx.textAlign = 'center';
+      ctx.fillStyle = 'rgba(233,246,255,0.45)';
+      ctx.font = '9px ' + FONT;
+      ctx.fillText('\u2190 \u2192 DIAL \u00b7 \u2191 \u2193 GLYPH \u00b7 ENTER SUBMIT \u00b7 ESC DISCONNECT', W / 2, 566);
+      ctx.fillText('A WRONG LOCK COSTS 12 TRACE', W / 2, 582);
+    }
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(233,246,255,0.22)';
+    ctx.font = '7.5px ' + FONT;
+    ctx.fillText('NULL SECTOR // ICE CONSOLE', W / 2, 610);
+    ctx.restore();
+  }
+
+  function drawToast() {
+    if (state.toastT <= 0 || !state.toast) return;
+    const alpha = Math.min(1, state.toastT / 0.5);
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.font = '700 9px ' + FONT;
+    const width = Math.min(W - 40, ctx.measureText(state.toast).width + 28);
+    const x = (W - width) / 2;
+    const y = TOP + 6;
+    ctx.fillStyle = 'rgba(4, 7, 18, 0.92)';
+    ctx.strokeStyle = 'rgba(95, 242, 208, 0.5)';
+    ctx.lineWidth = 1;
+    roundRect(x, y, width, 24, 7);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#dffbf4';
+    ctx.textAlign = 'center';
+    ctx.fillText(state.toast, W / 2, y + 16);
+    ctx.restore();
+  }
+
+  function drawFlash() {
+    if (state.flash <= 0) return;
+    ctx.save();
+    ctx.globalAlpha = state.flash * 0.35;
+    ctx.fillStyle = state.flashColor;
+    ctx.fillRect(0, 0, W, H);
+    ctx.restore();
+  }
+
+  function render() {
+    ctx.save();
+    if (state.shake > 0) {
+      ctx.translate(Math.sin(state.t * 60) * 4 * state.shake, Math.cos(state.t * 50) * 3 * state.shake);
+    }
+    drawGround();
+    drawCones();
+    drawVault();
+    drawBuildings();
+    drawVents();
+    drawLift();
+    drawRelay();
+    drawNode();
+    drawChips();
+    drawNPCs();
+    drawBots();
+    drawPlayer();
+    drawWeather();
+    ctx.restore();
+
+    drawHud();
+    drawToast();
+    if (state.dlg) drawDialogue();
+    if (state.hack) drawHack();
+    drawFlash();
+  }
+
+  function animateRain(dt) {
+    for (const d of rain) {
+      d.y += d.sp * dt;
+      d.x -= d.sp * 0.18 * dt;
+      if (d.y > H + 10) {
+        d.y = -14;
+        d.x = rand(0, W + 60);
+      }
+      if (d.x < -20) d.x = W + 20;
+    }
+  }
+
+  /* ---------------- input ---------------- */
+
+  function padPress(dir) {
+    if (state.mode === 'playing') {
+      input[dir] = true;
+      return;
+    }
+    if (state.mode === 'dialogue') {
+      if (dir === 'up') moveChoice(-1);
+      if (dir === 'down') moveChoice(1);
+      return;
+    }
+    if (state.mode === 'hack') hackInput(dir);
+  }
+
+  function padRelease(dir) {
+    input[dir] = false;
+  }
+
+  function actPress() {
+    if (state.mode === 'playing') interact();
+    else if (state.mode === 'dialogue') choose(state.dlg.sel);
+    else if (state.mode === 'hack') submitHack();
+    else if (state.mode === 'done' || state.mode === 'failed') startRun();
+  }
+
+  function bindPad(el, onDown, onUp) {
+    el.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      el.classList.add('is-down');
+      if (el.setPointerCapture) {
+        try { el.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+      }
+      onDown();
+    });
+    const release = () => {
+      el.classList.remove('is-down');
+      if (onUp) onUp();
+    };
+    el.addEventListener('pointerup', release);
+    el.addEventListener('pointercancel', release);
+    el.addEventListener('pointerleave', release);
+  }
+
+  bindPad(leftBtn, () => padPress('left'), () => padRelease('left'));
+  bindPad(rightBtn, () => padPress('right'), () => padRelease('right'));
+  bindPad(upBtn, () => padPress('up'), () => padRelease('up'));
+  bindPad(downBtn, () => padPress('down'), () => padRelease('down'));
+  bindPad(actBtn, actPress, null);
+  bindPad(jamBtn, useJammer, null);
+
+  startBtn.addEventListener('click', startRun);
+  againBtn.addEventListener('click', startRun);
+
+  window.addEventListener('keydown', (e) => {
+    const k = e.key;
+    if (k === ' ' || k === 'Enter' || k === 'Escape' || k.indexOf('Arrow') === 0) e.preventDefault();
+
+    if (state.mode === 'menu') {
+      if (k === 'Enter' || k === ' ') startRun();
+      return;
+    }
+
+    if (state.mode === 'playing') {
+      if (k === 'ArrowLeft' || k === 'a' || k === 'A') input.left = true;
+      else if (k === 'ArrowRight' || k === 'd' || k === 'D') input.right = true;
+      else if (k === 'ArrowUp' || k === 'w' || k === 'W') input.up = true;
+      else if (k === 'ArrowDown' || k === 's' || k === 'S') input.down = true;
+      else if (k === 'e' || k === 'E' || k === ' ') interact();
+      else if (k === 'j' || k === 'J') useJammer();
+      return;
+    }
+
+    if (state.mode === 'dialogue' && state.dlg) {
+      if (k === 'ArrowUp' || k === 'w' || k === 'W') moveChoice(-1);
+      else if (k === 'ArrowDown' || k === 's' || k === 'S') moveChoice(1);
+      else if (k === '1' || k === '2' || k === '3') choose(Number(k) - 1);
+      else if (k === 'Enter' || k === ' ' || k === 'e' || k === 'E') choose(state.dlg.sel);
+      else if (k === 'Escape') closeDialogue();
+      return;
+    }
+
+    if (state.mode === 'hack') {
+      if (k === 'ArrowLeft' || k === 'a' || k === 'A') hackInput('left');
+      else if (k === 'ArrowRight' || k === 'd' || k === 'D') hackInput('right');
+      else if (k === 'ArrowUp' || k === 'w' || k === 'W') hackInput('up');
+      else if (k === 'ArrowDown' || k === 's' || k === 'S') hackInput('down');
+      else if (k === 'Enter' || k === ' ') submitHack();
+      else if (k === 'Escape') abortHack();
+      return;
+    }
+
+    if (state.mode === 'done' || state.mode === 'failed') {
+      if (k === 'Enter' || k === ' ') startRun();
+    }
+  });
+
+  window.addEventListener('keyup', (e) => {
+    const k = e.key;
+    if (k === 'ArrowLeft' || k === 'a' || k === 'A') input.left = false;
+    else if (k === 'ArrowRight' || k === 'd' || k === 'D') input.right = false;
+    else if (k === 'ArrowUp' || k === 'w' || k === 'W') input.up = false;
+    else if (k === 'ArrowDown' || k === 's' || k === 'S') input.down = false;
+  });
+
+  window.addEventListener('blur', () => {
+    input.left = false;
+    input.right = false;
+    input.up = false;
+    input.down = false;
+  });
+
+  /* ---------------- boot ---------------- */
+
+  let lastFrame = 0;
+  function frame(now) {
+    const dt = Math.min(0.05, lastFrame ? (now - lastFrame) / 1000 : 0.016);
+    lastFrame = now;
+    state.t += dt;
+    animateRain(dt);
+    if (state.mode === 'playing') update(dt);
+    if (state.hack) {
+      state.hack.flash = Math.max(0, state.hack.flash - dt * 2);
+      state.hack.shake = Math.max(0, state.hack.shake - dt * 3);
+    }
+    if (state.toastT > 0 && state.mode !== 'playing') state.toastT = Math.max(0, state.toastT - dt);
+    render();
+    requestAnimationFrame(frame);
+  }
+
+  resetWorld();
+  render();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

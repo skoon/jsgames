@@ -1,0 +1,1323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#080b12">
+<title>Order Up</title>
+<link rel="stylesheet" href="../common.css">
+<style>
+  :root {
+    --bg-top: #2c2416;
+    --bg-mid: #0d1119;
+    --bg-bottom: #06090d;
+    --stage-bg: #0a1017;
+    --ink: #f7f2e8;
+  }
+  .panel { max-width: 372px; }
+  .title { margin-bottom: 14px; color: #8ffff0; text-shadow: 0 0 28px rgba(122, 245, 224, 0.3); }
+  .title .accent { color: #ffd166; }
+  .score {
+    font-size: 54px;
+    line-height: 1;
+    font-weight: 700;
+    color: #ffd166;
+    text-shadow: 0 0 30px rgba(255, 209, 102, 0.32);
+  }
+  .best { margin-top: 10px; font-size: 13px; letter-spacing: 0.16em; }
+  .run-line {
+    margin: 6px 0 0;
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    text-transform: none;
+    color: rgba(247, 242, 232, 0.66);
+  }
+  .rules { margin-top: 14px; }
+  .rule { font-size: 12.5px; }
+  .btn { margin-top: 20px; padding: 14px 30px; font-size: 13px; font-weight: 700; letter-spacing: 0.16em; }
+</style>
+</head>
+<body>
+  <div id="stage">
+    <canvas id="game" width="480" height="640" aria-label="Order Up. Run a food truck: build each customer's ticket from four ingredients, serve them before patience runs out, and clean up grease spills caused by wrong orders."></canvas>
+    <div id="overlay" class="overlay">
+      <div id="introPanel" class="panel panel-card">
+        <p class="eyebrow">Arcade &middot; Cooking</p>
+        <h1 class="title">Order <span class="accent">Up</span></h1>
+        <p class="lead">Three customers at the window, one truck, and a menu that never holds still. Build each ticket in order &mdash; a wrong tap spills grease across a service slot.</p>
+        <div class="rules">
+          <p class="rule">A / S / D / F add bun, leaf, patty, or sauce to the selected customer.</p>
+          <p class="rule">Tap a customer's card to switch, or press 1 / 2 / 3. Tap a spill twice to clean it.</p>
+          <p class="rule">Finish a ticket before patience drains. Angry customers cost one star.</p>
+          <p class="rule">Correct orders build a combo up to &times;5. Every wave brings more orders and less patience.</p>
+        </div>
+        <button type="button" id="startBtn" class="btn">Open the window</button>
+      </div>
+      <div id="resultPanel" class="panel panel-card" hidden>
+        <p class="eyebrow">Closing time</p>
+        <h1 class="title">Truck <span class="accent">Closed</span></h1>
+        <p class="label">Score</p>
+        <p class="score" id="finalScore">0</p>
+        <p class="best" id="bestLine">Best 0000</p>
+        <p class="run-line" id="runLine">Wave 1 &middot; 0 orders served</p>
+        <button type="button" id="againBtn" class="btn">New shift</button>
+      </div>
+    </div>
+  </div>
+  <p class="hint">A S D F ingredients &middot; 1 2 3 select customer &middot; tap spills to clean</p>
+  <div id="srStatus" class="sr-only" aria-live="polite"></div>
+
+<script>
+(() => {
+  'use strict';
+
+  const W = 480;
+  const H = 640;
+  const TAU = Math.PI * 2;
+  const STORAGE_KEY = 'orderup.best.v1';
+  const FONT = 'ui-monospace, "SF Mono", Menlo, Consolas, monospace';
+
+  const SLOT_X = [84, 240, 396];
+  const CARD_Y = 158;
+  const CARD_W = 116;
+  const CARD_H = 70;
+  const COUNTER_Y = 396;
+
+  const CHIP_W = 106;
+  const CHIP_H = 64;
+  const CHIP_Y = 506;
+  const CHIP_GAP = 8;
+  const chipX = (i) => 16 + i * (CHIP_W + CHIP_GAP);
+
+  const INGREDIENTS = [
+    { id: 'bun', label: 'BUN', key: 'a', color: '#ffc86b', deep: '#a8762a' },
+    { id: 'leaf', label: 'LEAF', key: 's', color: '#86e7c5', deep: '#2f8f76' },
+    { id: 'patty', label: 'PATTY', key: 'd', color: '#e0895f', deep: '#8f4a2b' },
+    { id: 'sauce', label: 'SAUCE', key: 'f', color: '#ff8474', deep: '#a8443a' },
+  ];
+
+  const ING = {};
+  INGREDIENTS.forEach((item) => { ING[item.id] = item; });
+  const ING_KEYS = {};
+  INGREDIENTS.forEach((item) => { ING_KEYS[item.key] = item.id; });
+
+  const PALETTES = [
+    { body: '#5f8cff', head: '#a9c2ff', deep: '#2c4a94' },
+    { body: '#b78cff', head: '#dfd0ff', deep: '#5b3b9c' },
+    { body: '#66d7b4', head: '#b8f7e4', deep: '#2a7f68' },
+    { body: '#e5a54c', head: '#ffdca6', deep: '#8c5c1c' },
+    { body: '#ff8a78', head: '#ffc3b8', deep: '#9a4437' },
+    { body: '#f472b6', head: '#ffc6e2', deep: '#933066' },
+  ];
+
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d', { alpha: false });
+  const overlay = document.getElementById('overlay');
+  const introPanel = document.getElementById('introPanel');
+  const resultPanel = document.getElementById('resultPanel');
+  const startBtn = document.getElementById('startBtn');
+  const againBtn = document.getElementById('againBtn');
+  const finalScoreEl = document.getElementById('finalScore');
+  const bestLineEl = document.getElementById('bestLine');
+  const runLineEl = document.getElementById('runLine');
+  const srStatus = document.getElementById('srStatus');
+
+  const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
+  const rand = (lo, hi) => lo + Math.random() * (hi - lo);
+  const randInt = (n) => Math.floor(Math.random() * n);
+
+  function hexA(hex, a) {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return 'rgba(' + r + ', ' + g + ', ' + b + ', ' + a + ')';
+  }
+
+  function readBest() {
+    try {
+      const v = Number(window.localStorage.getItem(STORAGE_KEY));
+      return Number.isFinite(v) && v > 0 ? Math.floor(v) : 0;
+    } catch (err) {
+      return 0;
+    }
+  }
+
+  function writeBest(v) {
+    try {
+      window.localStorage.setItem(STORAGE_KEY, String(v));
+    } catch (err) {
+      /* storage may be unavailable (private mode, file://) */
+    }
+  }
+
+  function sizeCanvas() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+  }
+
+  sizeCanvas();
+  window.addEventListener('resize', sizeCanvas);
+
+  const motes = [];
+  for (let i = 0; i < 34; i++) {
+    motes.push({
+      x: rand(0, W),
+      y: rand(100, COUNTER_Y),
+      r: rand(0.6, 1.6),
+      p: rand(0, TAU),
+      sp: rand(0.3, 1.1),
+    });
+  }
+
+  const state = {
+    mode: 'menu',
+    score: 0,
+    best: readBest(),
+    combo: 1,
+    hearts: 3,
+    wave: 1,
+    served: 0,
+    waveTarget: 4,
+    orders: 0,
+    slots: [null, null, null],
+    selected: 1,
+    arrivalTimer: 0.7,
+    breather: 0,
+    banner: null,
+    particles: [],
+    pops: [],
+    chipFlash: [0, 0, 0, 0],
+    truckBounce: 0,
+    shake: 0,
+    flash: 0,
+    flashColor: '#ff8474',
+    t: 0,
+  };
+
+  /* ---------- flow ---------- */
+  function startRun() {
+    state.mode = 'playing';
+    state.score = 0;
+    state.combo = 1;
+    state.hearts = 3;
+    state.wave = 1;
+    state.served = 0;
+    state.waveTarget = 4;
+    state.orders = 0;
+    state.slots = [null, null, null];
+    state.selected = 1;
+    state.arrivalTimer = 0.7;
+    state.breather = 0;
+    state.banner = { text: 'WAVE 1', sub: 'OPEN FOR BUSINESS', t: 2.2, max: 2.2 };
+    state.particles = [];
+    state.pops = [];
+    state.chipFlash = [0, 0, 0, 0];
+    state.truckBounce = 0;
+    state.shake = 0;
+    state.flash = 0;
+    introPanel.hidden = true;
+    resultPanel.hidden = true;
+    overlay.hidden = true;
+    srStatus.textContent = 'Shift started. Wave 1.';
+  }
+
+  function endRun() {
+    state.mode = 'over';
+    const isBest = state.score > state.best;
+    if (isBest) {
+      state.best = state.score;
+      writeBest(state.best);
+    }
+    finalScoreEl.textContent = String(state.score);
+    bestLineEl.textContent = isBest
+      ? 'New personal best'
+      : 'Best ' + String(state.best).padStart(4, '0');
+    runLineEl.textContent =
+      'Wave ' + state.wave + ' \u00b7 ' + state.orders +
+      (state.orders === 1 ? ' order served' : ' orders served');
+    introPanel.hidden = true;
+    resultPanel.hidden = false;
+    overlay.hidden = false;
+    srStatus.textContent = 'Truck closed. Score ' + state.score + '.';
+    try {
+      againBtn.focus({ preventScroll: true });
+    } catch (err) {
+      againBtn.focus();
+    }
+  }
+
+  /* ---------- customers ---------- */
+  function arrivalGap() {
+    return Math.max(0.65, 1.45 - state.wave * 0.07);
+  }
+
+  function patienceFor() {
+    return Math.max(6, 11.5 - state.wave * 0.8);
+  }
+
+  function makeTicket(len) {
+    const ids = INGREDIENTS.map((item) => item.id);
+    const ticket = [];
+    for (let i = 0; i < len; i++) {
+      let id = ids[randInt(ids.length)];
+      if (i > 0 && id === ticket[i - 1]) {
+        id = ids[(ids.indexOf(id) + 1 + randInt(ids.length - 1)) % ids.length];
+      }
+      ticket.push(id);
+    }
+    return ticket;
+  }
+
+  function spawnCustomer(slotIndex) {
+    const len = state.wave <= 1 ? 2 : 3;
+    const p = patienceFor();
+    const pal = PALETTES[randInt(PALETTES.length)];
+    state.slots[slotIndex] = {
+      kind: 'customer',
+      ticket: makeTicket(len),
+      progress: 0,
+      patience: p,
+      maxPatience: p,
+      color: pal,
+      phase: rand(0, TAU),
+      arrive: 0.3,
+      shakeT: 0,
+    };
+  }
+
+  function ensureSelection() {
+    const cur = state.slots[state.selected];
+    if (cur && cur.kind === 'customer') return;
+    let bestI = -1;
+    let bestP = Infinity;
+    for (let i = 0; i < 3; i++) {
+      const s = state.slots[i];
+      if (s && s.kind === 'customer' && s.patience < bestP) {
+        bestP = s.patience;
+        bestI = i;
+      }
+    }
+    if (bestI >= 0) state.selected = bestI;
+  }
+
+  /* ---------- serving ---------- */
+  function addIngredient(id) {
+    if (state.mode !== 'playing') return;
+    ensureSelection();
+    const c = state.slots[state.selected];
+    if (!c || c.kind !== 'customer') return;
+
+    const chipIndex = INGREDIENTS.findIndex((item) => item.id === id);
+    if (chipIndex >= 0) state.chipFlash[chipIndex] = 0.22;
+
+    if (id === c.ticket[c.progress]) {
+      c.progress += 1;
+      burst(SLOT_X[state.selected], 300, ING[id].color, 5, 90);
+      if (c.progress >= c.ticket.length) serve(c);
+    } else {
+      wrongOrder(c);
+    }
+  }
+
+  function wrongOrder(c) {
+    c.progress = 0;
+    c.patience = Math.max(1, c.patience * 0.78);
+    c.shakeT = 0.35;
+    state.combo = 1;
+    state.shake = 7;
+    state.flash = 0.6;
+    state.flashColor = '#ff8474';
+    spawnSpill();
+    popText('WRONG', SLOT_X[state.selected], 292, '#ff8474');
+    srStatus.textContent = 'Wrong ingredient. A spill is blocking a service slot.';
+  }
+
+  function spawnSpill() {
+    const empty = [];
+    for (let i = 0; i < 3; i++) {
+      if (!state.slots[i]) empty.push(i);
+    }
+    if (!empty.length) {
+      state.hearts = Math.max(0, state.hearts - 1);
+      state.shake = 9;
+      burst(W / 2, 398, '#ff8474', 10, 150);
+      if (state.hearts <= 0) endRun();
+      return;
+    }
+    const i = empty[randInt(empty.length)];
+    state.slots[i] = { kind: 'spill', taps: 2, ttl: 7, maxTtl: 7 };
+    burst(SLOT_X[i], 396, '#c9a4ff', 12, 160);
+  }
+
+  function cleanSpill(i) {
+    const s = state.slots[i];
+    if (!s || s.kind !== 'spill') return;
+    s.taps -= 1;
+    burst(SLOT_X[i], 396, '#9fe8d8', 6, 100);
+    state.shake = Math.max(state.shake, 2);
+    if (s.taps <= 0) {
+      state.slots[i] = null;
+      burst(SLOT_X[i], 394, '#86e7c5', 10, 140);
+      popText('CLEAN', SLOT_X[i], 366, '#86e7c5');
+    }
+  }
+
+  function serve(c) {
+    const i = state.slots.indexOf(c);
+    if (i < 0) return;
+    const ratio = clamp(c.patience / c.maxPatience, 0, 1);
+    const base = 20 + c.ticket.length * 10 + Math.round(ratio * 30);
+    const gain = base * state.combo;
+
+    state.score += gain;
+    state.combo = Math.min(5, state.combo + 1);
+    state.orders += 1;
+    state.served += 1;
+    state.truckBounce = 1;
+    state.flash = 0.28;
+    state.flashColor = '#ffc86b';
+    state.slots[i] = null;
+
+    const x = SLOT_X[i];
+    burst(x, 318, '#86e7c5', 12, 190);
+    burst(x, 318, '#ffc86b', 6, 130);
+    popText('+' + gain, x, 300, '#ffd79a');
+    state.arrivalTimer = Math.min(state.arrivalTimer, 0.3);
+    srStatus.textContent = 'Order served. ' + state.score + ' points.';
+
+    if (state.served >= state.waveTarget) advanceWave();
+  }
+
+  function advanceWave() {
+    state.wave += 1;
+    state.served = 0;
+    state.waveTarget = 3 + state.wave;
+    state.banner = { text: 'WAVE ' + state.wave, sub: 'MORE ORDERS, LESS PATIENCE', t: 2, max: 2 };
+    state.breather = 1.1;
+    state.arrivalTimer = 1.2;
+    srStatus.textContent = 'Wave ' + state.wave + ' started.';
+  }
+
+  function loseStar(i) {
+    state.hearts = Math.max(0, state.hearts - 1);
+    state.combo = 1;
+    state.shake = 9;
+    state.flash = 0.7;
+    state.flashColor = '#ff8474';
+    burst(SLOT_X[i], 318, '#ff8474', 14, 180);
+    popText('-1 star', SLOT_X[i], 298, '#ff8474');
+    srStatus.textContent = state.hearts > 0
+      ? 'Customer left angry. ' + state.hearts + ' stars left.'
+      : 'No stars left.';
+    if (state.hearts <= 0) endRun();
+  }
+
+  /* ---------- effects ---------- */
+  function burst(x, y, color, count, power) {
+    for (let i = 0; i < count; i++) {
+      const a = rand(0, TAU);
+      const sp = rand(power * 0.25, power);
+      const life = rand(0.3, 0.65);
+      state.particles.push({
+        x,
+        y,
+        vx: Math.cos(a) * sp,
+        vy: Math.sin(a) * sp - power * 0.3,
+        life,
+        max: life,
+        size: rand(1.6, 3.4),
+        color,
+      });
+    }
+  }
+
+  function popText(text, x, y, color) {
+    state.pops.push({ text, x, y, color, life: 0.9, max: 0.9 });
+  }
+
+  /* ---------- update ---------- */
+  function update(dt) {
+    state.t += dt;
+    if (state.shake > 0) state.shake = Math.max(0, state.shake - dt * 26);
+    if (state.flash > 0) state.flash = Math.max(0, state.flash - dt * 2.6);
+    if (state.banner) {
+      state.banner.t -= dt;
+      if (state.banner.t <= 0) state.banner = null;
+    }
+    if (state.truckBounce > 0) state.truckBounce = Math.max(0, state.truckBounce - dt * 3.4);
+    for (let i = 0; i < 4; i++) {
+      if (state.chipFlash[i] > 0) state.chipFlash[i] = Math.max(0, state.chipFlash[i] - dt * 4);
+    }
+
+    for (let i = state.particles.length - 1; i >= 0; i--) {
+      const p = state.particles[i];
+      p.life -= dt;
+      if (p.life <= 0) {
+        state.particles.splice(i, 1);
+        continue;
+      }
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.vy += 700 * dt;
+      p.vx *= 0.98;
+    }
+
+    for (let i = state.pops.length - 1; i >= 0; i--) {
+      const p = state.pops[i];
+      p.life -= dt;
+      p.y -= 46 * dt;
+      if (p.life <= 0) state.pops.splice(i, 1);
+    }
+
+    if (state.mode !== 'playing') return;
+
+    ensureSelection();
+
+    for (let i = 0; i < 3; i++) {
+      const s = state.slots[i];
+      if (!s) continue;
+      if (s.kind === 'customer') {
+        if (s.arrive > 0) s.arrive = Math.max(0, s.arrive - dt);
+        if (s.shakeT > 0) s.shakeT = Math.max(0, s.shakeT - dt);
+        s.patience -= dt;
+        if (s.patience <= 0) {
+          state.slots[i] = null;
+          loseStar(i);
+        }
+      } else {
+        s.ttl -= dt;
+        if (s.ttl <= 0) {
+          state.slots[i] = null;
+          burst(SLOT_X[i], 396, '#9fe8d8', 10, 130);
+          popText('CLEAN', SLOT_X[i], 366, '#86e7c5');
+        }
+      }
+    }
+    if (state.mode !== 'playing') return;
+
+    if (state.breather > 0) {
+      state.breather -= dt;
+    } else {
+      state.arrivalTimer -= dt;
+      if (state.arrivalTimer <= 0) {
+        const free = [];
+        for (let i = 0; i < 3; i++) {
+          if (!state.slots[i]) free.push(i);
+        }
+        if (free.length) {
+          spawnCustomer(free[randInt(free.length)]);
+          state.arrivalTimer = arrivalGap() * rand(0.85, 1.15);
+        } else {
+          state.arrivalTimer = 0.3;
+        }
+      }
+    }
+  }
+
+  /* ---------- drawing helpers ---------- */
+  function rr(x, y, w, h, radius) {
+    const r = Math.min(radius, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function drawText(str, x, y, opts) {
+    const o = opts || {};
+    const size = o.size || 10;
+    const weight = o.weight || 400;
+    const color = o.color || '#f7f2e8';
+    const track = o.track || 0;
+    const align = o.align || 'left';
+    ctx.save();
+    ctx.font = weight + ' ' + size + 'px ' + FONT;
+    ctx.fillStyle = color;
+    ctx.textBaseline = 'alphabetic';
+    if (o.glow) {
+      ctx.shadowColor = o.glow;
+      ctx.shadowBlur = o.blur || 16;
+    }
+    if (track) {
+      const chars = Array.from(str);
+      const widths = chars.map((ch) => ctx.measureText(ch).width);
+      const total = widths.reduce((sum, w) => sum + w, 0) + track * (chars.length - 1);
+      let cx = align === 'right' ? x - total : align === 'center' ? x - total / 2 : x;
+      chars.forEach((ch, i) => {
+        ctx.fillText(ch, cx, y);
+        cx += widths[i] + track;
+      });
+    } else {
+      ctx.textAlign = align;
+      ctx.fillText(str, x, y);
+    }
+    ctx.restore();
+  }
+
+  function drawIngredientIcon(id, x, y, r, alpha) {
+    const ing = ING[id];
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    if (id === 'bun') {
+      ctx.fillStyle = ing.color;
+      ctx.beginPath();
+      ctx.ellipse(x, y - r * 0.05, r, r * 0.72, 0, Math.PI, 0);
+      ctx.fill();
+      ctx.fillRect(x - r, y - r * 0.05, r * 2, r * 0.4);
+      ctx.fillStyle = ing.deep;
+      ctx.fillRect(x - r, y + r * 0.34, r * 2, r * 0.16);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
+      ctx.fillRect(x - r * 0.45, y - r * 0.45, r * 0.18, r * 0.18);
+      ctx.fillRect(x + r * 0.2, y - r * 0.5, r * 0.18, r * 0.18);
+    } else if (id === 'leaf') {
+      ctx.fillStyle = ing.color;
+      ctx.beginPath();
+      ctx.ellipse(x, y, r * 0.95, r * 0.58, -Math.PI / 5, 0, TAU);
+      ctx.fill();
+      ctx.strokeStyle = ing.deep;
+      ctx.lineWidth = Math.max(1, r * 0.14);
+      ctx.beginPath();
+      ctx.moveTo(x - r * 0.75, y + r * 0.4);
+      ctx.lineTo(x + r * 0.75, y - r * 0.4);
+      ctx.stroke();
+    } else if (id === 'patty') {
+      rr(x - r, y - r * 0.5, r * 2, r, r * 0.45);
+      ctx.fillStyle = ing.color;
+      ctx.fill();
+      ctx.strokeStyle = ing.deep;
+      ctx.lineWidth = Math.max(1, r * 0.12);
+      for (let i = -1; i <= 1; i++) {
+        ctx.beginPath();
+        ctx.moveTo(x - r * 0.6, y + i * r * 0.28);
+        ctx.lineTo(x + r * 0.6, y + i * r * 0.28);
+        ctx.stroke();
+      }
+    } else {
+      ctx.fillStyle = ing.color;
+      ctx.beginPath();
+      ctx.moveTo(x, y - r);
+      ctx.quadraticCurveTo(x + r, y + r * 0.1, x, y + r);
+      ctx.quadraticCurveTo(x - r, y + r * 0.1, x, y - r);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
+      ctx.beginPath();
+      ctx.arc(x - r * 0.26, y - r * 0.2, r * 0.16, 0, TAU);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function starPath(cx, cy, outer, inner, rot) {
+    ctx.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const a = (rot || 0) - Math.PI / 2 + (i * Math.PI) / 5;
+      const r = i % 2 ? inner : outer;
+      const x = cx + Math.cos(a) * r;
+      const y = cy + Math.sin(a) * r;
+      if (i) ctx.lineTo(x, y);
+      else ctx.moveTo(x, y);
+    }
+    ctx.closePath();
+  }
+
+  function drawStar(x, y, outer, inner, on) {
+    starPath(x, y, outer, inner, 0);
+    if (on) {
+      ctx.fillStyle = '#ffc86b';
+      ctx.shadowColor = 'rgba(255, 200, 107, 0.8)';
+      ctx.shadowBlur = 7;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    } else {
+      ctx.strokeStyle = 'rgba(247, 242, 232, 0.22)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+  }
+
+  /* ---------- backdrop ---------- */
+  function drawBackground() {
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, '#12202c');
+    g.addColorStop(0.42, '#0b1620');
+    g.addColorStop(0.72, '#091119');
+    g.addColorStop(1, '#050a10');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+
+    for (const m of motes) {
+      ctx.globalAlpha = 0.06 + 0.16 * (0.5 + 0.5 * Math.sin(state.t * m.sp + m.p));
+      ctx.fillStyle = '#ffe6b8';
+      ctx.fillRect(m.x, m.y, m.r, m.r);
+    }
+    ctx.globalAlpha = 1;
+
+    const glow = ctx.createRadialGradient(W / 2, 470, 20, W / 2, 470, 250);
+    glow.addColorStop(0, 'rgba(255, 200, 107, 0.14)');
+    glow.addColorStop(1, 'rgba(255, 200, 107, 0)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 240, W, 300);
+
+    drawLights();
+  }
+
+  function drawLights() {
+    const x0 = -12;
+    const y0 = 112;
+    const x1 = W + 12;
+    const y1 = 112;
+    const cx = W / 2;
+    const cy = 152;
+
+    ctx.strokeStyle = 'rgba(255, 220, 170, 0.2)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x0, y0);
+    ctx.quadraticCurveTo(cx, cy, x1, y1);
+    ctx.stroke();
+
+    for (let i = 1; i <= 8; i++) {
+      const t = i / 9;
+      const x = (1 - t) * (1 - t) * x0 + 2 * (1 - t) * t * cx + t * t * x1;
+      const y = (1 - t) * (1 - t) * y0 + 2 * (1 - t) * t * cy + t * t * y1;
+      const pulse = 0.55 + 0.45 * Math.sin(state.t * 2 + i * 0.7);
+      const glow = ctx.createRadialGradient(x, y, 1, x, y, 15);
+      glow.addColorStop(0, 'rgba(255, 214, 150, ' + (0.4 * pulse).toFixed(3) + ')');
+      glow.addColorStop(1, 'rgba(255, 214, 150, 0)');
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(x, y, 15, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255, 236, 196, ' + (0.7 + 0.3 * pulse).toFixed(3) + ')';
+      ctx.beginPath();
+      ctx.arc(x, y + 2, 3, 0, TAU);
+      ctx.fill();
+    }
+  }
+
+  /* ---------- counter ---------- */
+  function drawCounter() {
+    rr(-12, COUNTER_Y, W + 24, 30, 8);
+    const g = ctx.createLinearGradient(0, COUNTER_Y, 0, COUNTER_Y + 30);
+    g.addColorStop(0, '#1e3441');
+    g.addColorStop(1, '#0c1922');
+    ctx.fillStyle = g;
+    ctx.fill();
+    ctx.fillStyle = 'rgba(150, 226, 203, 0.38)';
+    ctx.fillRect(0, COUNTER_Y, W, 2);
+    ctx.fillStyle = 'rgba(150, 226, 203, 0.07)';
+    for (let x = 0; x < W; x += 26) ctx.fillRect(x + 6, COUNTER_Y + 15, 12, 2);
+  }
+
+  /* ---------- customers ---------- */
+  function drawSlotCard(c, i) {
+    const x = SLOT_X[i];
+    const selected = state.selected === i;
+    const shake = c.shakeT > 0 ? Math.sin(state.t * 64) * 3 * (c.shakeT / 0.35) : 0;
+    const alpha = c.arrive > 0 ? 1 - (c.arrive / 0.3) * 0.5 : 1;
+    const ratio = clamp(c.patience / c.maxPatience, 0, 1);
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.translate(shake, 0);
+
+    rr(x - 58, CARD_Y, CARD_W, CARD_H, 12);
+    ctx.fillStyle = 'rgba(9, 20, 26, 0.94)';
+    ctx.fill();
+    if (selected) {
+      ctx.strokeStyle = 'rgba(122, 245, 224, 0.85)';
+      ctx.lineWidth = 1.6;
+      ctx.shadowColor = 'rgba(122, 245, 224, 0.5)';
+      ctx.shadowBlur = 10;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    } else if (ratio < 0.25) {
+      ctx.strokeStyle = 'rgba(255, 132, 116, ' + (0.55 + 0.45 * Math.sin(state.t * 9)).toFixed(3) + ')';
+      ctx.lineWidth = 1.4;
+      ctx.stroke();
+    } else {
+      ctx.strokeStyle = 'rgba(150, 226, 203, 0.16)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+
+    drawText('ORDER', x, 171, {
+      size: 7,
+      weight: 700,
+      color: 'rgba(226, 240, 232, 0.42)',
+      align: 'center',
+      track: 2,
+    });
+
+    const n = c.ticket.length;
+    const tile = 24;
+    const gap = 6;
+    const total = n * tile + (n - 1) * gap;
+    let tx = x - total / 2;
+    for (let k = 0; k < n; k++) {
+      const done = k < c.progress;
+      const current = k === c.progress && selected;
+      rr(tx, 178, tile, tile, 6);
+      ctx.fillStyle = done ? hexA(ING[c.ticket[k]].color, 0.2) : 'rgba(255, 255, 255, 0.05)';
+      ctx.fill();
+      if (current) {
+        ctx.strokeStyle = 'rgba(255, 200, 107, ' + (0.55 + 0.45 * Math.sin(state.t * 8)).toFixed(3) + ')';
+        ctx.lineWidth = 1.6;
+      } else {
+        ctx.strokeStyle = done
+          ? hexA(ING[c.ticket[k]].color, 0.6)
+          : 'rgba(255, 255, 255, 0.1)';
+        ctx.lineWidth = 1;
+      }
+      ctx.stroke();
+      drawIngredientIcon(c.ticket[k], tx + tile / 2, 190, 8, done ? 0.45 : 1);
+      tx += tile + gap;
+    }
+
+    rr(x - 48, 212, 96, 5, 2.5);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+    ctx.fill();
+    const barColor = ratio > 0.5 ? '#86e7c5' : ratio > 0.25 ? '#ffc86b' : '#ff8474';
+    rr(x - 48, 212, Math.max(2, 96 * ratio), 5, 2.5);
+    ctx.fillStyle = barColor;
+    ctx.fill();
+
+    if (selected) {
+      ctx.fillStyle = 'rgba(122, 245, 224, 0.85)';
+      ctx.beginPath();
+      ctx.moveTo(x - 6, CARD_Y + CARD_H + 3);
+      ctx.lineTo(x + 6, CARD_Y + CARD_H + 3);
+      ctx.lineTo(x, CARD_Y + CARD_H + 11);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    ctx.restore();
+  }
+
+  function drawCustomer(c, x) {
+    const bob = Math.sin(state.t * 2 + c.phase) * 1.8;
+    const headY = 316 + bob;
+    const alpha = c.arrive > 0 ? 1 - (c.arrive / 0.3) * 0.6 : 1;
+    const worry = c.patience / c.maxPatience < 0.32;
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+    ctx.beginPath();
+    ctx.ellipse(x, 397, 22, 5, 0, 0, TAU);
+    ctx.fill();
+
+    ctx.fillStyle = c.color.head;
+    rr(x - 25, 340 + bob, 8, 28, 4);
+    ctx.fill();
+    rr(x + 17, 340 + bob, 8, 28, 4);
+    ctx.fill();
+
+    rr(x - 19, 332 + bob, 38, 64, 15);
+    const body = ctx.createLinearGradient(0, 332 + bob, 0, 396);
+    body.addColorStop(0, c.color.body);
+    body.addColorStop(1, c.color.deep);
+    ctx.fillStyle = body;
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.16)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.16)';
+    rr(x - 12, 356 + bob, 24, 26, 5);
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(x, headY, 16, 0, TAU);
+    ctx.fillStyle = c.color.head;
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(10, 20, 28, 0.4)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(x, headY - 1, 16, Math.PI * 1.06, Math.PI * 1.94);
+    ctx.fillStyle = c.color.deep;
+    ctx.fill();
+
+    ctx.fillStyle = '#0a141c';
+    ctx.beginPath();
+    ctx.arc(x - 5.5, headY + 1, 1.9, 0, TAU);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(x + 5.5, headY + 1, 1.9, 0, TAU);
+    ctx.fill();
+
+    ctx.strokeStyle = '#0a141c';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    if (worry) {
+      ctx.arc(x, headY + 13, 4, Math.PI * 1.15, Math.PI * 1.85);
+    } else {
+      ctx.arc(x, headY + 6, 4, Math.PI * 0.1, Math.PI * 0.9);
+    }
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  function drawSpill(s, x) {
+    const t = state.t;
+    ctx.save();
+
+    ctx.strokeStyle = 'rgba(255, 200, 107, 0.28)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(x, 398, 42, -Math.PI / 2, -Math.PI / 2 + TAU * clamp(s.ttl / s.maxTtl, 0, 1));
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.ellipse(x, 398, 34, 12, 0, 0, TAU);
+    const g = ctx.createRadialGradient(x - 7, 394, 2, x, 398, 38);
+    g.addColorStop(0, 'rgba(150, 225, 195, 0.55)');
+    g.addColorStop(0.5, 'rgba(72, 62, 112, 0.88)');
+    g.addColorStop(1, 'rgba(22, 18, 40, 0.95)');
+    ctx.fillStyle = g;
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(180, 250, 220, 0.3)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.ellipse(x - 9, 395, 12, 3.4, -0.25, 0, TAU);
+    ctx.fillStyle = 'rgba(200, 255, 235, 0.18)';
+    ctx.fill();
+
+    for (let k = 0; k < 3; k++) {
+      const bx = x - 14 + k * 13;
+      const by = 394 - Math.abs(Math.sin(t * 2 + k)) * 6;
+      ctx.beginPath();
+      ctx.arc(bx, by, 1.8 + (k % 2) * 0.8, 0, TAU);
+      ctx.fillStyle = 'rgba(200, 255, 235, 0.5)';
+      ctx.fill();
+    }
+
+    drawText('CLEAN', x, 370, {
+      size: 8,
+      weight: 700,
+      color: 'rgba(255, 200, 107, 0.82)',
+      align: 'center',
+      track: 1.6,
+    });
+
+    for (let k = 0; k < 2; k++) {
+      rr(x - 9 + k * 12, 374, 7, 4, 2);
+      ctx.fillStyle = k < s.taps ? 'rgba(255, 200, 107, 0.9)' : 'rgba(255, 255, 255, 0.16)';
+      ctx.fill();
+    }
+
+    ctx.restore();
+  }
+
+  /* ---------- truck ---------- */
+  function drawChip(i) {
+    const ing = INGREDIENTS[i];
+    const x = chipX(i);
+    const y = CHIP_Y;
+    const flash = state.chipFlash[i];
+
+    rr(x, y, CHIP_W, CHIP_H, 12);
+    const g = ctx.createLinearGradient(0, y, 0, y + CHIP_H);
+    g.addColorStop(0, 'rgba(255, 255, 255, 0.07)');
+    g.addColorStop(1, 'rgba(0, 0, 0, 0.2)');
+    ctx.fillStyle = g;
+    ctx.fill();
+    ctx.strokeStyle = flash > 0
+      ? hexA(ing.color, 0.9)
+      : 'rgba(180, 240, 225, 0.16)';
+    ctx.lineWidth = flash > 0 ? 2 : 1;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(x + 26, y + 30, 15, 0, TAU);
+    ctx.fillStyle = hexA(ing.color, 0.14);
+    ctx.fill();
+
+    drawIngredientIcon(ing.id, x + 26, y + 30, 9, 1);
+
+    drawText(ing.label, x + 50, y + 29, {
+      size: 9,
+      weight: 700,
+      color: 'rgba(240, 252, 248, 0.88)',
+      track: 1.4,
+    });
+    drawText('ADD', x + 50, y + 43, {
+      size: 7,
+      color: 'rgba(240, 252, 248, 0.34)',
+      track: 1.2,
+    });
+
+    rr(x + CHIP_W - 23, y + 8, 15, 15, 4);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.07)';
+    ctx.fill();
+    drawText(ing.key.toUpperCase(), x + CHIP_W - 15.5, y + 19, {
+      size: 8,
+      weight: 700,
+      color: 'rgba(240, 252, 248, 0.6)',
+      align: 'center',
+    });
+  }
+
+  function drawTruck() {
+    const bounce = state.truckBounce;
+    const lift = bounce > 0 ? Math.sin(bounce * Math.PI * 2) * 3 : 0;
+
+    ctx.save();
+    ctx.translate(0, lift * 0.35);
+
+    rr(0, 452, W, H - 452 + 24, 20);
+    const body = ctx.createLinearGradient(0, 452, 0, H);
+    body.addColorStop(0, '#142531');
+    body.addColorStop(1, '#070e15');
+    ctx.fillStyle = body;
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(150, 226, 203, 0.14)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    const seg = 40;
+    for (let i = 0; i < 12; i++) {
+      ctx.fillStyle = i % 2 ? '#ffc86b' : '#f6f1e4';
+      ctx.fillRect(i * seg, 428, seg, 20);
+      ctx.beginPath();
+      ctx.arc(i * seg + seg / 2, 448, seg / 2, 0, Math.PI);
+      ctx.fill();
+    }
+
+    const shade = ctx.createLinearGradient(0, 452, 0, 482);
+    shade.addColorStop(0, 'rgba(0, 0, 0, 0.38)');
+    shade.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = shade;
+    ctx.fillRect(0, 452, W, 30);
+
+    rr(28, 468, W - 56, 30, 8);
+    const win = ctx.createLinearGradient(0, 468, 0, 498);
+    win.addColorStop(0, '#2c1c11');
+    win.addColorStop(1, '#412718');
+    ctx.fillStyle = win;
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255, 200, 107, 0.35)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    drawText('ORDER UP', W / 2, 489, {
+      size: 11,
+      weight: 800,
+      color: '#ffd79a',
+      align: 'center',
+      track: 5,
+      glow: 'rgba(255, 200, 107, 0.6)',
+      blur: 12,
+    });
+
+    for (let i = 0; i < 4; i++) drawChip(i);
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+    ctx.fillRect(0, 576, W, 2);
+
+    for (const wx of [74, 406]) {
+      ctx.beginPath();
+      ctx.arc(wx, 614, 22, 0, TAU);
+      ctx.fillStyle = '#050a0e';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(150, 226, 203, 0.18)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(wx, 614, 9, 0, TAU);
+      ctx.fillStyle = 'rgba(150, 226, 203, 0.16)';
+      ctx.fill();
+    }
+
+    ctx.restore();
+  }
+
+  /* ---------- overlays ---------- */
+  function drawParticles() {
+    for (const p of state.particles) {
+      ctx.globalAlpha = clamp(p.life / p.max, 0, 1);
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size, 0, TAU);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawPops() {
+    for (const p of state.pops) {
+      ctx.globalAlpha = clamp(p.life / p.max, 0, 1);
+      drawText(p.text, p.x, p.y, {
+        size: 12,
+        weight: 700,
+        color: p.color,
+        align: 'center',
+        track: 0.6,
+        glow: p.color,
+        blur: 10,
+      });
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawVignette() {
+    const g = ctx.createRadialGradient(W / 2, H * 0.45, 140, W / 2, H * 0.45, 440);
+    g.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    g.addColorStop(1, 'rgba(0, 0, 0, 0.5)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  function drawFlash() {
+    if (state.flash <= 0) return;
+    ctx.fillStyle = hexA(state.flashColor, Number((state.flash * 0.13).toFixed(3)));
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  function drawHud() {
+    drawText('ORDER UP', 26, 30, { size: 10, weight: 700, color: '#7af5e0', track: 3 });
+    drawText('BEST ' + String(state.best).padStart(4, '0'), W - 26, 30, {
+      size: 9,
+      color: 'rgba(247, 242, 232, 0.42)',
+      align: 'right',
+      track: 1.4,
+    });
+
+    drawText('SCORE', 26, 50, {
+      size: 9,
+      weight: 700,
+      color: 'rgba(247, 242, 232, 0.42)',
+      track: 2,
+    });
+    drawText('WAVE ' + String(state.wave).padStart(2, '0'), W - 26, 50, {
+      size: 11,
+      weight: 700,
+      color: '#ffc86b',
+      align: 'right',
+      track: 2,
+    });
+
+    drawText(String(state.score).padStart(4, '0'), 24, 84, {
+      size: 30,
+      weight: 800,
+      color: '#f9fffc',
+      track: 0.6,
+    });
+
+    for (let i = 0; i < 3; i++) {
+      drawStar(W - 32 - i * 17, 76, 7, 3, i < state.hearts);
+    }
+
+    if (state.combo > 1) {
+      const pulse = 1 + 0.05 * Math.sin(state.t * 6);
+      ctx.save();
+      ctx.translate(W / 2, 38);
+      ctx.scale(pulse, pulse);
+      rr(-35, -13, 70, 22, 11);
+      ctx.fillStyle = 'rgba(255, 200, 107, 0.12)';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255, 200, 107, 0.45)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      drawText('COMBO \u00d7' + state.combo, 0, 2, {
+        size: 9,
+        weight: 800,
+        color: '#ffd79a',
+        align: 'center',
+        track: 0.8,
+      });
+      ctx.restore();
+    }
+  }
+
+  function drawBanner() {
+    const b = state.banner;
+    if (!b) return;
+    const inA = clamp((b.max - b.t) / 0.25, 0, 1);
+    const outA = clamp(b.t / 0.45, 0, 1);
+    const alpha = Math.min(inA, outA);
+    if (alpha <= 0.01) return;
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    const g = ctx.createLinearGradient(0, 248, 0, 324);
+    g.addColorStop(0, 'rgba(8, 16, 22, 0)');
+    g.addColorStop(0.5, 'rgba(8, 16, 22, 0.82)');
+    g.addColorStop(1, 'rgba(8, 16, 22, 0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 248, W, 76);
+
+    drawText(b.text, W / 2, 286, {
+      size: 30,
+      weight: 800,
+      color: '#ffe6bd',
+      align: 'center',
+      track: 2.4,
+      glow: 'rgba(255, 200, 107, 0.7)',
+      blur: 20,
+    });
+    drawText(b.sub, W / 2, 305, {
+      size: 8.5,
+      weight: 700,
+      color: 'rgba(247, 242, 232, 0.62)',
+      align: 'center',
+      track: 3,
+    });
+    ctx.restore();
+  }
+
+  /* ---------- render ---------- */
+  function render() {
+    drawBackground();
+
+    ctx.save();
+    if (state.shake > 0) {
+      ctx.translate(rand(-1, 1) * state.shake * 0.45, rand(-1, 1) * state.shake * 0.3);
+    }
+
+    for (let i = 0; i < 3; i++) {
+      const s = state.slots[i];
+      if (s && s.kind === 'customer') drawSlotCard(s, i);
+    }
+
+    for (let i = 0; i < 3; i++) {
+      const s = state.slots[i];
+      if (s && s.kind === 'customer') drawCustomer(s, SLOT_X[i]);
+    }
+
+    drawCounter();
+
+    for (let i = 0; i < 3; i++) {
+      const s = state.slots[i];
+      if (s && s.kind === 'customer' && state.selected === i) {
+        ctx.strokeStyle = 'rgba(122, 245, 224, 0.7)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.ellipse(SLOT_X[i], 399, 27, 7, 0, 0, TAU);
+        ctx.stroke();
+      }
+    }
+
+    for (let i = 0; i < 3; i++) {
+      const s = state.slots[i];
+      if (s && s.kind === 'spill') drawSpill(s, SLOT_X[i]);
+    }
+
+    drawParticles();
+    drawTruck();
+    drawPops();
+    ctx.restore();
+
+    drawVignette();
+    drawFlash();
+    drawHud();
+    drawBanner();
+  }
+
+  /* ---------- input ---------- */
+  function hitTest(p) {
+    for (let i = 0; i < 4; i++) {
+      const x = chipX(i);
+      if (p.x >= x && p.x <= x + CHIP_W && p.y >= CHIP_Y && p.y <= CHIP_Y + CHIP_H) {
+        return { type: 'chip', i };
+      }
+    }
+    for (let i = 0; i < 3; i++) {
+      const s = state.slots[i];
+      if (!s) continue;
+      if (Math.abs(p.x - SLOT_X[i]) > 70) continue;
+      if (s.kind === 'customer' && p.y >= CARD_Y && p.y <= 408) return { type: 'slot', i };
+      if (s.kind === 'spill' && p.y >= 340 && p.y <= 424) return { type: 'slot', i };
+    }
+    return null;
+  }
+
+  function canvasPoint(e) {
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: ((e.clientX - rect.left) / rect.width) * W,
+      y: ((e.clientY - rect.top) / rect.height) * H,
+    };
+  }
+
+  canvas.addEventListener('pointerdown', (e) => {
+    if (state.mode !== 'playing') return;
+    const hit = hitTest(canvasPoint(e));
+    if (!hit) return;
+    e.preventDefault();
+    if (hit.type === 'chip') {
+      addIngredient(INGREDIENTS[hit.i].id);
+      return;
+    }
+    const s = state.slots[hit.i];
+    if (!s) return;
+    if (s.kind === 'spill') cleanSpill(hit.i);
+    else state.selected = hit.i;
+  });
+
+  canvas.addEventListener('pointermove', (e) => {
+    if (state.mode !== 'playing') {
+      canvas.style.cursor = 'default';
+      return;
+    }
+    canvas.style.cursor = hitTest(canvasPoint(e)) ? 'pointer' : 'default';
+  });
+
+  window.addEventListener('keydown', (e) => {
+    if (state.mode !== 'playing') return;
+    const k = e.key.toLowerCase();
+    if (ING_KEYS[k]) {
+      e.preventDefault();
+      addIngredient(ING_KEYS[k]);
+      return;
+    }
+    if (k === '1' || k === '2' || k === '3') {
+      e.preventDefault();
+      const i = Number(k) - 1;
+      const s = state.slots[i];
+      if (s && s.kind === 'customer') state.selected = i;
+    }
+  });
+
+  window.addEventListener('blur', () => {
+    canvas.style.cursor = 'default';
+  });
+
+  startBtn.addEventListener('click', startRun);
+  againBtn.addEventListener('click', startRun);
+
+  /* ---------- boot ---------- */
+  introPanel.hidden = false;
+  resultPanel.hidden = true;
+  overlay.hidden = false;
+  try {
+    startBtn.focus({ preventScroll: true });
+  } catch (err) {
+    startBtn.focus();
+  }
+
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min((now - last) / 1000, 0.05);
+    last = now;
+    update(dt);
+    render();
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

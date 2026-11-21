@@ -1,0 +1,1031 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#080b12">
+<title>Neon Tunnel</title>
+<link rel="stylesheet" href="../common.css">
+<style>
+  :root {
+    --bg-top: #2a1740;
+    --bg-mid: #0b0a18;
+    --bg-bottom: #05060c;
+    --stage-bg: #0a0716;
+    --ink: #f2ecff;
+  }
+  .panel { max-width: 372px; }
+  .title { margin-bottom: 14px; color: #8ffff0; text-shadow: 0 0 28px rgba(122, 245, 224, 0.3); }
+  .title .accent { color: #ff8fe4; }
+  .score {
+    font-size: 54px;
+    line-height: 1;
+    font-weight: 700;
+    color: #ff8fe4;
+    text-shadow: 0 0 30px rgba(255, 95, 210, 0.35);
+  }
+  .best { margin-top: 10px; font-size: 13px; letter-spacing: 0.16em; }
+  .run-line {
+    margin: 6px 0 0;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: none;
+    color: rgba(242, 236, 255, 0.66);
+  }
+  .rules { margin-top: 14px; }
+  .rule { font-size: 12.5px; }
+  .btn { margin-top: 20px; padding: 14px 30px; font-size: 13px; font-weight: 700; letter-spacing: 0.16em; }
+</style>
+</head>
+<body>
+  <div id="stage">
+    <canvas id="game" width="480" height="640" aria-label="Neon Tunnel. Switch between three lanes to collect batteries and dodge barriers while the tunnel speeds up every twenty seconds."></canvas>
+    <div id="overlay" class="overlay">
+      <div id="introPanel" class="panel panel-card">
+        <p class="eyebrow">Arcade &middot; Reflex</p>
+        <h1 class="title">Neon <span class="accent">Tunnel</span></h1>
+        <p class="lead">Three lanes on a charging rail. Scoop up batteries, dodge the barriers, and hold the line as the tunnel speeds up every twenty seconds.</p>
+        <div class="rules">
+          <p class="rule">Arrow keys or A / D switch lanes. On touch, swipe or tap the left and right halves.</p>
+          <p class="rule">Every battery is worth +50 and one bar of charge.</p>
+          <p class="rule">A barrier costs a shield. You start with three.</p>
+          <p class="rule">Each 20-second wave raises the speed and tightens the gaps.</p>
+        </div>
+        <button type="button" id="startBtn" class="btn">Enter tunnel</button>
+      </div>
+      <div id="resultPanel" class="panel panel-card" hidden>
+        <p class="eyebrow">Run ended</p>
+        <h1 class="title">Power <span class="accent">Down</span></h1>
+        <p class="label">Score</p>
+        <p class="score" id="finalScore">0</p>
+        <p class="best" id="bestLine">Best 0000</p>
+        <p class="run-line" id="runLine">0 batteries</p>
+        <button type="button" id="againBtn" class="btn">Run again</button>
+      </div>
+    </div>
+  </div>
+  <p class="hint">&larr; &rarr; / A D or tap the sides to switch lanes</p>
+  <div id="srStatus" class="sr-only" aria-live="polite"></div>
+
+<script>
+(() => {
+  'use strict';
+
+  const W = 480;
+  const H = 640;
+  const TAU = Math.PI * 2;
+  const STORAGE_KEY = 'neontunnel.best.v1';
+
+  /* ---------- tunnel geometry ---------- */
+  const HORIZON = 208;
+  const PLAYER_Y = 592;
+  const NEAR_D = 250;
+  const LANE_SPREAD = 96;
+  const MAX_D = 1000;
+  const HIT_DEPTH = 54;
+
+  /* ---------- pacing ---------- */
+  const BASE_SPEED = 330;
+  const SPEED_STEP = 0.16;
+  const SPEED_CAP = 3;
+  const WAVE_SECONDS = 20;
+  const START_LIVES = 3;
+  const ROW_GAP = 268;
+  const ROW_GAP_SPEED = 0.16;
+
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d', { alpha: false });
+  const overlay = document.getElementById('overlay');
+  const introPanel = document.getElementById('introPanel');
+  const resultPanel = document.getElementById('resultPanel');
+  const startBtn = document.getElementById('startBtn');
+  const againBtn = document.getElementById('againBtn');
+  const finalScoreEl = document.getElementById('finalScore');
+  const bestLineEl = document.getElementById('bestLine');
+  const runLineEl = document.getElementById('runLine');
+  const srStatus = document.getElementById('srStatus');
+
+  const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
+  const rand = (lo, hi) => lo + Math.random() * (hi - lo);
+  const randInt = (n) => Math.floor(Math.random() * n);
+
+  /* ---------- one-point perspective ---------- */
+  const projS = (d) => NEAR_D / (NEAR_D + Math.max(0, d));
+  const projY = (d) => HORIZON + (PLAYER_Y - HORIZON) * projS(d);
+  const projX = (lane, s) => W / 2 + (lane - 1) * LANE_SPREAD * s;
+  const fadeAt = (d) => clamp(0.16 + (1 - d / MAX_D) * 0.95, 0.16, 1);
+
+  /* ---------- high score ---------- */
+  function readHigh() {
+    try {
+      const v = Number(window.localStorage.getItem(STORAGE_KEY));
+      return Number.isFinite(v) && v > 0 ? Math.floor(v) : 0;
+    } catch (err) {
+      return 0;
+    }
+  }
+
+  function writeHigh(v) {
+    try {
+      window.localStorage.setItem(STORAGE_KEY, String(v));
+    } catch (err) {
+      /* storage may be unavailable (private mode, file://) */
+    }
+  }
+
+  /* ---------- canvas sizing ---------- */
+  function sizeCanvas() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+  }
+
+  sizeCanvas();
+  window.addEventListener('resize', sizeCanvas);
+
+  const dust = [];
+  for (let i = 0; i < 46; i++) {
+    dust.push({
+      x: rand(0, W),
+      y: rand(0, HORIZON + 42),
+      r: rand(0.6, 1.8),
+      p: rand(0, TAU),
+      sp: rand(0.4, 1.4),
+      c: Math.random() < 0.5 ? 'rgba(95, 242, 255, 0.8)' : 'rgba(255, 95, 210, 0.8)',
+    });
+  }
+
+  /* ---------- state ---------- */
+  const state = {
+    mode: 'menu',
+    lane: 1,
+    lanePos: 1,
+    score: 0,
+    batteries: 0,
+    lives: START_LIVES,
+    wave: 1,
+    waveTimer: WAVE_SECONDS,
+    speed: BASE_SPEED,
+    travel: 0,
+    rowAcc: 0,
+    rowCount: 0,
+    rows: [],
+    particles: [],
+    pops: [],
+    invuln: 0,
+    shake: 0,
+    flash: 0,
+    banner: null,
+    t: 0,
+    high: readHigh(),
+    dust,
+  };
+
+  /* ---------- run flow ---------- */
+  function startRun() {
+    state.mode = 'playing';
+    state.lane = 1;
+    state.lanePos = 1;
+    state.score = 0;
+    state.batteries = 0;
+    state.lives = START_LIVES;
+    state.wave = 1;
+    state.waveTimer = WAVE_SECONDS;
+    state.speed = BASE_SPEED;
+    state.travel = 0;
+    state.rowAcc = 0;
+    state.rowCount = 0;
+    state.rows.length = 0;
+    state.particles.length = 0;
+    state.pops.length = 0;
+    state.invuln = 0;
+    state.shake = 0;
+    state.flash = 0;
+    state.banner = { text: 'WAVE 1', sub: 'FIND THE GAPS', t: 2, max: 2 };
+    overlay.hidden = true;
+    srStatus.textContent = 'Run started. Wave 1. Three shields.';
+  }
+
+  function endRun() {
+    state.mode = 'over';
+    const final = Math.floor(state.score);
+    const isBest = final > state.high;
+    if (isBest) {
+      state.high = final;
+      writeHigh(state.high);
+    }
+    finalScoreEl.textContent = String(final);
+    bestLineEl.textContent = isBest
+      ? 'New personal best'
+      : 'Best ' + String(state.high).padStart(4, '0');
+    runLineEl.textContent =
+      state.batteries +
+      (state.batteries === 1 ? ' battery' : ' batteries') +
+      ' \u00b7 reached wave ' +
+      state.wave;
+    introPanel.hidden = true;
+    resultPanel.hidden = false;
+    overlay.hidden = false;
+    srStatus.textContent = 'Run over. Score ' + final + '. Reached wave ' + state.wave + '.';
+    try {
+      againBtn.focus({ preventScroll: true });
+    } catch (err) {
+      againBtn.focus();
+    }
+  }
+
+  function switchLane(dir) {
+    if (state.mode !== 'playing') return;
+    const next = clamp(state.lane + dir, 0, 2);
+    if (next === state.lane) return;
+    state.lane = next;
+    const x = W / 2 + (next - 1) * LANE_SPREAD;
+    burst(x, PLAYER_Y - 2, '#5ff2ff', 5, 90, 0.25);
+  }
+
+  /* ---------- spawning ---------- */
+  function addBarrier(lane) {
+    state.rows.push({ kind: 'barrier', lane, d: MAX_D, checked: false, phase: rand(0, TAU) });
+  }
+
+  function addBattery(lane) {
+    state.rows.push({ kind: 'battery', lane, d: MAX_D, checked: false, phase: rand(0, TAU) });
+  }
+
+  function spawnRow() {
+    state.rowCount += 1;
+    const roll = Math.random();
+    const doubleChance = state.rowCount < 4 ? 0 : Math.min(0.52, 0.14 + state.wave * 0.06);
+
+    if (roll < doubleChance) {
+      const free = randInt(3);
+      for (let lane = 0; lane < 3; lane++) {
+        if (lane !== free) addBarrier(lane);
+      }
+      if (Math.random() < 0.6) addBattery(free);
+      return;
+    }
+
+    if (roll < doubleChance + 0.2) {
+      const lane = randInt(3);
+      addBattery(lane);
+      if (Math.random() < 0.4) addBattery((lane + 1 + randInt(2)) % 3);
+      return;
+    }
+
+    const blocked = randInt(3);
+    addBarrier(blocked);
+    const free = [0, 1, 2].filter((lane) => lane !== blocked);
+    if (Math.random() < 0.68) addBattery(free[randInt(2)]);
+  }
+
+  /* ---------- effects ---------- */
+  function burst(x, y, color, count, power, life) {
+    for (let i = 0; i < count; i++) {
+      const a = rand(0, TAU);
+      const sp = rand(power * 0.3, power);
+      const span = rand(0.3, 0.6) + (life || 0.4);
+      state.particles.push({
+        x,
+        y,
+        vx: Math.cos(a) * sp,
+        vy: Math.sin(a) * sp - power * 0.25,
+        life: span,
+        max: span,
+        size: rand(1.6, 3.6),
+        color,
+      });
+    }
+  }
+
+  function popText(text, x, y, color) {
+    state.pops.push({ text, x, y, color, life: 0.9, max: 0.9 });
+  }
+
+  /* ---------- collisions ---------- */
+  function collectBattery(e) {
+    state.batteries += 1;
+    state.score += 50;
+    const x = projX(e.lane, 1);
+    burst(x, PLAYER_Y - 46, '#5ff2ff', 12, 190, 0.35);
+    popText('+50', x, PLAYER_Y - 92, '#9df7ff');
+  }
+
+  function hitBarrier(e) {
+    if (state.invuln > 0) return;
+    state.lives -= 1;
+    state.invuln = 0.9;
+    state.shake = 16;
+    const x = projX(e.lane, 1);
+    burst(x, PLAYER_Y - 34, '#ff5f7a', 20, 300, 0.5);
+    popText('-1 shield', x, PLAYER_Y - 96, '#ff7f9a');
+    srStatus.textContent = state.lives > 0
+      ? 'Shield lost. ' + state.lives + ' left.'
+      : 'No shields left.';
+    if (state.lives <= 0) {
+      state.lives = 0;
+      endRun();
+    }
+  }
+
+  /* ---------- update ---------- */
+  function update(dt) {
+    state.t += dt;
+    if (state.shake > 0) state.shake = Math.max(0, state.shake - dt * 26);
+    if (state.flash > 0) state.flash = Math.max(0, state.flash - dt * 2.2);
+    if (state.banner) {
+      state.banner.t -= dt;
+      if (state.banner.t <= 0) state.banner = null;
+    }
+
+    for (let i = state.particles.length - 1; i >= 0; i--) {
+      const p = state.particles[i];
+      p.life -= dt;
+      if (p.life <= 0) {
+        state.particles.splice(i, 1);
+        continue;
+      }
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.vy += 260 * dt;
+      p.vx *= 0.97;
+    }
+
+    for (let i = state.pops.length - 1; i >= 0; i--) {
+      const p = state.pops[i];
+      p.life -= dt;
+      p.y -= 52 * dt;
+      if (p.life <= 0) state.pops.splice(i, 1);
+    }
+
+    state.lanePos += (state.lane - state.lanePos) * Math.min(1, dt * 15);
+
+    if (state.mode !== 'playing') {
+      state.travel += dt * 110;
+      return;
+    }
+
+    if (state.invuln > 0) state.invuln = Math.max(0, state.invuln - dt);
+
+    state.waveTimer -= dt;
+    if (state.waveTimer <= 0) {
+      state.waveTimer += WAVE_SECONDS;
+      state.wave += 1;
+      state.speed = BASE_SPEED * Math.min(SPEED_CAP, 1 + SPEED_STEP * (state.wave - 1));
+      state.banner = { text: 'WAVE ' + state.wave, sub: 'FASTER', t: 2, max: 2 };
+      state.flash = 1;
+      burst(W / 2, HORIZON + 14, '#ff5fd2', 16, 220, 0.5);
+      srStatus.textContent = 'Wave ' + state.wave + '. Speed up.';
+    }
+
+    const step = state.speed * dt;
+    state.travel += step;
+    state.score += step * 0.1;
+
+    state.rowAcc += step;
+    const gap = ROW_GAP + state.speed * ROW_GAP_SPEED;
+    if (state.rowAcc >= gap) {
+      state.rowAcc -= gap;
+      spawnRow();
+    }
+
+    const playerLane = Math.round(state.lanePos);
+
+    for (let i = state.rows.length - 1; i >= 0; i--) {
+      const e = state.rows[i];
+      e.d -= step;
+
+      if (e.d < -90) {
+        state.rows.splice(i, 1);
+        continue;
+      }
+
+      if (!e.checked && e.d <= HIT_DEPTH) {
+        e.checked = true;
+        if (e.lane === playerLane) {
+          if (e.kind === 'battery') {
+            collectBattery(e);
+            state.rows.splice(i, 1);
+            continue;
+          }
+          hitBarrier(e);
+          if (state.mode !== 'playing') return;
+        }
+      }
+    }
+  }
+
+  /* ---------- drawing helpers ---------- */
+  function rr(x, y, w, h, radius) {
+    const r = Math.min(radius, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function drawText(str, x, y, opts) {
+    const o = opts || {};
+    const size = o.size || 10;
+    const weight = o.weight || 400;
+    const color = o.color || '#f2ecff';
+    const track = o.track || 0;
+    const align = o.align || 'left';
+    ctx.save();
+    ctx.font = weight + ' ' + size + 'px ui-monospace, "SF Mono", Menlo, Consolas, monospace';
+    ctx.fillStyle = color;
+    ctx.textBaseline = 'alphabetic';
+    if (o.glow) {
+      ctx.shadowColor = o.glow;
+      ctx.shadowBlur = o.blur || 16;
+    }
+    if (track) {
+      const chars = Array.from(str);
+      const widths = chars.map((ch) => ctx.measureText(ch).width);
+      const total = widths.reduce((sum, w) => sum + w, 0) + track * (chars.length - 1);
+      let cx = align === 'right' ? x - total : align === 'center' ? x - total / 2 : x;
+      chars.forEach((ch, i) => {
+        ctx.fillText(ch, cx, y);
+        cx += widths[i] + track;
+      });
+    } else {
+      ctx.textAlign = align;
+      ctx.fillText(str, x, y);
+    }
+    ctx.restore();
+  }
+
+  /* ---------- backdrop ---------- */
+  function drawBackground() {
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, '#0a0616');
+    g.addColorStop(0.3, '#150a29');
+    g.addColorStop(0.62, '#1b0c30');
+    g.addColorStop(1, '#0b0618');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+
+    const bloom = ctx.createRadialGradient(W / 2, HORIZON, 4, W / 2, HORIZON, 300);
+    bloom.addColorStop(0, 'rgba(255, 95, 210, 0.24)');
+    bloom.addColorStop(0.45, 'rgba(140, 70, 255, 0.1)');
+    bloom.addColorStop(1, 'rgba(140, 70, 255, 0)');
+    ctx.fillStyle = bloom;
+    ctx.fillRect(0, 0, W, HORIZON + 230);
+
+    for (const d of state.dust) {
+      const a = 0.08 + 0.22 * (0.5 + 0.5 * Math.sin(state.t * d.sp + d.p));
+      ctx.globalAlpha = a;
+      ctx.fillStyle = d.c;
+      ctx.fillRect(d.x, d.y, d.r, d.r);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawTunnel() {
+    const cx = W / 2;
+
+    const floor = ctx.createLinearGradient(0, HORIZON, 0, H);
+    floor.addColorStop(0, 'rgba(52, 20, 72, 0.92)');
+    floor.addColorStop(0.5, 'rgba(28, 11, 44, 0.96)');
+    floor.addColorStop(1, 'rgba(12, 5, 21, 1)');
+    ctx.beginPath();
+    ctx.moveTo(cx, HORIZON);
+    ctx.lineTo(W + 40, H + 20);
+    ctx.lineTo(-40, H + 20);
+    ctx.closePath();
+    ctx.fillStyle = floor;
+    ctx.fill();
+
+    const sBottom = (H - HORIZON) / (PLAYER_Y - HORIZON);
+
+    /* depth rungs */
+    const RUNG = 92;
+    const off = state.travel % RUNG;
+    for (let k = 0; k < 13; k++) {
+      const d = k * RUNG - off;
+      if (d < 0) continue;
+      const s = projS(d);
+      const y = projY(d);
+      const half = LANE_SPREAD * 1.62 * s;
+      const a = 0.34 * (1 - d / (RUNG * 13)) * (0.45 + 0.55 * s);
+      if (a <= 0.004) continue;
+      ctx.strokeStyle = 'rgba(255, 120, 220, ' + a.toFixed(3) + ')';
+      ctx.lineWidth = 1 + s * 1.8;
+      ctx.beginPath();
+      ctx.moveTo(cx - half, y);
+      ctx.lineTo(cx + half, y);
+      ctx.stroke();
+    }
+
+    /* outer walls */
+    const wallGrad = ctx.createLinearGradient(0, HORIZON, 0, H);
+    wallGrad.addColorStop(0, 'rgba(255, 95, 210, 0.05)');
+    wallGrad.addColorStop(0.5, 'rgba(255, 95, 210, 0.25)');
+    wallGrad.addColorStop(1, 'rgba(95, 242, 255, 0.9)');
+    ctx.strokeStyle = wallGrad;
+    ctx.lineWidth = 2.6;
+    for (const side of [-1, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(cx, HORIZON);
+      ctx.lineTo(cx + side * LANE_SPREAD * 1.62 * sBottom, H);
+      ctx.stroke();
+    }
+
+    /* lane dividers */
+    ctx.strokeStyle = 'rgba(160, 246, 255, 0.16)';
+    ctx.lineWidth = 1.2;
+    ctx.setLineDash([14, 20]);
+    ctx.lineDashOffset = -((state.travel * 0.5) % 34);
+    for (const k of [-0.5, 0.5]) {
+      ctx.beginPath();
+      ctx.moveTo(cx + k * LANE_SPREAD * 0.18, HORIZON + 2);
+      ctx.lineTo(cx + k * LANE_SPREAD * sBottom, H);
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+  }
+
+  function drawFog() {
+    const y = projY(MAX_D);
+    const g = ctx.createRadialGradient(W / 2, y, 6, W / 2, y, 120);
+    g.addColorStop(0, 'rgba(44, 16, 68, 0.72)');
+    g.addColorStop(0.6, 'rgba(44, 16, 68, 0.32)');
+    g.addColorStop(1, 'rgba(44, 16, 68, 0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(W / 2 - 130, y - 130, 260, 260);
+  }
+
+  /* ---------- entities ---------- */
+  function drawEntities() {
+    const list = state.rows.slice().sort((a, b) => b.d - a.d);
+    for (const e of list) {
+      if (e.kind === 'barrier') drawBarrier(e);
+      else drawBattery(e);
+    }
+  }
+
+  function drawBarrier(e) {
+    const s = projS(e.d);
+    const x = projX(e.lane, s);
+    const y = projY(e.d);
+    const w = 82 * s;
+    const h = 54 * s;
+    if (w < 2) return;
+
+    ctx.save();
+    ctx.globalAlpha = fadeAt(e.d);
+
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+    ctx.beginPath();
+    ctx.ellipse(x, y + h * 0.16, w * 0.52, Math.max(1, h * 0.16), 0, 0, TAU);
+    ctx.fill();
+
+    const top = y - h;
+    rr(x - w / 2, top, w, h, Math.max(2, 8 * s));
+    const body = ctx.createLinearGradient(0, top, 0, y);
+    body.addColorStop(0, 'rgba(255, 90, 150, 0.55)');
+    body.addColorStop(0.55, 'rgba(120, 22, 62, 0.72)');
+    body.addColorStop(1, 'rgba(48, 9, 30, 0.88)');
+    ctx.fillStyle = body;
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255, 130, 180, 0.9)';
+    ctx.lineWidth = Math.max(1, 1.8 * s);
+    ctx.stroke();
+
+    ctx.save();
+    ctx.clip();
+    ctx.strokeStyle = 'rgba(255, 190, 220, 0.16)';
+    ctx.lineWidth = Math.max(1, 6 * s);
+    const step = Math.max(6, 16 * s);
+    for (let sx = x - w / 2 - h; sx < x + w / 2 + h; sx += step) {
+      ctx.beginPath();
+      ctx.moveTo(sx, y);
+      ctx.lineTo(sx + h, top);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    ctx.strokeStyle = 'rgba(255, 205, 232, 0.9)';
+    ctx.lineWidth = Math.max(1, 1.5 * s);
+    ctx.beginPath();
+    ctx.moveTo(x - w / 2 + 3 * s, top + 1.6 * s);
+    ctx.lineTo(x + w / 2 - 3 * s, top + 1.6 * s);
+    ctx.stroke();
+
+    ctx.fillStyle = 'rgba(255, 130, 180, 0.95)';
+    ctx.beginPath();
+    ctx.arc(x, top + h * 0.52, Math.max(1.2, 3.2 * s), 0, TAU);
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  function drawBattery(e) {
+    const s = projS(e.d);
+    if (s < 0.02) return;
+    const x = projX(e.lane, s);
+    const y = projY(e.d) - 44 * s + Math.sin(state.t * 3.4 + e.phase) * 4 * s;
+    const w = 26 * s;
+    const h = 40 * s;
+
+    ctx.save();
+    ctx.globalAlpha = fadeAt(e.d);
+
+    const halo = ctx.createRadialGradient(x, y, 1, x, y, 46 * s);
+    halo.addColorStop(0, 'rgba(95, 242, 255, 0.34)');
+    halo.addColorStop(1, 'rgba(95, 242, 255, 0)');
+    ctx.fillStyle = halo;
+    ctx.beginPath();
+    ctx.arc(x, y, 46 * s, 0, TAU);
+    ctx.fill();
+
+    rr(x - w / 2, y - h / 2, w, h, Math.max(2, 7 * s));
+    const cell = ctx.createLinearGradient(0, y - h / 2, 0, y + h / 2);
+    cell.addColorStop(0, 'rgba(198, 255, 255, 0.96)');
+    cell.addColorStop(0.5, 'rgba(95, 242, 255, 0.88)');
+    cell.addColorStop(1, 'rgba(28, 140, 180, 0.9)');
+    ctx.fillStyle = cell;
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(220, 255, 255, 0.92)';
+    ctx.lineWidth = Math.max(0.8, 1.2 * s);
+    ctx.stroke();
+
+    rr(x - w * 0.2, y - h / 2 - 6 * s, w * 0.4, 7 * s, Math.max(1, 2 * s));
+    ctx.fillStyle = 'rgba(198, 255, 255, 0.95)';
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.moveTo(x + 3.4 * s, y - h * 0.28);
+    ctx.lineTo(x - 6 * s, y + 2 * s);
+    ctx.lineTo(x - 1 * s, y + 2 * s);
+    ctx.lineTo(x - 3.4 * s, y + h * 0.3);
+    ctx.lineTo(x + 6 * s, y - 3 * s);
+    ctx.lineTo(x + 1 * s, y - 3 * s);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(6, 34, 44, 0.9)';
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  /* ---------- player ---------- */
+  function drawPlayer() {
+    const x = W / 2 + (state.lanePos - 1) * LANE_SPREAD;
+    const bob = Math.sin(state.t * 6) * 2;
+    const y = PLAYER_Y + bob;
+    const flicker = state.invuln > 0 && Math.floor(state.t * 22) % 2 === 0;
+
+    ctx.save();
+    if (flicker) ctx.globalAlpha = 0.35;
+
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+    ctx.beginPath();
+    ctx.ellipse(x, PLAYER_Y + 9, 30, 7, 0, 0, TAU);
+    ctx.fill();
+
+    const glow = ctx.createRadialGradient(x, y - 34, 3, x, y - 34, 66);
+    glow.addColorStop(0, 'rgba(95, 242, 255, 0.3)');
+    glow.addColorStop(1, 'rgba(95, 242, 255, 0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(x, y - 34, 66, 0, TAU);
+    ctx.fill();
+
+    /* speed streaks */
+    for (let i = 0; i < 4; i++) {
+      const off = (state.t * 220 + i * 26) % 104;
+      ctx.globalAlpha = (flicker ? 0.12 : 0.28) * (1 - off / 104);
+      ctx.strokeStyle = i % 2 ? '#ff5fd2' : '#5ff2ff';
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(x - 26 - i * 8, y - 10 + i * 8);
+      ctx.lineTo(x - 26 - i * 8, y + 6 + i * 8 + off * 0.24);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = flicker ? 0.35 : 1;
+
+    /* hoverboard */
+    rr(x - 34, y - 4, 68, 11, 5.5);
+    const board = ctx.createLinearGradient(0, y - 4, 0, y + 7);
+    board.addColorStop(0, '#d8ffff');
+    board.addColorStop(0.5, '#5ff2ff');
+    board.addColorStop(1, '#1f7fa8');
+    ctx.fillStyle = board;
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(220, 255, 255, 0.85)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.fillStyle = 'rgba(255, 95, 210, 0.85)';
+    rr(x - 8, y + 7, 16, 3, 1.5);
+    ctx.fill();
+
+    /* legs */
+    ctx.fillStyle = '#1d3352';
+    rr(x - 10, y - 20, 8, 18, 4);
+    ctx.fill();
+    rr(x + 2, y - 20, 8, 18, 4);
+    ctx.fill();
+
+    /* torso */
+    rr(x - 13, y - 58, 26, 42, 12);
+    const body = ctx.createLinearGradient(0, y - 58, 0, y - 16);
+    body.addColorStop(0, '#c9fff6');
+    body.addColorStop(0.45, '#6ff0ff');
+    body.addColorStop(1, '#2a8cc0');
+    ctx.fillStyle = body;
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(230, 255, 255, 0.7)';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    /* pack */
+    rr(x + 10, y - 50, 7, 22, 3);
+    ctx.fillStyle = 'rgba(255, 95, 210, 0.9)';
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255, 200, 240, 0.9)';
+    ctx.fillRect(x + 12, y - 46, 3, 5);
+
+    /* visor */
+    rr(x - 10, y - 52, 20, 13, 6);
+    ctx.fillStyle = '#07121f';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(95, 242, 255, 0.55)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(200, 255, 255, 0.85)';
+    ctx.fillRect(x - 7, y - 48, 9, 2);
+
+    /* antenna */
+    ctx.strokeStyle = 'rgba(220, 255, 255, 0.7)';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(x + 7, y - 58);
+    ctx.lineTo(x + 11, y - 66);
+    ctx.stroke();
+    ctx.fillStyle = '#ff8fe4';
+    ctx.shadowColor = '#ff5fd2';
+    ctx.shadowBlur = 8;
+    ctx.beginPath();
+    ctx.arc(x + 11, y - 67, 2.2, 0, TAU);
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  /* ---------- overlays on canvas ---------- */
+  function drawParticles() {
+    for (const p of state.particles) {
+      ctx.globalAlpha = clamp(p.life / p.max, 0, 1);
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size, 0, TAU);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawPops() {
+    for (const p of state.pops) {
+      const a = clamp(p.life / p.max, 0, 1);
+      drawText(p.text, p.x, p.y, {
+        size: 12,
+        weight: 700,
+        color: p.color,
+        align: 'center',
+        track: 0.8,
+        glow: p.color,
+        blur: 12,
+      });
+      ctx.globalAlpha = a;
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawVignette() {
+    const g = ctx.createRadialGradient(W / 2, H * 0.48, 120, W / 2, H * 0.48, 430);
+    g.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    g.addColorStop(1, 'rgba(0, 0, 0, 0.55)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  function drawFlash() {
+    if (state.flash <= 0) return;
+    ctx.fillStyle = 'rgba(255, 150, 235, ' + (state.flash * 0.14).toFixed(3) + ')';
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  function drawBatteryIcon(x, y) {
+    rr(x, y - 8, 11, 16, 3);
+    ctx.fillStyle = 'rgba(95, 242, 255, 0.85)';
+    ctx.fill();
+    ctx.fillStyle = 'rgba(95, 242, 255, 0.85)';
+    ctx.fillRect(x + 3.5, y - 11, 4, 3);
+    ctx.fillStyle = 'rgba(6, 34, 44, 0.9)';
+    ctx.fillRect(x + 3, y - 5, 5, 2);
+    ctx.fillRect(x + 3, y - 1, 5, 2);
+  }
+
+  function drawShieldPip(x, y, on) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.beginPath();
+    ctx.moveTo(0, -6);
+    ctx.lineTo(5, 0);
+    ctx.lineTo(0, 6);
+    ctx.lineTo(-5, 0);
+    ctx.closePath();
+    if (on) {
+      ctx.fillStyle = 'rgba(95, 242, 255, 0.9)';
+      ctx.shadowColor = 'rgba(95, 242, 255, 0.85)';
+      ctx.shadowBlur = 8;
+      ctx.fill();
+    } else {
+      ctx.strokeStyle = 'rgba(242, 236, 255, 0.22)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawHud() {
+    drawText('NEON TUNNEL', 26, 33, { size: 10, weight: 700, color: '#7af5e0', track: 3 });
+    drawText('BEST ' + String(state.high).padStart(4, '0'), W - 26, 33, {
+      size: 9,
+      color: 'rgba(242, 236, 255, 0.42)',
+      align: 'right',
+      track: 1.4,
+    });
+
+    drawText(String(Math.floor(state.score)).padStart(4, '0'), 24, 80, {
+      size: 34,
+      weight: 800,
+      color: '#f7fdff',
+      track: 1.4,
+    });
+
+    drawText('WAVE ' + String(state.wave).padStart(2, '0'), W - 26, 56, {
+      size: 12,
+      weight: 700,
+      color: '#ff9fe0',
+      align: 'right',
+      track: 2,
+    });
+
+    const barW = 96;
+    const barX = W - 26 - barW;
+    rr(barX, 63, barW, 4, 2);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.14)';
+    ctx.fill();
+    const p = clamp(state.waveTimer / WAVE_SECONDS, 0, 1);
+    rr(barX, 63, Math.max(2, barW * p), 4, 2);
+    ctx.fillStyle = '#ff5fd2';
+    ctx.fill();
+
+    drawText(Math.ceil(state.waveTimer) + 's to next', W - 26, 80, {
+      size: 8,
+      color: 'rgba(242, 236, 255, 0.36)',
+      align: 'right',
+      track: 1.2,
+    });
+
+    drawBatteryIcon(28, 103);
+    drawText('\u00d7 ' + String(state.batteries).padStart(2, '0'), 45, 108, {
+      size: 12,
+      weight: 700,
+      color: '#9df7ff',
+      track: 1,
+    });
+
+    for (let i = 0; i < START_LIVES; i++) {
+      drawShieldPip(W - 32 - i * 16, 103, i < state.lives);
+    }
+  }
+
+  function drawBanner() {
+    const b = state.banner;
+    if (!b) return;
+    const inA = clamp((b.max - b.t) / 0.25, 0, 1);
+    const outA = clamp(b.t / 0.45, 0, 1);
+    const alpha = Math.min(inA, outA);
+    const pop = 1 + (1 - inA) * 0.16;
+    if (alpha <= 0.01) return;
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.translate(W / 2, 322);
+    ctx.scale(pop, pop);
+    drawText(b.text, 0, 0, {
+      size: 30,
+      weight: 800,
+      color: '#ffe2f8',
+      align: 'center',
+      track: 2.4,
+      glow: '#ff5fd2',
+      blur: 22,
+    });
+    drawText(b.sub, 0, 19, {
+      size: 9,
+      weight: 700,
+      color: 'rgba(242, 236, 255, 0.66)',
+      align: 'center',
+      track: 3,
+    });
+    ctx.restore();
+  }
+
+  /* ---------- render ---------- */
+  function render() {
+    drawBackground();
+    ctx.save();
+    if (state.shake > 0) {
+      ctx.translate(rand(-1, 1) * state.shake * 0.45, rand(-1, 1) * state.shake * 0.3);
+    }
+    drawTunnel();
+    drawEntities();
+    drawFog();
+    drawParticles();
+    drawPlayer();
+    drawPops();
+    ctx.restore();
+    drawVignette();
+    drawFlash();
+    drawHud();
+    drawBanner();
+  }
+
+  /* ---------- input ---------- */
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+      e.preventDefault();
+      switchLane(-1);
+    } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+      e.preventDefault();
+      switchLane(1);
+    }
+  });
+
+  let drag = null;
+  canvas.addEventListener('pointerdown', (e) => {
+    if (state.mode !== 'playing') return;
+    drag = { x: e.clientX, id: e.pointerId, swiped: false };
+  });
+
+  canvas.addEventListener('pointermove', (e) => {
+    if (!drag || drag.id !== e.pointerId) return;
+    const dx = e.clientX - drag.x;
+    if (!drag.swiped && Math.abs(dx) > 26) {
+      switchLane(dx > 0 ? 1 : -1);
+      drag.swiped = true;
+    }
+  });
+
+  canvas.addEventListener('pointerup', (e) => {
+    if (!drag || drag.id !== e.pointerId) return;
+    if (!drag.swiped && state.mode === 'playing') {
+      const rect = canvas.getBoundingClientRect();
+      switchLane(e.clientX < rect.left + rect.width / 2 ? -1 : 1);
+    }
+    drag = null;
+  });
+
+  canvas.addEventListener('pointercancel', () => {
+    drag = null;
+  });
+
+  window.addEventListener('blur', () => {
+    drag = null;
+  });
+
+  startBtn.addEventListener('click', startRun);
+  againBtn.addEventListener('click', startRun);
+
+  /* ---------- boot ---------- */
+  introPanel.hidden = false;
+  resultPanel.hidden = true;
+  overlay.hidden = false;
+  try {
+    startBtn.focus({ preventScroll: true });
+  } catch (err) {
+    startBtn.focus();
+  }
+
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min((now - last) / 1000, 0.05);
+    last = now;
+    update(dt);
+    render();
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
